@@ -67,7 +67,10 @@ const applicationId = 'io.github.jeffshee.HanabiRenderer';
 let extSettings = null;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
 let settingsSchemaSource = Gio.SettingsSchemaSource.get_default();
-if (settingsSchemaSource.lookup(extSchemaId, false))
+const settingsSchema = settingsSchemaSource
+    ? settingsSchemaSource.lookup(extSchemaId, false)
+    : null;
+if (settingsSchema)
     extSettings = Gio.Settings.new(extSchemaId);
 
 const forceGtk4PaintableSink = extSettings
@@ -92,11 +95,6 @@ const haveGraphicsOffload = isGtkVersionAtLeast(4, 14) && isEnableGraphicsOffloa
 
 let codePath = 'src';
 let contentFit = null;
-if (haveContentFit) {
-    contentFit = extSettings
-        ? extSettings.get_int('content-fit')
-        : Gtk.ContentFit.CONTAIN;
-}
 let mute = extSettings ? extSettings.get_boolean('mute') : false;
 let nohide = false;
 let videoPath = extSettings ? extSettings.get_string('video-path') : '';
@@ -110,6 +108,37 @@ let windowed = false;
 let fullscreened = true;
 let isDebugMode = extSettings ? extSettings.get_boolean('debug-mode') : true;
 let changeWallpaperTimerId = null;
+let argvContentFitOverride = false;
+
+const parseContentFit = value => {
+    if (!haveContentFit)
+        return null;
+
+    switch (String(value).toLowerCase()) {
+    case '0':
+    case 'fill':
+        return Gtk.ContentFit.FILL;
+    case '1':
+    case 'contain':
+        return Gtk.ContentFit.CONTAIN;
+    case '2':
+    case 'cover':
+        return Gtk.ContentFit.COVER;
+    case '3':
+    case 'scale-down':
+    case 'scaledown':
+    case 'scale_down':
+        return Gtk.ContentFit.SCALE_DOWN;
+    default:
+        return null;
+    }
+};
+
+if (haveContentFit) {
+    contentFit = extSettings
+        ? extSettings.get_int('content-fit')
+        : Gtk.ContentFit.CONTAIN;
+}
 
 
 const HanabiRenderer = GObject.registerClass(
@@ -188,6 +217,8 @@ const HanabiRenderer = GObject.registerClass(
                 case 'content-fit':
                     if (!haveContentFit)
                         return;
+                    if (argvContentFitOverride)
+                        return;
                     contentFit = settings.get_int(key);
                     this._pictures.forEach(picture =>
                         picture.set_content_fit(contentFit)
@@ -223,6 +254,9 @@ const HanabiRenderer = GObject.registerClass(
                     case '--codepath':
                     case '-F':
                     case '--filepath':
+                    case '-T':
+                    case '--fit-mode':
+                    case '--content-fit':
                     case '-V':
                     case '--volume':
                         lastCommand = arg;
@@ -257,6 +291,18 @@ const HanabiRenderer = GObject.registerClass(
                     videoPath = arg;
                     console.debug(`filepath = ${videoPath}`);
                     break;
+                case '-T':
+                case '--fit-mode':
+                case '--content-fit': {
+                    let parsedContentFit = parseContentFit(arg);
+                    if (parsedContentFit === null) {
+                        console.error(`Invalid content fit "${arg}". Use fill, contain, cover, scale-down or 0-3.`);
+                        return false;
+                    }
+                    contentFit = parsedContentFit;
+                    argvContentFitOverride = true;
+                    break;
+                }
                 case '-V':
                 case '--volume':
                     volume = Math.max(0.0, Math.min(1.0, parseFloat(arg)));
@@ -313,6 +359,8 @@ const HanabiRenderer = GObject.registerClass(
 
         _buildUI() {
             this._monitors.forEach((gdkMonitor, index) => {
+                let geometry = gdkMonitor.get_geometry();
+
                 let widget = this._getWidgetFromSharedPaintable();
 
                 // Avoid creating another instance if we couldn't get the shared paintable
@@ -346,7 +394,6 @@ const HanabiRenderer = GObject.registerClass(
                         widget = this._getGtkStockWidget();
                 }
 
-                let geometry = gdkMonitor.get_geometry();
                 let state = {
                     position: [geometry.x, geometry.y],
                     keepAtBottom: true,

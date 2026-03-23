@@ -122,6 +122,7 @@ export default class HanabiExtension extends Extension {
     launchRenderer() {
         // Launch preferences dialog for first-time user
         let videoPath = this.settings.get_string('video-path');
+        let contentFit = this.settings.get_int('content-fit');
         // TODO: check if the path is exist or not instead
         if (videoPath === '')
             this.openPreferences();
@@ -138,6 +139,7 @@ export default class HanabiExtension extends Extension {
         // TODO: recheck `-P` argument
         argv.push('-P', this.path);
         argv.push('-F', videoPath);
+        argv.push('--content-fit', `${contentFit}`);
 
         this.currentProcess = new Launcher.LaunchSubprocess();
         this.currentProcess.set_cwd(GLib.get_home_dir());

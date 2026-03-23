@@ -34,9 +34,17 @@ const rendererLogger = new Logger.Logger('renderer');
 // Get GNOME Shell major version
 const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0]);
 
+function isWaylandCompositor() {
+    // GNOME 50 removed Meta.is_wayland_compositor() with the X11 backend gone.
+    if (!Meta.is_wayland_compositor)
+        return true;
+
+    return Meta.is_wayland_compositor();
+}
+
 export class LaunchSubprocess {
     constructor(flags = Gio.SubprocessFlags.NONE) {
-        this._isX11 = !Meta.is_wayland_compositor();
+        this._isX11 = !isWaylandCompositor();
 
         this._flags =
             flags |

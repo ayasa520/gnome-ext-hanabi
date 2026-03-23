@@ -34,6 +34,14 @@ const logger = new Logger.Logger();
 // Get GNOME Shell major version
 const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0]);
 
+function isWaylandCompositor() {
+    // GNOME 50 removed Meta.is_wayland_compositor() with the X11 backend gone.
+    if (!Meta.is_wayland_compositor)
+        return true;
+
+    return Meta.is_wayland_compositor();
+}
+
 class ManagedWindow {
     constructor(window) {
         this._window = window;
@@ -148,7 +156,7 @@ class ManagedWindow {
 
 export class WindowManager {
     constructor() {
-        this._isX11 = !Meta.is_wayland_compositor();
+        this._isX11 = !isWaylandCompositor();
         this._windows = new Set();
         this._waylandClient = null;
     }
