@@ -53,6 +53,33 @@ function resolveRegularFile(projectDirPath, relativePath) {
     return filePath;
 }
 
+function resolvePreviewFile(projectDirPath, project) {
+    const candidates = [
+        'preview.gif',
+        project?.preview,
+        'preview.jpg',
+        'preview.jpeg',
+        'preview.png',
+        'preview.webp',
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const previewPath = resolveRegularFile(projectDirPath, candidate);
+        if (previewPath)
+            return previewPath;
+    }
+
+    return null;
+}
+
+function resolveProjectTitle(projectDirPath, project) {
+    const title = typeof project?.title === 'string' ? project.title.trim() : '';
+    if (title)
+        return title;
+
+    return GLib.path_get_basename(projectDirPath);
+}
+
 export function loadProject(projectDirPath) {
     if (!projectDirPath)
         return null;
@@ -77,12 +104,18 @@ export function loadProject(projectDirPath) {
     if (entry && !entryPath && type !== ProjectType.SCENE)
         return null;
 
-    let previewPath = resolveRegularFile(projectDirPath, project?.preview);
-    if (!previewPath)
-        previewPath = resolveRegularFile(projectDirPath, 'preview.jpg');
+    const previewPath = resolvePreviewFile(projectDirPath, project);
+    const tags = Array.isArray(project?.tags)
+        ? project.tags.filter(tag => typeof tag === 'string' && tag !== '')
+        : [];
 
     return {
         path: projectDirPath,
+        basename: GLib.path_get_basename(projectDirPath),
+        title: resolveProjectTitle(projectDirPath, project),
+        description: typeof project?.description === 'string' ? project.description : '',
+        tags,
+        workshopId: project?.workshopid ?? null,
         type,
         entryPath,
         previewPath,

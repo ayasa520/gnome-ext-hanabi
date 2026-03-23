@@ -20,6 +20,7 @@ sources = [
   'panelMenu.js',
   'playbackState.js',
   'prefs.js',
+  'project.js',
   'roundedCornersEffect.js',
   'wallpaper.js',
   'windowManager.js',

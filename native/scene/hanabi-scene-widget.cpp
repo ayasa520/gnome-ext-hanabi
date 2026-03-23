@@ -400,11 +400,20 @@ static void ensure_render_retry(HanabiSceneWidget *self) {
         self->render_retry_id = g_timeout_add(16, render_retry_cb, self);
 }
 
+static void reset_scene_state(HanabiSceneWidget *self) {
+    clear_render_retry(self);
+    self->scene.reset();
+    self->scene_ready = false;
+    self->render_ready = false;
+    self->current_texture = 0;
+    self->current_width = 0;
+    self->current_height = 0;
+}
+
 static void hanabi_scene_widget_dispose(GObject *object) {
     auto *self = HANABI_SCENE_WIDGET(object);
-    clear_render_retry(self);
+    reset_scene_state(self);
     self->textures.clear();
-    self->scene.reset();
     G_OBJECT_CLASS(hanabi_scene_widget_parent_class)->dispose(object);
 }
 
@@ -808,8 +817,7 @@ void hanabi_scene_widget_set_project_dir(HanabiSceneWidget *self, const char *pr
     g_free(self->project_dir);
     self->project_dir = g_strdup(project_dir);
     self->project = std::move(project);
-    self->scene_ready = false;
-    self->render_ready = false;
+    reset_scene_state(self);
     g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_PROJECT_DIR]);
     request_render(self);
     ensure_render_retry(self);
@@ -822,12 +830,12 @@ const char *hanabi_scene_widget_get_project_dir(HanabiSceneWidget *self) {
 
 void hanabi_scene_widget_set_muted(HanabiSceneWidget *self, gboolean muted) {
     g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
-    if (self->muted == muted)
-        return;
+    const gboolean changed = self->muted != muted;
     self->muted = muted;
     if (self->scene)
         self->scene->setPropertyBool(wallpaper::PROPERTY_MUTED, self->muted);
-    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_MUTED]);
+    if (changed)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_MUTED]);
 }
 
 gboolean hanabi_scene_widget_get_muted(HanabiSceneWidget *self) {
@@ -838,12 +846,12 @@ gboolean hanabi_scene_widget_get_muted(HanabiSceneWidget *self) {
 void hanabi_scene_widget_set_volume(HanabiSceneWidget *self, double volume) {
     g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
     volume = CLAMP(volume, 0.0, 1.0);
-    if (std::abs(self->volume - volume) < 0.0001)
-        return;
+    const bool changed = std::abs(self->volume - volume) >= 0.0001;
     self->volume = volume;
     if (self->scene)
         self->scene->setPropertyFloat(wallpaper::PROPERTY_VOLUME, static_cast<float>(self->volume));
-    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_VOLUME]);
+    if (changed)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_VOLUME]);
 }
 
 double hanabi_scene_widget_get_volume(HanabiSceneWidget *self) {

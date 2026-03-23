@@ -534,6 +534,8 @@ const HanabiRenderer = GObject.registerClass(
                 window.setWallpaperWidget(widget);
             });
 
+            this.setVolume(volume);
+            this.setMute(mute);
             this.setAutoWallpaper();
         }
 
@@ -543,13 +545,23 @@ const HanabiRenderer = GObject.registerClass(
                 changeWallpaperTimerId = null;
             }
 
-            if (this._play) {
-                try {
-                    this._play.pause();
-                } catch (_e) {
-                }
+            if (this._sceneWidgets?.length) {
+                this._sceneWidgets.forEach(widget => {
+                    try {
+                        // Explicitly stop scene audio before widget gets replaced/collected.
+                        widget.set_muted(true);
+                    } catch (_e) {
+                    }
+                    try {
+                        widget.pause();
+                    } catch (_e) {
+                    }
+                    try {
+                        widget.set_project_dir(null);
+                    } catch (_e) {
+                    }
+                });
             }
-
             if (this._media) {
                 try {
                     this._media.pause();
@@ -1099,6 +1111,10 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         setMute(_mute) {
+            mute = _mute;
+            if (extSettings && extSettings.get_boolean('mute') !== _mute)
+                extSettings.set_boolean('mute', _mute);
+
             if (!this._play && !this._media && !this._webView && !this._sceneWidgets?.length)
                 return;
 
