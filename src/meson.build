@@ -45,4 +45,9 @@ install_data('schemas/@0@.gschema.xml'.format(schema),
 
 subdir('po')
 
+meson.add_install_script(
+  meson.project_source_root() / 'build-aux' / 'install-scene-native.sh',
+  install_dir
+)
+
 meson.add_install_script(meson.project_source_root() / 'build-aux' / 'meson-postinstall.sh')

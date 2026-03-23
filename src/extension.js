@@ -26,6 +26,8 @@ import * as WindowManager from './windowManager.js';
 import * as PlaybackState from './playbackState.js';
 import * as AutoPause from './autoPause.js';
 import * as PanelMenu from './panelMenu.js';
+import * as DBus from './dbus.js';
+import {loadProject} from './project.js';
 
 export default class HanabiExtension extends Extension {
     constructor(metadata) {
@@ -33,6 +35,7 @@ export default class HanabiExtension extends Extension {
         this.isEnabled = false;
         this.launchRendererId = 0;
         this.currentProcess = null;
+        this.currentProjectType = null;
         this.reloadTime = 100;
 
         /**
@@ -45,6 +48,7 @@ export default class HanabiExtension extends Extension {
     enable() {
         this.settings = this.getSettings();
         this.playbackState = new PlaybackState.PlaybackState();
+        this.renderer = new DBus.RendererWrapper();
 
         /**
          * Panel Menu
@@ -59,7 +63,21 @@ export default class HanabiExtension extends Extension {
             else
                 this.panelMenu.disable();
         });
+        this.settings.connect('changed::project-path', () => {
+            if (!this.isEnabled)
+                return;
 
+            const projectPath = this.settings.get_string('project-path');
+            this.renderer.setProjectPath(projectPath);
+        });
+        this.settings.connect('changed::mute', () => {
+            if (this.isEnabled)
+                this.renderer.setMute(this.settings.get_boolean('mute'));
+        });
+        this.settings.connect('changed::volume', () => {
+            if (this.isEnabled)
+                this.renderer.setVolume(this.settings.get_int('volume') / 100.0);
+        });
         /**
          * Disable startup animation (Workaround for issue #65)
          */
@@ -120,40 +138,55 @@ export default class HanabiExtension extends Extension {
     }
 
     launchRenderer() {
+        if (!this.isEnabled)
+            return;
+
         // Launch preferences dialog for first-time user
-        let videoPath = this.settings.get_string('video-path');
+        let projectPath = this.settings.get_string('project-path');
         let contentFit = this.settings.get_int('content-fit');
-        // TODO: check if the path is exist or not instead
-        if (videoPath === '')
+        const project = loadProject(projectPath);
+        if (!project) {
             this.openPreferences();
+            return;
+        }
+        this.currentProjectType = project.type;
 
         this.reloadTime = 100;
-        const argv = [];
-        argv.push(
+        const argv = [
             GLib.build_filenamev([
                 this.path,
                 'renderer',
                 'renderer.js',
-            ])
-        );
-        // TODO: recheck `-P` argument
+            ]),
+        ];
         argv.push('-P', this.path);
-        argv.push('-F', videoPath);
+        argv.push('-F', projectPath);
         argv.push('--content-fit', `${contentFit}`);
 
         this.currentProcess = new Launcher.LaunchSubprocess();
         this.currentProcess.set_cwd(GLib.get_home_dir());
+        const nativeTypelibDir = GLib.build_filenamev([this.path, 'native', 'scene', 'girepository-1.0']);
+        const nativeLibDir = GLib.build_filenamev([this.path, 'native', 'scene', 'lib']);
+        this.currentProcess.setenv(
+            'GI_TYPELIB_PATH',
+            [nativeTypelibDir, GLib.getenv('GI_TYPELIB_PATH')].filter(Boolean).join(':')
+        );
+        this.currentProcess.setenv(
+            'LD_LIBRARY_PATH',
+            [nativeLibDir, GLib.getenv('LD_LIBRARY_PATH')].filter(Boolean).join(':')
+        );
         this.currentProcess.spawnv(argv);
         this.manager.set_wayland_client(this.currentProcess);
+        const process = this.currentProcess;
 
         /**
          * If the renderer dies, wait 100ms and relaunch it, unless the exit status is different than zero,
          * in which case it will wait one second. This is done this way to avoid relaunching the renderer
          * too fast if it has a bug that makes it fail continuously, avoiding filling the journal too fast.
          */
-        this.currentProcess.subprocess.wait_async(null, (obj, res) => {
+        process.subprocess.wait_async(null, (obj, res) => {
             obj.wait_finish(res);
-            if (!this.currentProcess || obj !== this.currentProcess.subprocess)
+            if (this.currentProcess !== process || obj !== process.subprocess)
                 return;
 
             if (obj.get_if_exited()) {
@@ -164,6 +197,7 @@ export default class HanabiExtension extends Extension {
                 this.reloadTime = 1000;
             }
             this.currentProcess = null;
+            this.currentProjectType = null;
             this.manager.set_wayland_client(null);
             if (this.isEnabled) {
                 if (this.launchRendererId)
@@ -184,6 +218,7 @@ export default class HanabiExtension extends Extension {
 
     disable() {
         this.settings = null;
+        this.renderer = null;
         this.panelMenu.disable();
         Main.sessionMode.hasOverview = this.old_hasOverview;
         this.override.disable();
@@ -195,24 +230,11 @@ export default class HanabiExtension extends Extension {
     }
 
     killCurrentProcess() {
-        // If a reload was pending, kill it and schedule a new reload.
         if (this.launchRendererId) {
             GLib.source_remove(this.launchRendererId);
             this.launchRendererId = 0;
-            if (this.isEnabled) {
-                this.launchRendererId = GLib.timeout_add(
-                    GLib.PRIORITY_DEFAULT,
-                    this.reloadTime,
-                    () => {
-                        this.launchRendererId = 0;
-                        this.launchRenderer();
-                        return false;
-                    }
-                );
-            }
         }
 
-        // Kill the renderer. It will be reloaded automatically.
         if (this.currentProcess && this.currentProcess.subprocess) {
             this.currentProcess.cancellable.cancel();
             this.currentProcess.subprocess.send_signal(15);

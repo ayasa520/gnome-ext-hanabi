@@ -56,13 +56,42 @@ try {
 }
 const haveGstAudio = GstAudio !== null;
 
+let WebKit = null;
+try {
+    for (const version of ['6.0', '4.1', '4.0']) {
+        try {
+            imports.gi.versions.WebKit = version;
+            WebKit = imports.gi.WebKit;
+            break;
+        } catch (e) {
+            WebKit = null;
+        }
+    }
+} catch (_e) {
+    WebKit = null;
+}
+const haveWebKit = WebKit !== null;
+if (!haveWebKit)
+    console.warn('WebKit, or the typelib is not installed. Web projects will fallback to a placeholder.');
+
+let HanabiScene = null;
+try {
+    HanabiScene = imports.gi.HanabiScene;
+} catch (_e) {
+    HanabiScene = null;
+}
+const haveSceneBackend = HanabiScene !== null;
+if (!haveSceneBackend)
+    console.warn('HanabiScene typelib is not installed. Scene projects will fallback to a placeholder.');
+
 // ContentFit is available from Gtk 4.8+
 const haveContentFit = isGtkVersionAtLeast(4, 8);
 
 // Use glsinkbin for Gst 1.24+
 const useGstGL = isGstVersionAtLeast(1, 24);
 
-const applicationId = 'io.github.jeffshee.HanabiRenderer';
+const rendererDbusName = 'io.github.jeffshee.HanabiRenderer';
+let applicationId = rendererDbusName;
 
 let extSettings = null;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
@@ -97,7 +126,8 @@ let codePath = 'src';
 let contentFit = null;
 let mute = extSettings ? extSettings.get_boolean('mute') : false;
 let nohide = false;
-let videoPath = extSettings ? extSettings.get_string('video-path') : '';
+let standalone = false;
+let projectPath = extSettings ? extSettings.get_string('project-path') : '';
 let volume = extSettings ? extSettings.get_int('volume') / 100.0 : 0.5;
 let changeWallpaper = extSettings ? extSettings.get_boolean('change-wallpaper') : true;
 let changeWallpaperDirectoryPath = extSettings ? extSettings.get_string('change-wallpaper-directory-path') : '';
@@ -109,6 +139,110 @@ let fullscreened = true;
 let isDebugMode = extSettings ? extSettings.get_boolean('debug-mode') : true;
 let changeWallpaperTimerId = null;
 let argvContentFitOverride = false;
+
+const hasArg = arg => ARGV.includes(arg);
+
+if (hasArg('-S') || hasArg('--standalone')) {
+    standalone = true;
+    applicationId = `${rendererDbusName}.Standalone`;
+}
+
+const ProjectType = {
+    VIDEO: 'video',
+    WEB: 'web',
+    SCENE: 'scene',
+};
+
+const readJsonFile = path => {
+    try {
+        const [ok, contents] = GLib.file_get_contents(path);
+        if (!ok)
+            return null;
+
+        return JSON.parse(new TextDecoder().decode(contents));
+    } catch (e) {
+        return null;
+    }
+};
+
+const resolveRegularFile = (projectDirPath, relativePath) => {
+    if (!relativePath)
+        return null;
+
+    const filePath = GLib.build_filenamev([projectDirPath, relativePath]);
+    const file = Gio.File.new_for_path(filePath);
+    if (file.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.REGULAR)
+        return null;
+
+    return filePath;
+};
+
+const loadProject = path => {
+    if (!path)
+        return null;
+
+    const projectDir = Gio.File.new_for_path(path);
+    if (projectDir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
+        return null;
+
+    const manifestPath = GLib.build_filenamev([path, 'project.json']);
+    const manifest = readJsonFile(manifestPath);
+    const type = `${manifest?.type ?? ''}`.toLowerCase();
+    if (![ProjectType.VIDEO, ProjectType.WEB, ProjectType.SCENE].includes(type))
+        return null;
+
+    let entry = typeof manifest?.file === 'string' && manifest.file !== ''
+        ? manifest.file
+        : null;
+    if (!entry && type === ProjectType.WEB)
+        entry = 'index.html';
+
+    let entryPath = resolveRegularFile(path, entry);
+    if (type === ProjectType.SCENE && !entryPath)
+        entryPath = resolveRegularFile(path, 'scene.pkg');
+    if (entry && !entryPath && type !== ProjectType.SCENE)
+        return null;
+
+    let previewPath = resolveRegularFile(path, manifest?.preview);
+    if (!previewPath)
+        previewPath = resolveRegularFile(path, 'preview.jpg');
+
+    return {
+        type,
+        path,
+        entryPath,
+        previewPath,
+    };
+};
+
+const listProjects = parentDirPath => {
+    const projects = [];
+    if (!parentDirPath)
+        return projects;
+
+    const dir = Gio.File.new_for_path(parentDirPath);
+    if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
+        return projects;
+
+    const enumerator = dir.enumerate_children(
+        'standard::*',
+        Gio.FileQueryInfoFlags.NONE,
+        null
+    );
+
+    let info;
+    while ((info = enumerator.next_file(null))) {
+        if (info.get_file_type() !== Gio.FileType.DIRECTORY)
+            continue;
+
+        const child = dir.get_child(info.get_name());
+        const project = loadProject(child.get_path());
+        if (project)
+            projects.push(project);
+    }
+
+    return projects.sort((a, b) => a.path.localeCompare(b.path));
+};
 
 const parseContentFit = value => {
     if (!haveContentFit)
@@ -158,8 +292,16 @@ const HanabiRenderer = GObject.registerClass(
             this._pictures = [];
             this._sharedPaintable = null;
             this._gstImplName = '';
+            this._project = null;
+            this._play = null;
+            this._media = null;
+            this._webView = null;
+            this._webPausePicture = null;
+            this._sceneWidgets = [];
             this._isPlaying = false;
-            this._exportDbus();
+            this._dbus = null;
+            if (!standalone)
+                this._exportDbus();
             this._setupGst();
 
             this.connect('activate', app => {
@@ -171,6 +313,10 @@ const HanabiRenderer = GObject.registerClass(
                     this._buildUI();
                     this._hanabiWindows.forEach(window => {
                         window.present();
+                    });
+                    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                        this.setPlay();
+                        return GLib.SOURCE_REMOVE;
                     });
                 }
             });
@@ -187,9 +333,9 @@ const HanabiRenderer = GObject.registerClass(
 
             extSettings?.connect('changed', (settings, key) => {
                 switch (key) {
-                case 'video-path':
-                    videoPath = settings.get_string(key);
-                    this.setFilePath(videoPath);
+                case 'project-path':
+                    projectPath = settings.get_string(key);
+                    this._switchProject();
                     break;
                 case 'mute':
                     mute = settings.get_boolean(key);
@@ -240,20 +386,23 @@ const HanabiRenderer = GObject.registerClass(
                     case '-M':
                     case '--mute':
                         mute = true;
-                        console.debug(`mute = ${mute}`);
                         break;
                     case '-N':
                     case '--nohide':
                         // Launch renderer in standalone mode without hiding
                         nohide = true;
-                        console.debug(`nohide = ${nohide}`);
+                        break;
+                    case '-S':
+                    case '--standalone':
+                        standalone = true;
+                        applicationId = `${rendererDbusName}.Standalone`;
                         break;
                     case '-W':
                     case '--windowed':
                     case '-P':
                     case '--codepath':
                     case '-F':
-                    case '--filepath':
+                    case '--project-path':
                     case '-T':
                     case '--fit-mode':
                     case '--content-fit':
@@ -276,20 +425,15 @@ const HanabiRenderer = GObject.registerClass(
                         width: parseInt(data[0]),
                         height: parseInt(data[1]),
                     };
-                    console.debug(
-                        `windowed = ${windowed}, windowConfig = ${windowDimension}`
-                    );
                     break;
                 }
                 case '-P':
                 case '--codepath':
                     codePath = arg;
-                    console.debug(`codepath = ${codePath}`);
                     break;
                 case '-F':
-                case '--filepath':
-                    videoPath = arg;
-                    console.debug(`filepath = ${videoPath}`);
+                case '--project-path':
+                    projectPath = arg;
                     break;
                 case '-T':
                 case '--fit-mode':
@@ -306,7 +450,6 @@ const HanabiRenderer = GObject.registerClass(
                 case '-V':
                 case '--volume':
                     volume = Math.max(0.0, Math.min(1.0, parseFloat(arg)));
-                    console.debug(`volume = ${volume}`);
                     break;
                 }
                 lastCommand = null;
@@ -353,49 +496,17 @@ const HanabiRenderer = GObject.registerClass(
                     continue;
 
                 feature.set_rank(rank);
-                console.debug(`changed rank: ${oldRank} -> ${rank} for ${featureName}`);
             }
         }
 
         _buildUI() {
+            this._project = loadProject(projectPath);
+
             this._monitors.forEach((gdkMonitor, index) => {
-                let geometry = gdkMonitor.get_geometry();
-
-                let widget = this._getWidgetFromSharedPaintable();
-
-                // Avoid creating another instance if we couldn't get the shared paintable
-                if (index > 0 && !widget)
-                    return;
-
-                if (!widget) {
-                    if (!forceMediaFile && haveGstPlay) {
-                        let sink = null;
-                        if (!forceGtk4PaintableSink) {
-                            // Try to find "clappersink" for best performance
-                            sink = Gst.ElementFactory.make(
-                                'clappersink',
-                                'clappersink'
-                            );
-                        }
-
-                        // Try "gtk4paintablesink" from gstreamer-rs plugins as 2nd best choice
-                        if (!sink) {
-                            sink = Gst.ElementFactory.make(
-                                'gtk4paintablesink',
-                                'gtk4paintablesink'
-                            );
-                        }
-
-                        if (sink)
-                            widget = this._getWidgetFromSink(sink);
-                    }
-
-                    if (!widget)
-                        widget = this._getGtkStockWidget();
-                }
+                let widget = this._getWidgetForMonitor(index);
 
                 let state = {
-                    position: [geometry.x, geometry.y],
+                    position: [gdkMonitor.get_geometry().x, gdkMonitor.get_geometry().y],
                     keepAtBottom: true,
                     keepMinimized: true,
                     keepPosition: true,
@@ -411,7 +522,343 @@ const HanabiRenderer = GObject.registerClass(
 
                 this._hanabiWindows.push(window);
             });
-            console.log(`using ${this._gstImplName} for video output`);
+            console.log(`using ${this._gstImplName}`);
+        }
+
+        _switchProject() {
+            this._project = loadProject(projectPath);
+            this._resetBackend();
+
+            this._hanabiWindows.forEach((window, index) => {
+                const widget = this._getWidgetForMonitor(index);
+                window.setWallpaperWidget(widget);
+            });
+
+            this.setAutoWallpaper();
+        }
+
+        _resetBackend() {
+            if (changeWallpaperTimerId) {
+                GLib.source_remove(changeWallpaperTimerId);
+                changeWallpaperTimerId = null;
+            }
+
+            if (this._play) {
+                try {
+                    this._play.pause();
+                } catch (_e) {
+                }
+            }
+
+            if (this._media) {
+                try {
+                    this._media.pause();
+                    this._media.stream_unprepared();
+                } catch (_e) {
+                }
+            }
+
+            this._pictures = [];
+            this._sharedPaintable = null;
+            this._play = null;
+            this._media = null;
+            this._webView = null;
+            this._webPausePicture = null;
+            this._scenePicture = null;
+            this._sceneWidgets = [];
+            this._adapter = null;
+            this._gstImplName = '';
+            this._setPlayingState(false);
+        }
+
+        _getWidgetForMonitor(index) {
+            if (!this._project)
+                return this._getPlaceholderWidget('Invalid wallpaper project');
+
+            switch (this._project.type) {
+            case ProjectType.WEB:
+                return this._getWebWidget();
+            case ProjectType.SCENE:
+                return this._getSceneWidget();
+            case ProjectType.VIDEO:
+            default:
+                return this._getVideoWidget(index);
+            }
+        }
+
+        _getVideoWidget(index) {
+            let widget = this._getWidgetFromSharedPaintable();
+
+            if (index > 0 && !widget)
+                return this._getPlaceholderWidget('Video renderer could not be shared across monitors');
+
+            if (!widget) {
+                if (!forceMediaFile && haveGstPlay) {
+                    let sink = null;
+                    if (!forceGtk4PaintableSink)
+                        sink = Gst.ElementFactory.make('clappersink', 'clappersink');
+
+                    if (!sink)
+                        sink = Gst.ElementFactory.make('gtk4paintablesink', 'gtk4paintablesink');
+
+                    if (sink)
+                        widget = this._getWidgetFromSink(sink);
+                }
+
+                if (!widget)
+                    widget = this._getGtkStockWidget();
+            }
+
+            return widget;
+        }
+
+        _getPlaceholderWidget(message) {
+            this._gstImplName = this._gstImplName || 'Placeholder';
+
+            const box = new Gtk.Box({
+                hexpand: true,
+                vexpand: true,
+                halign: Gtk.Align.FILL,
+                valign: Gtk.Align.FILL,
+            });
+            box.add_css_class('background');
+
+            const label = new Gtk.Label({
+                label: message,
+                wrap: true,
+                justify: Gtk.Justification.CENTER,
+                halign: Gtk.Align.CENTER,
+                valign: Gtk.Align.CENTER,
+            });
+            box.append(label);
+
+            return box;
+        }
+
+        _getSceneWidget() {
+            this._gstImplName = 'HanabiScene';
+
+            if (!this._project.entryPath)
+                return this._getPlaceholderWidget('Scene package not found');
+
+            if (haveSceneBackend) {
+                const sceneWidget = new HanabiScene.Widget({
+                    'project-dir': this._project.path,
+                    muted: mute,
+                    volume,
+                    'fill-mode': this._getSceneFillMode(),
+                    playing: true,
+                    hexpand: true,
+                    vexpand: true,
+                    halign: Gtk.Align.FILL,
+                    valign: Gtk.Align.FILL,
+                });
+                this._sceneWidgets.push(sceneWidget);
+                this._setPlayingState(true);
+                this.setAutoWallpaper();
+                return sceneWidget;
+            }
+
+            if (!this._project.previewPath)
+                return this._getPlaceholderWidget('Scene preview is not available');
+
+            const picture = Gtk.Picture.new_for_file(
+                Gio.File.new_for_path(this._project.previewPath)
+            );
+            picture.set({
+                hexpand: true,
+                vexpand: true,
+                can_shrink: true,
+                halign: Gtk.Align.FILL,
+                valign: Gtk.Align.FILL,
+            });
+            if (haveContentFit)
+                picture.set_content_fit(contentFit);
+
+            this._scenePicture = picture;
+            this._setPlayingState(true);
+            this.setAutoWallpaper();
+
+            return picture;
+        }
+
+        _getSceneFillMode() {
+            if (!haveContentFit)
+                return 2;
+
+            switch (contentFit) {
+            case Gtk.ContentFit.FILL:
+                return 0;
+            case Gtk.ContentFit.CONTAIN:
+            case Gtk.ContentFit.SCALE_DOWN:
+                return 1;
+            case Gtk.ContentFit.COVER:
+            default:
+                return 2;
+            }
+        }
+
+        _getWebWidget() {
+            this._gstImplName = 'WebKitWebView';
+
+            if (!haveWebKit)
+                return this._getPlaceholderWidget('WebKitGTK is not available');
+
+            const userContentManager = new WebKit.UserContentManager();
+            userContentManager.add_script(
+                new WebKit.UserScript(
+                    `
+                    (() => {
+                        if (window.__hanabiPlaybackBridgeInstalled)
+                            return;
+                        window.__hanabiPlaybackBridgeInstalled = true;
+
+                        window.__hanabiAudioContexts = window.__hanabiAudioContexts || [];
+                        const wrapAudioContext = key => {
+                            const Original = window[key];
+                            if (typeof Original !== 'function')
+                                return;
+
+                            const Wrapped = class extends Original {
+                                constructor(...args) {
+                                    super(...args);
+                                    window.__hanabiAudioContexts.push(this);
+                                }
+                            };
+                            Object.setPrototypeOf(Wrapped, Original);
+                            window[key] = Wrapped;
+                        };
+
+                        wrapAudioContext('AudioContext');
+                        wrapAudioContext('webkitAudioContext');
+                    })();
+                    `,
+                    WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                    WebKit.UserScriptInjectionTime.START,
+                    null,
+                    null
+                )
+            );
+
+            const webView = new WebKit.WebView({
+                user_content_manager: userContentManager,
+                hexpand: true,
+                vexpand: true,
+            });
+            const pausePicture = new Gtk.Picture({
+                hexpand: true,
+                vexpand: true,
+                visible: false,
+                can_shrink: true,
+            });
+            if (haveContentFit)
+                pausePicture.set_content_fit(contentFit);
+
+            const overlay = new Gtk.Overlay({
+                hexpand: true,
+                vexpand: true,
+            });
+            overlay.set_child(webView);
+            overlay.add_overlay(pausePicture);
+            webView.set_can_focus(false);
+
+            const settings = webView.get_settings();
+            if (settings.set_enable_webaudio)
+                settings.set_enable_webaudio(true);
+            if (settings.set_enable_webgl)
+                settings.set_enable_webgl(true);
+            if (settings.set_allow_file_access_from_file_urls)
+                settings.set_allow_file_access_from_file_urls(true);
+
+            webView.connect('load-changed', (_view, loadEvent) => {
+                if (loadEvent !== WebKit.LoadEvent.FINISHED)
+                    return;
+
+                if (this._isPlaying)
+                    this._setWebPlayback(true);
+            });
+
+            const file = Gio.File.new_for_path(this._project.entryPath);
+            webView.load_uri(file.get_uri());
+            this._webView = webView;
+            this._webPausePicture = pausePicture;
+
+            this._setPlayingState(true);
+            this.setAutoWallpaper();
+
+            return overlay;
+        }
+
+        _setWebPlayback(isPlaying) {
+            if (!this._webView)
+                return;
+
+            const script = `
+                (() => {
+                    const playing = ${isPlaying ? 'true' : 'false'};
+                    const mediaElements = document.querySelectorAll('audio, video');
+                    for (const media of mediaElements) {
+                        if (playing)
+                            media.play?.().catch?.(() => {});
+                        else
+                            media.pause?.();
+                    }
+
+                    const contexts = window.__hanabiAudioContexts || [];
+                    for (const context of contexts) {
+                        if (playing)
+                            context.resume?.().catch?.(() => {});
+                        else
+                            context.suspend?.().catch?.(() => {});
+                    }
+
+                    window.dispatchEvent(new CustomEvent('hanabi-playback-change', {
+                        detail: {playing},
+                    }));
+                })();
+            `;
+
+            this._webView.evaluate_javascript(
+                script,
+                -1,
+                null,
+                null,
+                null,
+                () => {}
+            );
+
+            if (isPlaying) {
+                this._webView.visible = true;
+                if (this._webPausePicture)
+                    this._webPausePicture.visible = false;
+            } else {
+                this._freezeWebView();
+            }
+            this._setPlayingState(isPlaying);
+        }
+
+        _freezeWebView() {
+            if (!this._webView || !this._webPausePicture)
+                return;
+
+            this._webView.get_snapshot(
+                WebKit.SnapshotRegion.VISIBLE,
+                WebKit.SnapshotOptions.NONE,
+                null,
+                (webView, result) => {
+                    try {
+                        const snapshot = webView.get_snapshot_finish(result);
+                        if (!snapshot)
+                            return;
+
+                        this._webPausePicture.paintable = snapshot;
+                        this._webPausePicture.visible = true;
+                        this._webView.visible = false;
+                    } catch (e) {
+                        console.warn(e);
+                    }
+                }
+            );
         }
 
         _getWidgetFromSharedPaintable() {
@@ -514,11 +961,11 @@ const HanabiRenderer = GObject.registerClass(
                 (adapter, state) => {
                     // Monitor playing state.
                     this._isPlaying = state === GstPlay.PlayState.PLAYING;
-                    this._dbus.emit_signal('isPlayingChanged', new GLib.Variant('(b)', [this._isPlaying]));
+                    this._emitPlayingChanged();
                 }
             );
 
-            let file = Gio.File.new_for_path(videoPath);
+            let file = Gio.File.new_for_path(this._project.entryPath);
             this._play.set_uri(file.get_uri());
 
             this.setPlay();
@@ -532,7 +979,7 @@ const HanabiRenderer = GObject.registerClass(
 
             // The constructor of MediaFile doesn't work in gjs.
             // Have to call the `new_for_xxx` function here.
-            this._media = Gtk.MediaFile.new_for_filename(videoPath);
+            this._media = Gtk.MediaFile.new_for_filename(this._project.entryPath);
             this._media.set({
                 loop: true,
             });
@@ -544,7 +991,7 @@ const HanabiRenderer = GObject.registerClass(
             // Monitor playing state.
             this._media.connect('notify::playing', media => {
                 this._isPlaying = media.get_playing();
-                this._dbus.emit_signal('isPlayingChanged', new GLib.Variant('(b)', [this._isPlaying]));
+                this._emitPlayingChanged();
             });
 
             this._sharedPaintable = this._media;
@@ -562,6 +1009,15 @@ const HanabiRenderer = GObject.registerClass(
                 <interface name="io.github.jeffshee.HanabiRenderer">
                     <method name="setPlay"/>
                     <method name="setPause"/>
+                    <method name="setMute">
+                        <arg name="mute" type="b" direction="in"/>
+                    </method>
+                    <method name="setVolume">
+                        <arg name="volume" type="d" direction="in"/>
+                    </method>
+                    <method name="setProjectPath">
+                        <arg name="projectPath" type="s" direction="in"/>
+                    </method>
                     <property name="isPlaying" type="b" access="read"/>
                     <signal name="isPlayingChanged">
                         <arg name="isPlaying" type="b"/>
@@ -569,9 +1025,21 @@ const HanabiRenderer = GObject.registerClass(
                 </interface>
             </node>`;
 
+            const dbusImpl = {
+                setPlay: () => this.setPlay(),
+                setPause: () => this.setPause(),
+                setMute: _mute => this.setMute(_mute),
+                setVolume: _volume => this.setVolume(_volume),
+                setProjectPath: _projectPath => this.setProjectPath(_projectPath),
+                get isPlaying() {
+                    return this._renderer.isPlaying;
+                },
+                _renderer: this,
+            };
+
             this._dbus = Gio.DBusExportedObject.wrapJSObject(
                 dbusXml,
-                this
+                dbusImpl
             );
             this._dbus.export(
                 Gio.DBus.session,
@@ -580,7 +1048,20 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _unexportDbus() {
-            this._dbus.unexport();
+            this._dbus?.unexport();
+        }
+
+        _emitPlayingChanged() {
+            if (!this._dbus)
+                return;
+            this._dbus.emit_signal('isPlayingChanged', new GLib.Variant('(b)', [this._isPlaying]));
+        }
+
+        setProjectPath(_projectPath) {
+            projectPath = _projectPath;
+            if (extSettings && extSettings.get_string('project-path') !== _projectPath)
+                extSettings.set_string('project-path', _projectPath);
+            this._switchProject();
         }
 
 
@@ -593,6 +1074,11 @@ const HanabiRenderer = GObject.registerClass(
          */
         setVolume(_volume) {
             let player = this._play != null ? this._play : this._media;
+            if (!player) {
+                if (this._sceneWidgets?.length)
+                    this._sceneWidgets.forEach(widget => widget.set_volume(_volume));
+                return;
+            }
 
             // GstPlay uses linear volume
             if (this._play) {
@@ -613,6 +1099,9 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         setMute(_mute) {
+            if (!this._play && !this._media && !this._webView && !this._sceneWidgets?.length)
+                return;
+
             if (this._play) {
                 if (this._play.mute === _mute)
                     this._play.mute = !_mute;
@@ -621,98 +1110,95 @@ const HanabiRenderer = GObject.registerClass(
                 if (this._media.muted === _mute)
                     this._media.muted = !_mute;
                 this._media.muted = _mute;
+            } else if (this._webView) {
+                if (this._webView.is_muted === _mute)
+                    this._webView.is_muted = !_mute;
+                this._webView.is_muted = _mute;
+            } else if (this._sceneWidgets?.length) {
+                this._sceneWidgets.forEach(widget => widget.set_muted(_mute));
             }
         }
 
-        setFilePath(_videoPath) {
-            let file = Gio.File.new_for_path(_videoPath);
-            if (this._play) {
-                this._play.set_uri(file.get_uri());
-            } else if (this._media) {
-                // Reset the stream when switching the file,
-                // otherwise `play()` is not playing for some reason.
-                this._media.stream_unprepared();
-                this._media.file = file;
-            }
-            this.setPlay();
+        _setPlayingState(isPlaying) {
+            this._isPlaying = isPlaying;
+            this._emitPlayingChanged();
         }
 
         setPlay() {
-            if (this._play)
+            if (this._play) {
                 this._play.play();
-            else if (this._media)
+            } else if (this._media) {
                 this._media.play();
+            } else if (this._webView) {
+                this._setWebPlayback(true);
+            } else if (this._sceneWidgets?.length) {
+                this._sceneWidgets.forEach(widget => widget.play());
+                this._setPlayingState(true);
+            } else if (this._project?.type === ProjectType.SCENE) {
+                this._setPlayingState(true);
+            } else {
+                this._setPlayingState(true);
+            }
         }
 
         setPause() {
-            if (this._play)
+            if (this._play) {
                 this._play.pause();
-            else if (this._media)
+            } else if (this._media) {
                 this._media.pause();
+            } else if (this._webView) {
+                this._setWebPlayback(false);
+            } else if (this._sceneWidgets?.length) {
+                this._sceneWidgets.forEach(widget => widget.pause());
+                this._setPlayingState(false);
+            } else if (this._project?.type === ProjectType.SCENE) {
+                this._setPlayingState(false);
+            } else {
+                this._setPlayingState(false);
+            }
         }
 
         setAutoWallpaper() {
-            // Index to keep track of the current video
             let currentIndex = 0;
-            let videoPaths = [];
-            let dir = Gio.File.new_for_path(changeWallpaperDirectoryPath);
-            // Check if dir exists and is a directory
-            if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
+            let projects = listProjects(changeWallpaperDirectoryPath);
+            if (projects.length === 0)
                 return;
 
-            let enumerator = dir.enumerate_children(
-                'standard::*',
-                Gio.FileQueryInfoFlags.NONE,
-                null
-            );
-
-            // Get files to push into array
-            let fileInfo;
-            while ((fileInfo = enumerator.next_file(null))) {
-                if (fileInfo.get_content_type().startsWith('video/')) {
-                    let file = dir.get_child(fileInfo.get_name());
-                    videoPaths.push(file.get_path());
-                }
-            }
-            if (videoPaths.length === 0)
-                return;
-            videoPaths = videoPaths.sort();
-
-            let getRandomIndex = (actualIndex, videosLength) => {
-                if (videosLength <= 1)
+            let getRandomIndex = (actualIndex, projectsLength) => {
+                if (projectsLength <= 1)
                     return actualIndex;
 
                 let newIndex;
                 do
-                    newIndex = Math.floor(Math.random() * videosLength);
+                    newIndex = Math.floor(Math.random() * projectsLength);
                 while (newIndex === actualIndex);
                 return newIndex;
             };
 
+            const activeProjectIndex = projects.findIndex(project => project.path === projectPath);
+            if (activeProjectIndex !== -1)
+                currentIndex = activeProjectIndex;
+
             let operation = () => {
-                console.debug(`setAutoWallpaper operation, interval: ${changeWallpaperInterval} min`);
-                // Avoid changing the wallpaper if it's paused to avoid unexpected playback resume.
                 if (this._isPlaying) {
-                    extSettings.set_string('video-path', videoPaths[currentIndex]);
+                    extSettings.set_string('project-path', projects[currentIndex].path);
 
                     if (changeWallpaperMode === 0)
-                        currentIndex = (currentIndex + 1) % videoPaths.length;
+                        currentIndex = (currentIndex + 1) % projects.length;
                     else if (changeWallpaperMode === 1)
-                        currentIndex = (currentIndex - 1 + videoPaths.length) % videoPaths.length;
+                        currentIndex = (currentIndex - 1 + projects.length) % projects.length;
                     else if (changeWallpaperMode === 2)
-                        currentIndex = getRandomIndex(currentIndex, videoPaths.length);
+                        currentIndex = getRandomIndex(currentIndex, projects.length);
                 }
 
-                // return true to be called again.
                 return true;
             };
 
-            // Remove the current timer
             if (changeWallpaperTimerId) {
                 GLib.source_remove(changeWallpaperTimerId);
                 changeWallpaperTimerId = null;
             }
-            // Reset the timer accordingly
+
             if (changeWallpaper) {
                 operation();
                 changeWallpaperTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, changeWallpaperInterval * 60, operation);
@@ -738,6 +1224,7 @@ const HanabiRendererWindow = GObject.registerClass(
                 default_width: windowDimension.width,
                 title,
             });
+            this._gdkMonitor = gdkMonitor;
 
             // Load CSS with custom style
             let cssProvider = new Gtk.CssProvider();
@@ -753,16 +1240,20 @@ const HanabiRendererWindow = GObject.registerClass(
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             );
 
-            this.set_child(widget);
+            this.setWallpaperWidget(widget);
             if (!windowed) {
                 if (fullscreened) {
-                    this.fullscreen_on_monitor(gdkMonitor);
+                    this.fullscreen_on_monitor(this._gdkMonitor);
                 } else {
-                    let geometry = gdkMonitor.get_geometry();
+                    let geometry = this._gdkMonitor.get_geometry();
                     let [width, height] = [geometry.width, geometry.height];
                     this.set_size_request(width, height);
                 }
             }
+        }
+
+        setWallpaperWidget(widget) {
+            this.set_child(widget);
         }
     }
 );

@@ -111,7 +111,12 @@ export class PlaybackState {
                     onExit() {},
                 },
                 transitions: {
-                    // userPlay: {},
+                    userPlay: {
+                        target: 'playing',
+                        action: () => {
+                            this._logger.debug('pausedByAuto -> playing');
+                        },
+                    },
                     autoPlay: {
                         target: 'playing',
                         action: () => {
@@ -134,9 +139,9 @@ export class PlaybackState {
                 },
                 transitions: {
                     userPlay: {
-                        target: 'pausedByAuto',
+                        target: 'playing',
                         action: () => {
-                            this._logger.debug('paused -> pausedByAuto');
+                            this._logger.debug('paused -> playing');
                         },
                     },
                     autoPlay: {

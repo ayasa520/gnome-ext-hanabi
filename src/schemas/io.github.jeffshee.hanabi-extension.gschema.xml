@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
     <schema id="io.github.jeffshee.hanabi-extension" path="/io/github/jeffshee/hanabi-extension/">
-        <key name="video-path" type="s">
+        <key name="project-path" type="s">
             <default>''</default>
-            <summary>Video Path</summary>
-            <description>Path to the video file</description>
+            <summary>Project Path</summary>
+            <description>Path to the wallpaper project directory</description>
         </key>
 
         <key name="mute" type="b">
@@ -27,8 +27,8 @@
 
         <key name="change-wallpaper-directory-path" type="s">
             <default>''</default>
-            <summary>Change Wallpaper Directory Path</summary>
-            <description>Change Wallpaper Directory Path</description>
+            <summary>Wallpaper Projects Directory</summary>
+            <description>Path to a directory containing wallpaper projects</description>
         </key>
 
         <key name="change-wallpaper-interval" type="i">

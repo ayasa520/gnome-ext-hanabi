@@ -57,7 +57,25 @@ See also the section [Troubleshooting](#troubleshooting), for version-specific k
 
 3. Restart GNOME Shell
 4. Enable the Hanabi extension
-5. Choose your video wallpaper in the extension preference window
+5. Choose a wallpaper project directory in the extension preference window
+
+### Wallpaper Project Types
+
+Hanabi now selects a project directory containing `project.json`, instead of selecting a single media file directly.
+
+Currently supported project types:
+
+- `video`: video wallpaper projects
+- `web`: web wallpaper projects rendered with WebKitGTK
+- `scene`: scene wallpaper projects rendered through Hanabi's native scene bridge
+
+### Repository Layout
+
+- [src](./src): GNOME Shell extension code
+- [native/scene](./native/scene): Hanabi's native scene bridge
+- [third_party/wallpaper-scene-renderer](./third_party/wallpaper-scene-renderer): upstream scene renderer source used by the native bridge
+
+Only the compiled native artifacts are installed into the extension directory at runtime. The third-party renderer sources are kept in this repository for development and build purposes.
 
 ### Distro-specific Guides
 
@@ -67,20 +85,23 @@ See also the section [Troubleshooting](#troubleshooting), for version-specific k
 
 ### Troubleshooting
 
-1. The video doesn't play / The extension is enabled but nothing happens  
+1. Video wallpapers do not play / The extension is enabled but nothing happens
    The GTK4 media backend is not pre-installed on some distributions (such as PopOS).
 
     To install the backend:  
      `sudo apt install libgtk-4-media-gstreamer`
 
 2. High CPU usage during video playback (proprietary NVIDIA)  
-   Your hardware acceleration may not work properly, see this [issue](https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/-/issues/1478).
+   Hardware acceleration may not work properly, see this [issue](https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/-/issues/1478).
 
     To delete the GStreamer cache:  
      `rm -rf ~/.cache/gstreamer-1.0/`  
      After that, check if `gst-inspect-1.0 nvcodec` reports all its features.
 
-3. The GNOME Shell keeps crashing after enabling Hanabi, help!  
+3. Scene wallpapers do not work after building from source
+   The native scene bridge and its typelib are built and installed during `meson install`. If you move files around manually without reinstalling, the extension will not be able to load the scene backend.
+
+4. The GNOME Shell keeps crashing after enabling Hanabi, help!
    You can try to disable the extension from tty ( <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F3</kbd> ):
     ```
     gnome-extensions disable hanabi-extension@jeffshee.github.io

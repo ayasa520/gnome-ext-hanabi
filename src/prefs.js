@@ -22,6 +22,7 @@ import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import {loadProject} from './project.js';
 
 const haveContentFit = Gtk.get_minor_version() >= 8;
 
@@ -38,7 +39,7 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
             title: _('General'),
         });
         page.add(generalGroup);
-        prefsRowVideoPath(window, generalGroup);
+        prefsRowProjectPath(window, generalGroup);
         prefsRowFitMode(window, generalGroup);
         prefsRowBoolean(window, generalGroup, _('Mute Audio'), 'mute', '');
         prefsRowInt(window, generalGroup, _('Volume Level'), 'volume', '', 0, 100, 1, 10);
@@ -216,40 +217,52 @@ function prefsRowInt(
  * @param {Adw.PreferencesWindow} window AdwPreferencesWindow
  * @param {Adw.PreferencesGroup} prefsGroup AdwPreferencesGroup
  */
-function prefsRowVideoPath(window, prefsGroup) {
+function formatProjectSubtitle(path) {
+    if (!path)
+        return _('None');
+
+    const project = loadProject(path);
+    if (!project)
+        return path;
+
+    return `${project.path} (${project.type})`;
+}
+
+function prefsRowProjectPath(window, prefsGroup) {
     const settings = window._settings;
-    const title = _('Video Path');
-    const key = 'video-path';
+    const title = _('Project Path');
+    const key = 'project-path';
 
     let path = settings.get_string(key);
     const row = new Adw.ActionRow({
         title,
-        subtitle: `${path !== '' ? path : _('None')}`,
+        subtitle: formatProjectSubtitle(path),
     });
     prefsGroup.add(row);
 
     /**
-     * Video file chooser
+     * Wallpaper project chooser
      */
     function createDialog() {
-        let fileFilter = new Gtk.FileFilter();
-        fileFilter.add_mime_type('video/*');
-
         let fileChooser = new Gtk.FileChooserDialog({
-            title: _('Open File'),
-            action: Gtk.FileChooserAction.OPEN,
+            title: _('Select Project'),
+            action: Gtk.FileChooserAction.SELECT_FOLDER,
         });
         fileChooser.set_modal(true);
         fileChooser.set_transient_for(window);
         fileChooser.add_button(_('Cancel'), Gtk.ResponseType.CANCEL);
         fileChooser.add_button(_('Open'), Gtk.ResponseType.ACCEPT);
-        fileChooser.add_filter(fileFilter);
 
         fileChooser.connect('response', (dialog, responseId) => {
             if (responseId === Gtk.ResponseType.ACCEPT) {
                 let _path = dialog.get_file().get_path();
-                settings.set_string(key, _path);
-                row.subtitle = `${_path !== '' ? _path : _('None')}`;
+                let project = loadProject(_path);
+                if (project) {
+                    settings.set_string(key, _path);
+                    row.subtitle = formatProjectSubtitle(_path);
+                } else {
+                    row.subtitle = _('Selected directory does not contain a valid project.json');
+                }
             }
             dialog.destroy();
         });
@@ -277,7 +290,7 @@ function prefsRowVideoPath(window, prefsGroup) {
  */
 function prefsRowDirectoryPath(window, prefsGroup) {
     const settings = window._settings;
-    const title = _('Change Wallpaper Directory Path');
+    const title = _('Wallpaper Projects Directory');
     const key = 'change-wallpaper-directory-path';
 
     let path = settings.get_string(key);
@@ -292,7 +305,7 @@ function prefsRowDirectoryPath(window, prefsGroup) {
      */
     function createDialog() {
         let fileChooser = new Gtk.FileChooserDialog({
-            title: _('Select Directory'),
+            title: _('Select Projects Directory'),
             action: Gtk.FileChooserAction.SELECT_FOLDER,
         });
         fileChooser.set_modal(true);

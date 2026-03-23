@@ -7,13 +7,13 @@ This guide provides an overview of how to use scripts to interact with the Hanab
 
 You can modify all Hanabi extension settings through the `gsettings` command.
 
-For example, to change the video path, use the following command:
+For example, to change the wallpaper project, use the following command:
 
 ```bash
-gsettings set io.github.jeffshee.hanabi-extension video-path '<video_path>'
+gsettings set io.github.jeffshee.hanabi-extension project-path '<project_path>'
 ```
 
-Replace `<video_path>` with the path to the video file you want to set as your wallpaper.
+Replace `<project_path>` with the path to a directory containing a `project.json` wallpaper project.
 
 ### Example: Switching Wallpaper with Night Theme Switcher Extension
 
@@ -24,13 +24,13 @@ Here's how to do it:
 - Sunrise
 
 ```bash
-gsettings set io.github.jeffshee.hanabi-extension video-path '<light_theme_video_path>'
+gsettings set io.github.jeffshee.hanabi-extension project-path '<light_theme_project_path>'
 ```
 
 - Sunset
 
 ```bash
-gsettings set io.github.jeffshee.hanabi-extension video-path '<dark_theme_video_path>'
+gsettings set io.github.jeffshee.hanabi-extension project-path '<dark_theme_project_path>'
 ```
 
 ![](images/night-theme-switcher-run-commands.png)
@@ -45,7 +45,7 @@ _Note: You can find all the example scripts in the `docs/scripts` directory._
 
 ### Example: Random Wallpaper
 
-You can write a script that randomly selects a wallpaper from a directory and sets it as your wallpaper at specified intervals.
+You can write a script that randomly selects a wallpaper project from a directory and sets it as your wallpaper at specified intervals.
 
 Here's a sample script in Python:
 
@@ -55,21 +55,19 @@ import random
 import subprocess
 import time
 
-dir_path = '/path/to/wallpaper/directory' # Set the path to your directory
-video_exts = ['.mp4', '.webm']
+dir_path = '/path/to/wallpaper-projects-directory' # Set the path to your directory
 interval = 30 # Set the interval in seconds
 
 while True:
-    video_paths = []
-    for root, _, files in os.walk(dir_path):
-        for file in files:
-            if any(file.lower().endswith(ext) for ext in video_exts):
-                video_paths.append(os.path.join(root, file))
+    project_paths = []
+    for entry in os.scandir(dir_path):
+        if entry.is_dir() and os.path.isfile(os.path.join(entry.path, 'project.json')):
+            project_paths.append(entry.path)
 
-    if video_paths:
-        video_path = random.choice(video_paths)
-        gsettings_command = f"gsettings set io.github.jeffshee.hanabi-extension video-path '{video_path}'"
-        print(f"Video path: {video_path}")
+    if project_paths:
+        project_path = random.choice(project_paths)
+        gsettings_command = f"gsettings set io.github.jeffshee.hanabi-extension project-path '{project_path}'"
+        print(f"Project path: {project_path}")
         subprocess.run(["bash", "-c", gsettings_command])
 
     time.sleep(interval)

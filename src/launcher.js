@@ -35,8 +35,7 @@ const rendererLogger = new Logger.Logger('renderer');
 const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0]);
 
 function isWaylandCompositor() {
-    // GNOME 50 removed Meta.is_wayland_compositor() with the X11 backend gone.
-    if (!Meta.is_wayland_compositor)
+    if (shellVersion >= 50)
         return true;
 
     return Meta.is_wayland_compositor();
@@ -99,6 +98,10 @@ export class LaunchSubprocess {
 
     set_cwd(cwd) {
         this._launcher.set_cwd(cwd);
+    }
+
+    setenv(variable, value, overwrite = true) {
+        this._launcher.setenv(variable, value, overwrite);
     }
 
     read_output() {

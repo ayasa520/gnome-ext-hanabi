@@ -25,6 +25,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as DBus from './dbus.js';
+import {listProjects} from './project.js';
 
 export class HanabiPanelMenu {
     constructor(extension) {
@@ -35,6 +36,7 @@ export class HanabiPanelMenu {
         this._playbackState = extension.getPlaybackState();
         this._isPlaying = false;
         this._renderer = new DBus.RendererWrapper();
+        this._signalHandles = [];
     }
 
     enable() {
@@ -70,6 +72,20 @@ export class HanabiPanelMenu {
             this._isPlaying ? _('Pause') : _('Play')
         );
 
+        const updatePlayPauseLabel = () => {
+            if (playPause.label)
+                playPause.label.set_text(this._isPlaying ? _('Pause') : _('Play'));
+        };
+
+        const syncPlayingState = () => {
+            const variant = this._renderer.proxy.get_cached_property('isPlaying');
+            if (!variant)
+                return;
+
+            this._isPlaying = variant.unpack();
+            updatePlayPauseLabel();
+        };
+
         playPause.connect('activate', () => {
             if (this._isPlaying)
                 this._playbackState.userPause();
@@ -77,15 +93,22 @@ export class HanabiPanelMenu {
                 this._playbackState.userPlay();
         });
 
-        this._renderer.proxy.connectSignal(
+        this._signalHandles.push(this._renderer.proxy.connectSignal(
             'isPlayingChanged',
             (_proxy, _sender, [isPlaying]) => {
                 this._isPlaying = isPlaying;
-                playPause.label.set_text(
-                    this._isPlaying ? _('Pause') : _('Play')
-                );
+                updatePlayPauseLabel();
             }
-        );
+        ));
+
+        this._signalHandles.push([
+            this._renderer.proxy,
+            this._renderer.proxy.connect('notify::g-name-owner', () => {
+                syncPlayingState();
+            }),
+        ]);
+
+        syncPlayingState();
 
         menu.addMenuItem(playPause);
 
@@ -94,15 +117,25 @@ export class HanabiPanelMenu {
             this._getMute() ? _('Unmute Audio') : _('Mute Audio')
         );
 
+        const updateMuteLabel = () => {
+            if (muteAudio.label)
+                muteAudio.label.set_text(
+                    this._getMute() ? _('Unmute Audio') : _('Mute Audio')
+                );
+        };
+
         muteAudio.connect('activate', () => {
             this._setMute(!this._getMute());
         });
 
-        this._settings.connect('changed::mute', () => {
-            muteAudio.label.set_text(
-                this._getMute() ? _('Unmute Audio') : _('Mute Audio')
-            );
-        });
+        this._signalHandles.push([
+            this._settings,
+            this._settings.connect('changed::mute', () => {
+                updateMuteLabel();
+            }),
+        ]);
+
+        updateMuteLabel();
 
         menu.addMenuItem(muteAudio);
 
@@ -114,12 +147,15 @@ export class HanabiPanelMenu {
         if (!this._getChangeWallpaper())
             nextWallpaperMenuItem.hide();
 
-        this._settings.connect('changed::change-wallpaper', () => {
-            if (this._getChangeWallpaper())
-                nextWallpaperMenuItem.show();
-            else
-                nextWallpaperMenuItem.hide();
-        });
+        this._signalHandles.push([
+            this._settings,
+            this._settings.connect('changed::change-wallpaper', () => {
+                if (this._getChangeWallpaper())
+                    nextWallpaperMenuItem.show();
+                else
+                    nextWallpaperMenuItem.hide();
+            }),
+        ]);
 
         // Preferences
         menu.addAction(_('Preferences'), () => {
@@ -147,41 +183,32 @@ export class HanabiPanelMenu {
      */
     _setNextWallpaper = () => {
         let changeWallpaperDirectoryPath = this._settings.get_string('change-wallpaper-directory-path');
-        let videoPaths = [];
-        let dir = Gio.File.new_for_path(changeWallpaperDirectoryPath);
-        // Check if dir exists and is a directory
-        if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
+        let projects = listProjects(changeWallpaperDirectoryPath);
+        if (projects.length === 0)
             return;
 
-        let enumerator = dir.enumerate_children(
-            'standard::*',
-            Gio.FileQueryInfoFlags.NONE,
-            null
-        );
-
-        // Get files to push into array
-        let fileInfo;
-        while ((fileInfo = enumerator.next_file(null))) {
-            if (fileInfo.get_content_type().startsWith('video/')) {
-                let file = dir.get_child(fileInfo.get_name());
-                videoPaths.push(file.get_path());
-            }
-        }
-
-        videoPaths = videoPaths.sort();
-        let currentVideoPath = this._settings.get_string('video-path');
-        let currentIndex = videoPaths.findIndex(videoPath => videoPath === currentVideoPath);
+        let currentProjectPath = this._settings.get_string('project-path');
+        let currentIndex = projects.findIndex(project => project.path === currentProjectPath);
         let nextIndex = 0;
         if (currentIndex !== -1)
-            nextIndex = (currentIndex + 1) % videoPaths.length;
-        this._settings.set_string('video-path', videoPaths[nextIndex]);
+            nextIndex = (currentIndex + 1) % projects.length;
+        this._settings.set_string('project-path', projects[nextIndex].path);
     };
 
     disable() {
         if (!this.isEnabled)
             return;
 
+        this._signalHandles.forEach(handle => {
+            if (Array.isArray(handle))
+                handle[0].disconnect(handle[1]);
+            else
+                this._renderer.proxy.disconnectSignal(handle);
+        });
+        this._signalHandles = [];
+
         this.indicator.destroy();
+        this.indicator = null;
         this.isEnabled = false;
     }
 }

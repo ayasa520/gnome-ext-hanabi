@@ -1,6 +1,8 @@
 # Hanabi extension
 src/video.*
 .build
+src/schemas/gschemas.compiled
+native/scene/build/
 
 # Logs
 logs
