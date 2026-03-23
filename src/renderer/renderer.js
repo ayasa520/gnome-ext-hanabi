@@ -1258,7 +1258,10 @@ const HanabiRendererWindow = GObject.registerClass(
 
             this.setWallpaperWidget(widget);
             if (!windowed) {
-                if (fullscreened) {
+                // In extension mode (nohide=false), fullscreen may transiently mark the
+                // renderer as the active fullscreen window during login and hide/cover
+                // panel or dock before shell-side management catches up.
+                if (fullscreened && nohide) {
                     this.fullscreen_on_monitor(this._gdkMonitor);
                 } else {
                     let geometry = this._gdkMonitor.get_geometry();
