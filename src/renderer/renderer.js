@@ -562,7 +562,27 @@ const HanabiRenderer = GObject.registerClass(
                     }
                 });
             }
+
+            if (this._play) {
+                try {
+                    // Cut off audio immediately before pausing/stopping.
+                    this._play.mute = true;
+                } catch (_e) {
+                }
+                try {
+                    this._play.pause();
+                } catch (_e) {
+                }
+                try {
+                    this._play.stop();
+                } catch (_e) {
+                }
+            }
             if (this._media) {
+                try {
+                    this._media.muted = true;
+                } catch (_e) {
+                }
                 try {
                     this._media.pause();
                     this._media.stream_unprepared();
