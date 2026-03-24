@@ -546,43 +546,34 @@ const HanabiRenderer = GObject.registerClass(
             }
 
             if (this._sceneWidgets?.length) {
-                this._sceneWidgets.forEach(widget => {
-                    try {
-                        // Explicitly stop scene audio before widget gets replaced/collected.
-                        widget.set_muted(true);
-                    } catch (_e) {
-                    }
+                const oldSceneWidgets = [...this._sceneWidgets];
+                oldSceneWidgets.forEach(widget => {
                     try {
                         widget.pause();
                     } catch (_e) {
                     }
-                    try {
-                        widget.set_project_dir(null);
-                    } catch (_e) {
-                    }
+                });
+
+                // Scene audio shutdown can be asynchronous on some systems.
+                // Retry pause shortly after switch to suppress trailing sound.
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+                    oldSceneWidgets.forEach(widget => {
+                        try {
+                            widget.pause();
+                        } catch (_e) {
+                        }
+                    });
+                    return GLib.SOURCE_REMOVE;
                 });
             }
 
             if (this._play) {
                 try {
-                    // Cut off audio immediately before pausing/stopping.
-                    this._play.mute = true;
-                } catch (_e) {
-                }
-                try {
                     this._play.pause();
-                } catch (_e) {
-                }
-                try {
-                    this._play.stop();
                 } catch (_e) {
                 }
             }
             if (this._media) {
-                try {
-                    this._media.muted = true;
-                } catch (_e) {
-                }
                 try {
                     this._media.pause();
                     this._media.stream_unprepared();
