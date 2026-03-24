@@ -449,7 +449,9 @@ const HanabiRenderer = GObject.registerClass(
                         return false;
                     }
                     contentFit = parsedContentFit;
-                    argvContentFitOverride = true;
+                    // Keep CLI override for standalone/manual runs.
+                    // In extension mode we still want settings changes to update live.
+                    argvContentFitOverride = standalone;
                     break;
                 }
                 case '-V':
