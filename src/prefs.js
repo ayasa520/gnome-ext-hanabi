@@ -48,6 +48,7 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
         prefsRowLibraryPath(window, generalGroup);
         prefsRowProjectChooser(window, generalGroup);
         prefsRowFitMode(window, generalGroup);
+        prefsRowInt(window, generalGroup, _('Scene FPS'), 'scene-fps', _('Set target FPS for scene wallpapers'), 5, 240, 5, 10);
         prefsRowBoolean(window, generalGroup, _('Mute Audio'), 'mute', '');
         prefsRowInt(window, generalGroup, _('Volume Level'), 'volume', '', 0, 100, 1, 10);
         prefsRowBoolean(window, generalGroup, _('Show Panel Menu'), 'show-panel-menu', '');

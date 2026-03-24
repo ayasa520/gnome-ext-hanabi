@@ -22,6 +22,9 @@ double hanabi_scene_widget_get_volume(HanabiSceneWidget *self);
 void hanabi_scene_widget_set_fill_mode(HanabiSceneWidget *self, int fill_mode);
 int hanabi_scene_widget_get_fill_mode(HanabiSceneWidget *self);
 
+void hanabi_scene_widget_set_fps(HanabiSceneWidget *self, int fps);
+int hanabi_scene_widget_get_fps(HanabiSceneWidget *self);
+
 void hanabi_scene_widget_play(HanabiSceneWidget *self);
 void hanabi_scene_widget_pause(HanabiSceneWidget *self);
 gboolean hanabi_scene_widget_get_playing(HanabiSceneWidget *self);

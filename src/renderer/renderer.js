@@ -128,6 +128,7 @@ let mute = extSettings ? extSettings.get_boolean('mute') : false;
 let nohide = false;
 let standalone = false;
 let projectPath = extSettings ? extSettings.get_string('project-path') : '';
+let sceneFps = extSettings ? extSettings.get_int('scene-fps') : 30;
 let volume = extSettings ? extSettings.get_int('volume') / 100.0 : 0.5;
 let changeWallpaper = extSettings ? extSettings.get_boolean('change-wallpaper') : true;
 let changeWallpaperDirectoryPath = extSettings ? extSettings.get_string('change-wallpaper-directory-path') : '';
@@ -344,6 +345,10 @@ const HanabiRenderer = GObject.registerClass(
                 case 'volume':
                     volume = settings.get_int(key) / 100.0;
                     this.setVolume(volume);
+                    break;
+                case 'scene-fps':
+                    sceneFps = settings.get_int(key);
+                    this.setSceneFps(sceneFps);
                     break;
                 case 'change-wallpaper':
                     changeWallpaper = settings.get_boolean(key);
@@ -669,6 +674,7 @@ const HanabiRenderer = GObject.registerClass(
                     'project-dir': this._project.path,
                     muted: mute,
                     volume,
+                    fps: sceneFps,
                     'fill-mode': this._getSceneFillMode(),
                     playing: true,
                     hexpand: true,
@@ -1155,6 +1161,12 @@ const HanabiRenderer = GObject.registerClass(
             } else if (this._sceneWidgets?.length) {
                 this._sceneWidgets.forEach(widget => widget.set_muted(_mute));
             }
+        }
+
+        setSceneFps(fps) {
+            if (!this._sceneWidgets?.length)
+                return;
+            this._sceneWidgets.forEach(widget => widget.set_fps?.(fps));
         }
 
         _setPlayingState(isPlaying) {

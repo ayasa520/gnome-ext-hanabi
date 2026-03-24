@@ -31,6 +31,7 @@ enum {
     PROP_MUTED,
     PROP_VOLUME,
     PROP_FILL_MODE,
+    PROP_FPS,
     PROP_PLAYING,
     N_PROPS,
 };
@@ -341,6 +342,7 @@ struct _HanabiSceneWidget {
     gboolean muted;
     gdouble volume;
     gint fill_mode;
+    gint fps;
     gboolean playing;
 
     bool gl_ready;
@@ -441,6 +443,9 @@ static void hanabi_scene_widget_set_property(GObject *object, guint prop_id, con
     case PROP_FILL_MODE:
         hanabi_scene_widget_set_fill_mode(self, g_value_get_int(value));
         break;
+    case PROP_FPS:
+        hanabi_scene_widget_set_fps(self, g_value_get_int(value));
+        break;
     case PROP_PLAYING:
         if (g_value_get_boolean(value))
             hanabi_scene_widget_play(self);
@@ -466,6 +471,9 @@ static void hanabi_scene_widget_get_property(GObject *object, guint prop_id, GVa
         break;
     case PROP_FILL_MODE:
         g_value_set_int(value, self->fill_mode);
+        break;
+    case PROP_FPS:
+        g_value_set_int(value, self->fps);
         break;
     case PROP_PLAYING:
         g_value_set_boolean(value, self->playing);
@@ -582,6 +590,7 @@ static bool ensure_scene_initialized(HanabiSceneWidget *self) {
     self->scene->setPropertyFloat(wallpaper::PROPERTY_VOLUME, static_cast<float>(self->volume));
     self->scene->setPropertyBool(wallpaper::PROPERTY_MUTED, self->muted);
     self->scene->setPropertyInt32(wallpaper::PROPERTY_FILLMODE, static_cast<int32_t>(to_wp_fill_mode(self->fill_mode)));
+    self->scene->setPropertyInt32(wallpaper::PROPERTY_FPS, self->fps);
 
     self->scene_ready = true;
     return true;
@@ -775,6 +784,9 @@ static void hanabi_scene_widget_class_init(HanabiSceneWidgetClass *klass) {
     properties[PROP_FILL_MODE] =
         g_param_spec_int("fill-mode", nullptr, nullptr, 0, 2, 2,
                          static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_FPS] =
+        g_param_spec_int("fps", nullptr, nullptr, 5, 240, 30,
+                         static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
     properties[PROP_PLAYING] =
         g_param_spec_boolean("playing", nullptr, nullptr, TRUE,
                              static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
@@ -788,6 +800,7 @@ static void hanabi_scene_widget_init(HanabiSceneWidget *self) {
     new (&self->project) SceneProject();
     self->volume = 1.0;
     self->fill_mode = 2;
+    self->fps = 30;
     self->playing = TRUE;
 
     gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(self), FALSE);
@@ -873,6 +886,22 @@ void hanabi_scene_widget_set_fill_mode(HanabiSceneWidget *self, int fill_mode) {
 int hanabi_scene_widget_get_fill_mode(HanabiSceneWidget *self) {
     g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), 2);
     return self->fill_mode;
+}
+
+void hanabi_scene_widget_set_fps(HanabiSceneWidget *self, int fps) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+    fps = CLAMP(fps, 5, 240);
+    if (self->fps == fps)
+        return;
+    self->fps = fps;
+    if (self->scene)
+        self->scene->setPropertyInt32(wallpaper::PROPERTY_FPS, self->fps);
+    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_FPS]);
+}
+
+int hanabi_scene_widget_get_fps(HanabiSceneWidget *self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), 30);
+    return self->fps;
 }
 
 void hanabi_scene_widget_play(HanabiSceneWidget *self) {

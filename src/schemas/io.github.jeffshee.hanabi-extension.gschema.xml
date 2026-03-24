@@ -114,6 +114,13 @@
             <description>Control how content fits within the GtkPicture</description>
         </key>
 
+        <key name="scene-fps" type="i">
+            <range min="5" max="240" />
+            <default>30</default>
+            <summary>Scene FPS</summary>
+            <description>Set the target FPS for scene wallpaper rendering</description>
+        </key>
+
         <key name="startup-delay" type="i">
             <range min="0" max="10000" />
             <default>1000</default>
