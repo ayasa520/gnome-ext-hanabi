@@ -25,5 +25,6 @@ int hanabi_scene_widget_get_fill_mode(HanabiSceneWidget *self);
 void hanabi_scene_widget_play(HanabiSceneWidget *self);
 void hanabi_scene_widget_pause(HanabiSceneWidget *self);
 gboolean hanabi_scene_widget_get_playing(HanabiSceneWidget *self);
+void hanabi_scene_widget_set_mouse_pos(HanabiSceneWidget *self, double x, double y);
 
 G_END_DECLS

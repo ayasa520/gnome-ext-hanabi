@@ -16,6 +16,7 @@
  */
 
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -23,13 +24,18 @@ import Graphene from 'gi://Graphene';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import * as DBus from './dbus.js';
 import * as Logger from './logger.js';
+import {loadProject, ProjectType} from './project.js';
 import * as RoundedCornersEffect from './roundedCornersEffect.js';
 
 const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const logger = new Logger.Logger();
 // Ref: https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/layout.js
 const BACKGROUND_FADE_ANIMATION_TIME = 1000;
+const MOTION_EVENT_INTERVAL_US = 33000;
+const MOTION_MIN_DELTA_PX = 1;
+const extSchemaId = 'io.github.jeffshee.hanabi-extension';
 
 // const CUSTOM_BACKGROUND_BOUNDS_PADDING = 2;
 
@@ -47,10 +53,23 @@ export const LiveWallpaper = GObject.registerClass(
                 x_expand: true,
                 y_expand: true,
                 opacity: 0,
+                reactive: true,
             });
             this._backgroundActor = backgroundActor;
             this._metaBackgroundGroup = backgroundActor.get_parent();
             this._monitorIndex = backgroundActor.monitor;
+            this._renderer = new DBus.RendererWrapper();
+            this._lastMotionEventTimeUs = 0;
+            this._lastMotionPos = null;
+            this._bridgeProjectType = null;
+            this._settings = Gio.Settings.new(extSchemaId);
+            this._settingsProjectPathSignal = this._settings.connect('changed::project-path', () => {
+                this._refreshProjectType();
+            });
+            this._rendererOwnerSignal = this._renderer.proxy.connect('notify::g-name-owner', () => {
+                this._lastMotionPos = null;
+            });
+            this._refreshProjectType();
 
             /**
              * _monitorScale is fractional scale factor
@@ -80,6 +99,7 @@ export const LiveWallpaper = GObject.registerClass(
             this.setPixelStep(this._monitorWidth, this._monitorHeight);
             this.setRoundedClipRadius(0.0);
             this.setRoundedClipBounds(0, 0, this._monitorWidth, this._monitorHeight);
+            this._setupPointerBridge();
 
             // FIXME: Bounds calculation is wrong if the layout isn't vanilla (with custom dock, panel, etc.), disabled for now.
             // this.connect('notify::allocation', () => {
@@ -181,6 +201,100 @@ export const LiveWallpaper = GObject.registerClass(
                 duration: BACKGROUND_FADE_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
+        }
+
+        _setupPointerBridge() {
+            this.connect('motion-event', (_actor, event) => {
+                const now = GLib.get_monotonic_time();
+                // Cap high-frequency pointer move events to around 30Hz.
+                if (now - this._lastMotionEventTimeUs < MOTION_EVENT_INTERVAL_US)
+                    return Clutter.EVENT_PROPAGATE;
+
+                this._lastMotionEventTimeUs = now;
+                this._dispatchPointerEvent('mousemove', event);
+                return Clutter.EVENT_PROPAGATE;
+            });
+
+            this.connect('button-press-event', (_actor, event) => {
+                this._dispatchPointerEvent('mousedown', event);
+                return Clutter.EVENT_PROPAGATE;
+            });
+
+            this.connect('button-release-event', (_actor, event) => {
+                this._dispatchPointerEvent('mouseup', event);
+                return Clutter.EVENT_PROPAGATE;
+            });
+
+            this.connect('scroll-event', (_actor, event) => {
+                this._dispatchPointerEvent('wheel', event);
+                return Clutter.EVENT_PROPAGATE;
+            });
+        }
+
+        _dispatchPointerEvent(type, event) {
+            if (!this._isBridgeActive())
+                return;
+
+            const [stageX, stageY] = event.get_coords();
+            const [actorX, actorY] = this.get_transformed_position();
+            const x = stageX - actorX;
+            const y = stageY - actorY;
+            if (x < 0 || y < 0 || x > this.width || y > this.height)
+                return;
+
+            if (type === 'mousemove') {
+                if (this._lastMotionPos) {
+                    const dx = Math.abs(x - this._lastMotionPos.x);
+                    const dy = Math.abs(y - this._lastMotionPos.y);
+                    if (dx < MOTION_MIN_DELTA_PX && dy < MOTION_MIN_DELTA_PX)
+                        return;
+                }
+                this._lastMotionPos = {x, y};
+            }
+
+            let button = 0;
+            if (type === 'mousedown' || type === 'mouseup')
+                button = event.get_button();
+
+            let deltaX = 0;
+            let deltaY = 0;
+            if (type === 'wheel') {
+                const scrollDirection = event.get_scroll_direction();
+                if (scrollDirection === Clutter.ScrollDirection.UP) {
+                    deltaY = -120;
+                } else if (scrollDirection === Clutter.ScrollDirection.DOWN) {
+                    deltaY = 120;
+                } else if (scrollDirection === Clutter.ScrollDirection.LEFT) {
+                    deltaX = -120;
+                } else if (scrollDirection === Clutter.ScrollDirection.RIGHT) {
+                    deltaX = 120;
+                } else {
+                    [deltaX, deltaY] = event.get_scroll_delta();
+                }
+            }
+
+            const payload = JSON.stringify({
+                type,
+                monitorIndex: this._monitorIndex,
+                x,
+                y,
+                button,
+                deltaX,
+                deltaY,
+            });
+            this._renderer.dispatchPointerEvent(payload);
+        }
+
+        _refreshProjectType() {
+            const projectPath = this._settings.get_string('project-path');
+            const project = loadProject(projectPath);
+            this._bridgeProjectType = [ProjectType.WEB, ProjectType.SCENE].includes(project?.type)
+                ? project.type
+                : null;
+        }
+
+        _isBridgeActive() {
+            return !!this._bridgeProjectType && this._renderer.proxy.g_name_owner;
         }
     }
 );

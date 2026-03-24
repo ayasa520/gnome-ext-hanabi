@@ -901,3 +901,19 @@ gboolean hanabi_scene_widget_get_playing(HanabiSceneWidget *self) {
     g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), FALSE);
     return self->playing;
 }
+
+void hanabi_scene_widget_set_mouse_pos(HanabiSceneWidget *self, double x, double y) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+    if (!self->scene)
+        return;
+
+    const int width = gtk_widget_get_width(GTK_WIDGET(self));
+    const int height = gtk_widget_get_height(GTK_WIDGET(self));
+    if (width <= 0 || height <= 0)
+        return;
+
+    // Scene renderer expects normalized [0, 1] coordinates.
+    const double nx = CLAMP(x / static_cast<double>(width), 0.0, 1.0);
+    const double ny = CLAMP(y / static_cast<double>(height), 0.0, 1.0);
+    self->scene->mouseInput(nx, ny);
+}

@@ -295,8 +295,8 @@ const HanabiRenderer = GObject.registerClass(
             this._project = null;
             this._play = null;
             this._media = null;
-            this._webView = null;
-            this._webPausePicture = null;
+            this._webViews = new Map();
+            this._webPausePictures = new Map();
             this._sceneWidgets = [];
             this._isPlaying = false;
             this._dbus = null;
@@ -585,8 +585,8 @@ const HanabiRenderer = GObject.registerClass(
             this._sharedPaintable = null;
             this._play = null;
             this._media = null;
-            this._webView = null;
-            this._webPausePicture = null;
+            this._webViews = new Map();
+            this._webPausePictures = new Map();
             this._scenePicture = null;
             this._sceneWidgets = [];
             this._adapter = null;
@@ -600,7 +600,7 @@ const HanabiRenderer = GObject.registerClass(
 
             switch (this._project.type) {
             case ProjectType.WEB:
-                return this._getWebWidget();
+                return this._getWebWidget(index);
             case ProjectType.SCENE:
                 return this._getSceneWidget();
             case ProjectType.VIDEO:
@@ -721,7 +721,7 @@ const HanabiRenderer = GObject.registerClass(
             }
         }
 
-        _getWebWidget() {
+        _getWebWidget(index) {
             this._gstImplName = 'WebKitWebView';
 
             if (!haveWebKit)
@@ -803,8 +803,8 @@ const HanabiRenderer = GObject.registerClass(
 
             const file = Gio.File.new_for_path(this._project.entryPath);
             webView.load_uri(file.get_uri());
-            this._webView = webView;
-            this._webPausePicture = pausePicture;
+            this._webViews.set(index, webView);
+            this._webPausePictures.set(index, pausePicture);
 
             this._setPlayingState(true);
             this.setAutoWallpaper();
@@ -813,7 +813,7 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _setWebPlayback(isPlaying) {
-            if (!this._webView)
+            if (this._webViews.size === 0)
                 return;
 
             const script = `
@@ -841,30 +841,35 @@ const HanabiRenderer = GObject.registerClass(
                 })();
             `;
 
-            this._webView.evaluate_javascript(
-                script,
-                -1,
-                null,
-                null,
-                null,
-                () => {}
-            );
+            this._webViews.forEach((webView, index) => {
+                webView.evaluate_javascript(
+                    script,
+                    -1,
+                    null,
+                    null,
+                    null,
+                    () => {}
+                );
 
-            if (isPlaying) {
-                this._webView.visible = true;
-                if (this._webPausePicture)
-                    this._webPausePicture.visible = false;
-            } else {
-                this._freezeWebView();
-            }
+                if (isPlaying) {
+                    webView.visible = true;
+                    const pausePicture = this._webPausePictures.get(index);
+                    if (pausePicture)
+                        pausePicture.visible = false;
+                } else {
+                    this._freezeWebView(index);
+                }
+            });
             this._setPlayingState(isPlaying);
         }
 
-        _freezeWebView() {
-            if (!this._webView || !this._webPausePicture)
+        _freezeWebView(index) {
+            const webView = this._webViews.get(index);
+            const pausePicture = this._webPausePictures.get(index);
+            if (!webView || !pausePicture)
                 return;
 
-            this._webView.get_snapshot(
+            webView.get_snapshot(
                 WebKit.SnapshotRegion.VISIBLE,
                 WebKit.SnapshotOptions.NONE,
                 null,
@@ -874,9 +879,9 @@ const HanabiRenderer = GObject.registerClass(
                         if (!snapshot)
                             return;
 
-                        this._webPausePicture.paintable = snapshot;
-                        this._webPausePicture.visible = true;
-                        this._webView.visible = false;
+                        pausePicture.paintable = snapshot;
+                        pausePicture.visible = true;
+                        webView.visible = false;
                     } catch (e) {
                         console.warn(e);
                     }
@@ -1041,6 +1046,9 @@ const HanabiRenderer = GObject.registerClass(
                     <method name="setProjectPath">
                         <arg name="projectPath" type="s" direction="in"/>
                     </method>
+                    <method name="dispatchPointerEvent">
+                        <arg name="payload" type="s" direction="in"/>
+                    </method>
                     <property name="isPlaying" type="b" access="read"/>
                     <signal name="isPlayingChanged">
                         <arg name="isPlaying" type="b"/>
@@ -1054,6 +1062,7 @@ const HanabiRenderer = GObject.registerClass(
                 setMute: _mute => this.setMute(_mute),
                 setVolume: _volume => this.setVolume(_volume),
                 setProjectPath: _projectPath => this.setProjectPath(_projectPath),
+                dispatchPointerEvent: payload => this.dispatchPointerEvent(payload),
                 get isPlaying() {
                     return this._renderer.isPlaying;
                 },
@@ -1126,7 +1135,7 @@ const HanabiRenderer = GObject.registerClass(
             if (extSettings && extSettings.get_boolean('mute') !== _mute)
                 extSettings.set_boolean('mute', _mute);
 
-            if (!this._play && !this._media && !this._webView && !this._sceneWidgets?.length)
+            if (!this._play && !this._media && this._webViews.size === 0 && !this._sceneWidgets?.length)
                 return;
 
             if (this._play) {
@@ -1137,10 +1146,12 @@ const HanabiRenderer = GObject.registerClass(
                 if (this._media.muted === _mute)
                     this._media.muted = !_mute;
                 this._media.muted = _mute;
-            } else if (this._webView) {
-                if (this._webView.is_muted === _mute)
-                    this._webView.is_muted = !_mute;
-                this._webView.is_muted = _mute;
+            } else if (this._webViews.size > 0) {
+                this._webViews.forEach(webView => {
+                    if (webView.is_muted === _mute)
+                        webView.is_muted = !_mute;
+                    webView.is_muted = _mute;
+                });
             } else if (this._sceneWidgets?.length) {
                 this._sceneWidgets.forEach(widget => widget.set_muted(_mute));
             }
@@ -1156,7 +1167,7 @@ const HanabiRenderer = GObject.registerClass(
                 this._play.play();
             } else if (this._media) {
                 this._media.play();
-            } else if (this._webView) {
+            } else if (this._webViews.size > 0) {
                 this._setWebPlayback(true);
             } else if (this._sceneWidgets?.length) {
                 this._sceneWidgets.forEach(widget => widget.play());
@@ -1173,7 +1184,7 @@ const HanabiRenderer = GObject.registerClass(
                 this._play.pause();
             } else if (this._media) {
                 this._media.pause();
-            } else if (this._webView) {
+            } else if (this._webViews.size > 0) {
                 this._setWebPlayback(false);
             } else if (this._sceneWidgets?.length) {
                 this._sceneWidgets.forEach(widget => widget.pause());
@@ -1229,6 +1240,85 @@ const HanabiRenderer = GObject.registerClass(
             if (changeWallpaper) {
                 operation();
                 changeWallpaperTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, changeWallpaperInterval * 60, operation);
+            }
+        }
+
+        dispatchPointerEvent(payload) {
+            let event;
+            try {
+                event = JSON.parse(payload);
+            } catch (_e) {
+                return;
+            }
+
+            const monitorIndex = Number(event.monitorIndex);
+            const type = String(event.type ?? '');
+            if (!['mousemove', 'mousedown', 'mouseup', 'wheel'].includes(type) || Number.isNaN(monitorIndex))
+                return;
+
+            const x = Number(event.x ?? 0);
+            const y = Number(event.y ?? 0);
+            const button = Number(event.button ?? 0);
+            const deltaX = Number(event.deltaX ?? 0);
+            const deltaY = Number(event.deltaY ?? 0);
+
+            if (this._project?.type === ProjectType.WEB) {
+                const webView = this._webViews.get(monitorIndex);
+                if (!webView)
+                    return;
+
+                const scriptEvent = {
+                    type,
+                    x,
+                    y,
+                    button,
+                    deltaX,
+                    deltaY,
+                };
+                const script = `
+                    (() => {
+                        const data = ${JSON.stringify(scriptEvent)};
+                        const target = document.elementFromPoint(data.x, data.y) || document.body;
+                        if (!target)
+                            return;
+
+                        const common = {
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: data.x,
+                            clientY: data.y,
+                            screenX: data.x,
+                            screenY: data.y,
+                            button: Math.max(0, data.button - 1),
+                        };
+
+                        let domEvent;
+                        if (data.type === 'wheel') {
+                            domEvent = new WheelEvent('wheel', {
+                                ...common,
+                                deltaX: data.deltaX,
+                                deltaY: data.deltaY,
+                            });
+                        } else {
+                            domEvent = new MouseEvent(data.type, common);
+                        }
+                        target.dispatchEvent(domEvent);
+                    })();
+                `;
+                webView.evaluate_javascript(
+                    script,
+                    -1,
+                    null,
+                    null,
+                    null,
+                    () => {}
+                );
+            } else if (this._project?.type === ProjectType.SCENE) {
+                const sceneWidget = this._sceneWidgets?.[monitorIndex];
+                if (!sceneWidget)
+                    return;
+                if (type === 'mousemove' && sceneWidget.set_mouse_pos)
+                    sceneWidget.set_mouse_pos(x, y);
             }
         }
 
