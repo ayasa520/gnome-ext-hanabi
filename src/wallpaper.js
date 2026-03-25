@@ -69,6 +69,7 @@ export const LiveWallpaper = GObject.registerClass(
             this._rendererOwnerSignal = this._renderer.proxy.connect('notify::g-name-owner', () => {
                 this._lastMotionPos = null;
             });
+            this._applyWallpaperId = 0;
             this._refreshProjectType();
 
             /**
@@ -100,6 +101,7 @@ export const LiveWallpaper = GObject.registerClass(
             this.setRoundedClipRadius(0.0);
             this.setRoundedClipBounds(0, 0, this._monitorWidth, this._monitorHeight);
             this._setupPointerBridge();
+            this.connect('destroy', () => this._onDestroy());
 
             // FIXME: Bounds calculation is wrong if the layout isn't vanilla (with custom dock, panel, etc.), disabled for now.
             // this.connect('notify::allocation', () => {
@@ -160,7 +162,12 @@ export const LiveWallpaper = GObject.registerClass(
 
             // Perform intial operation without timeout
             if (operation())
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, operation);
+                this._applyWallpaperId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+                    const shouldContinue = operation();
+                    if (!shouldContinue)
+                        this._applyWallpaperId = 0;
+                    return shouldContinue;
+                });
         }
 
         _getRenderer() {
@@ -295,6 +302,28 @@ export const LiveWallpaper = GObject.registerClass(
 
         _isBridgeActive() {
             return !!this._bridgeProjectType && this._renderer.proxy.g_name_owner;
+        }
+
+        _onDestroy() {
+            if (this._applyWallpaperId) {
+                GLib.source_remove(this._applyWallpaperId);
+                this._applyWallpaperId = 0;
+            }
+
+            if (this._settingsProjectPathSignal) {
+                this._settings.disconnect(this._settingsProjectPathSignal);
+                this._settingsProjectPathSignal = 0;
+            }
+
+            if (this._rendererOwnerSignal) {
+                this._renderer.proxy.disconnect(this._rendererOwnerSignal);
+                this._rendererOwnerSignal = 0;
+            }
+
+            this._wallpaper?.destroy();
+            this._wallpaper = null;
+            this._settings = null;
+            this._renderer = null;
         }
     }
 );

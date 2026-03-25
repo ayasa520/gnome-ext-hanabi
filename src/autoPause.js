@@ -34,13 +34,17 @@ const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0]);
 export class AutoPause {
     constructor(extension) {
         this._playbackState = extension.getPlaybackState();
+        this._moduleSignalHandles = [];
 
         // Modules
         this.modules = [];
         this.modules.push(new PauseOnMaximizeOrFullscreenModule(extension));
         this.modules.push(new PauseOnBatteryModule(extension));
         this.modules.push(new PauseOnMprisPlayingModule(extension));
-        this.modules.forEach(module => module.connect('updated', () => this.eval()));
+        this.modules.forEach(module => {
+            const id = module.connect('updated', () => this.eval());
+            this._moduleSignalHandles.push([module, id]);
+        });
     }
 
     enable() {
@@ -55,7 +59,11 @@ export class AutoPause {
     }
 
     disable() {
+        this._moduleSignalHandles.forEach(([module, id]) => module.disconnect(id));
+        this._moduleSignalHandles = [];
         this.modules.forEach(module => module.disable());
+        this.modules = [];
+        this._playbackState = null;
     }
 }
 
@@ -74,9 +82,30 @@ const AutoPauseModule = GObject.registerClass({
         this._settings = extension.getSettings();
         this.name = moduleName;
         this._logger = moduleName ? new Logger.Logger(`autoPause::${moduleName}`) : logger;
+        this._signalHandles = [];
+        this._dbusSignalHandles = [];
     }
 
     enable() {}
+
+    _connectTracked(object, signal, callback) {
+        const id = object.connect(signal, callback);
+        this._signalHandles.push([object, id]);
+        return id;
+    }
+
+    _connectTrackedDbusSignal(proxy, signal, callback) {
+        const id = proxy.connectSignal(signal, callback);
+        this._dbusSignalHandles.push([proxy, id]);
+        return id;
+    }
+
+    _disconnectTrackedSignals() {
+        this._signalHandles.forEach(([object, id]) => object.disconnect(id));
+        this._signalHandles = [];
+        this._dbusSignalHandles.forEach(([proxy, id]) => proxy.disconnectSignal(id));
+        this._dbusSignalHandles = [];
+    }
 
     _update() {
         this.emit('updated');
@@ -86,7 +115,9 @@ const AutoPauseModule = GObject.registerClass({
         return false;
     }
 
-    disable() {}
+    disable() {
+        this._disconnectTrackedSignals();
+    }
 });
 
 
@@ -111,7 +142,7 @@ const PauseOnMaximizeOrFullscreenModule = GObject.registerClass(
             this.conditions = {
                 pauseOnMaximizeOrFullscreen: this._settings.get_int('pause-on-maximize-or-fullscreen'),
             };
-            this._settings.connect('changed::pause-on-maximize-or-fullscreen', () => {
+            this._connectTracked(this._settings, 'changed::pause-on-maximize-or-fullscreen', () => {
                 this.conditions.pauseOnMaximizeOrFullscreen = this._settings.get_int('pause-on-maximize-or-fullscreen');
                 this._update();
             });
@@ -274,6 +305,7 @@ const PauseOnMaximizeOrFullscreenModule = GObject.registerClass(
         }
 
         disable() {
+            super.disable();
             this._workspaceManager?.disconnect(this._activeWorkspaceChangedId);
             this._windows.forEach(({metaWindow, signals}) => {
                 signals.forEach(signal => metaWindow.disconnect(signal));
@@ -314,11 +346,11 @@ const PauseOnBatteryModule = GObject.registerClass(
                 pauseOnBattery: this._settings.get_int('pause-on-battery'),
                 lowBatteryThreshold: this._settings.get_int('low-battery-threshold'),
             };
-            this._settings.connect('changed::pause-on-battery', () => {
+            this._connectTracked(this._settings, 'changed::pause-on-battery', () => {
                 this.conditions.pauseOnBattery = this._settings.get_int('pause-on-battery');
                 this._update();
             });
-            this._settings.connect('changed::low-battery-threshold', () => {
+            this._connectTracked(this._settings, 'changed::low-battery-threshold', () => {
                 this.conditions.lowBatteryThreshold = this._settings.get_int('low-battery-threshold');
                 this._update();
             });
@@ -327,7 +359,7 @@ const PauseOnBatteryModule = GObject.registerClass(
         }
 
         enable() {
-            this._upower.proxy.connect('g-properties-changed', (_proxy, properties) => {
+            this._connectTracked(this._upower.proxy, 'g-properties-changed', (_proxy, properties) => {
                 let payload = properties.deep_unpack();
                 if (!payload.hasOwnProperty('State') && !payload.hasOwnProperty('Percentage'))
                     return;
@@ -361,7 +393,7 @@ const PauseOnBatteryModule = GObject.registerClass(
         }
 
         disable() {
-
+            super.disable();
         }
     }
 );
@@ -381,7 +413,7 @@ const PauseOnMprisPlayingModule = GObject.registerClass(
             this.conditions = {
                 pauseOnMprisPlaying: this._settings.get_boolean('pause-on-mpris-playing'),
             };
-            this._settings.connect('changed::pause-on-mpris-playing', () => {
+            this._connectTracked(this._settings, 'changed::pause-on-mpris-playing', () => {
                 this.conditions.pauseOnMprisPlaying = this._settings.get_boolean('pause-on-mpris-playing');
                 this._update();
             });
@@ -404,7 +436,7 @@ const PauseOnMprisPlayingModule = GObject.registerClass(
             });
             this._logger.debug(this._stringifyMediaPlayers());
 
-            this._dbus.proxy.connectSignal('NameOwnerChanged', (_proxy, _sender, [name, oldOwner, newOwner]) => {
+            this._connectTrackedDbusSignal(this._dbus.proxy, 'NameOwnerChanged', (_proxy, _sender, [name, oldOwner, newOwner]) => {
                 if (name.startsWith('org.mpris.MediaPlayer2.')) {
                     let mprisName = name;
                     if (oldOwner === '') {
@@ -488,6 +520,7 @@ const PauseOnMprisPlayingModule = GObject.registerClass(
         }
 
         disable() {
+            super.disable();
             Object.values(this._mediaPlayers).forEach(
                 mediaPlayer => {
                     let mpris = mediaPlayer.mpris;

@@ -34,9 +34,13 @@ export default class HanabiExtension extends Extension {
         super(metadata);
         this.isEnabled = false;
         this.launchRendererId = 0;
+        this.startupDelayId = 0;
+        this.startupCompleteId = 0;
+        this.startupOverviewRestoreId = 0;
         this.currentProcess = null;
         this.currentProjectType = null;
         this.reloadTime = 100;
+        this._settingsSignals = [];
 
         /**
          * This is a safeguard measure for the case of Gnome Shell being relaunched
@@ -57,27 +61,27 @@ export default class HanabiExtension extends Extension {
         if (this.settings.get_boolean('show-panel-menu'))
             this.panelMenu.enable();
 
-        this.settings.connect('changed::show-panel-menu', () => {
+        this._settingsSignals.push(this.settings.connect('changed::show-panel-menu', () => {
             if (this.settings.get_boolean('show-panel-menu'))
                 this.panelMenu.enable();
             else
                 this.panelMenu.disable();
-        });
-        this.settings.connect('changed::project-path', () => {
+        }));
+        this._settingsSignals.push(this.settings.connect('changed::project-path', () => {
             if (!this.isEnabled)
                 return;
 
             const projectPath = this.settings.get_string('project-path');
             this.renderer.setProjectPath(projectPath);
-        });
-        this.settings.connect('changed::mute', () => {
+        }));
+        this._settingsSignals.push(this.settings.connect('changed::mute', () => {
             if (this.isEnabled)
                 this.renderer.setMute(this.settings.get_boolean('mute'));
-        });
-        this.settings.connect('changed::volume', () => {
+        }));
+        this._settingsSignals.push(this.settings.connect('changed::volume', () => {
             if (this.isEnabled)
                 this.renderer.setVolume(this.settings.get_int('volume') / 100.0);
-        });
+        }));
         /**
          * Disable startup animation (Workaround for issue #65)
          */
@@ -85,8 +89,10 @@ export default class HanabiExtension extends Extension {
 
         if (Main.layoutManager._startingUp) {
             Main.sessionMode.hasOverview = false;
-            Main.layoutManager.connect('startup-complete', () => {
+            this.startupOverviewRestoreId = Main.layoutManager.connect('startup-complete', () => {
                 Main.sessionMode.hasOverview = this.old_hasOverview;
+                Main.layoutManager.disconnect(this.startupOverviewRestoreId);
+                this.startupOverviewRestoreId = 0;
             });
             // Handle Ubuntu's method
             if (Main.layoutManager.startInOverview)
@@ -105,17 +111,21 @@ export default class HanabiExtension extends Extension {
             this.startupCompleteId = Main.layoutManager.connect(
                 'startup-complete',
                 () => {
-                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, this.settings.get_int('startup-delay'), () => {
+                    this.startupDelayId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, this.settings.get_int('startup-delay'), () => {
+                        this.startupDelayId = 0;
                         Main.layoutManager.disconnect(this.startupCompleteId);
-                        this.startupCompleteId = null;
-                        this.innerEnable();
+                        this.startupCompleteId = 0;
+                        if (this.settings)
+                            this.innerEnable();
                         return false;
                     });
                 }
             );
         } else {
-            GLib.timeout_add(GLib.PRIORITY_DEFAULT, this.settings.get_int('startup-delay'), () => {
-                this.innerEnable();
+            this.startupDelayId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, this.settings.get_int('startup-delay'), () => {
+                this.startupDelayId = 0;
+                if (this.settings)
+                    this.innerEnable();
                 return false;
             });
         }
@@ -217,16 +227,41 @@ export default class HanabiExtension extends Extension {
     }
 
     disable() {
-        this.settings = null;
-        this.renderer = null;
-        this.panelMenu.disable();
+        if (this.startupDelayId) {
+            GLib.source_remove(this.startupDelayId);
+            this.startupDelayId = 0;
+        }
+
+        if (this.startupCompleteId) {
+            Main.layoutManager.disconnect(this.startupCompleteId);
+            this.startupCompleteId = 0;
+        }
+
+        if (this.startupOverviewRestoreId) {
+            Main.layoutManager.disconnect(this.startupOverviewRestoreId);
+            this.startupOverviewRestoreId = 0;
+        }
+
+        this._settingsSignals.forEach(signalId => this.settings?.disconnect(signalId));
+        this._settingsSignals = [];
+
+        this.panelMenu?.disable();
         Main.sessionMode.hasOverview = this.old_hasOverview;
-        this.override.disable();
-        this.manager.disable();
-        this.autoPause.disable();
+        this.override?.disable();
+        this.manager?.disable();
+        this.autoPause?.disable();
 
         this.isEnabled = false;
         this.killCurrentProcess();
+        this.playbackState?.destroy();
+
+        this.settings = null;
+        this.renderer = null;
+        this.panelMenu = null;
+        this.override = null;
+        this.manager = null;
+        this.autoPause = null;
+        this.playbackState = null;
     }
 
     killCurrentProcess() {

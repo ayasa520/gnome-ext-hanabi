@@ -35,6 +35,12 @@ const PROJECT_FLOWBOX_COLUMN_SPACING = 12;
 export default class HanabiExtensionPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         window._settings = this.getSettings();
+        window._signalHandles = [];
+        window.connect('close-request', () => {
+            window._signalHandles?.forEach(([object, id]) => object.disconnect(id));
+            window._signalHandles = [];
+            return false;
+        });
         // Create a preferences page and group
         const page = new Adw.PreferencesPage();
 
@@ -144,6 +150,12 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
         // Add our page to the window
         window.add(page);
     }
+}
+
+function connectTracked(window, object, signal, callback) {
+    const id = object.connect(signal, callback);
+    window._signalHandles.push([object, id]);
+    return id;
 }
 
 /**
@@ -288,7 +300,7 @@ function prefsRowLibraryPath(window, prefsGroup) {
         dialog.show();
     });
 
-    settings.connect(`changed::${key}`, () => {
+    connectTracked(window, settings, `changed::${key}`, () => {
         row.subtitle = formatLibrarySubtitle(settings.get_string(key));
     });
 }
@@ -362,21 +374,37 @@ function createAnimatedProjectPreview(path) {
     try {
         const animation = GdkPixbuf.PixbufAnimation.new_from_file(path);
         const iter = animation.get_iter(null);
+        const frameTextures = new Map();
+        let timerId = 0;
+        let destroyed = false;
 
         const updateFrame = () => {
+            if (destroyed)
+                return GLib.SOURCE_REMOVE;
+
             const pixbuf = iter.get_pixbuf();
             if (pixbuf) {
-                const scaled = pixbuf.scale_simple(
-                    PROJECT_CARD_WIDTH,
-                    PROJECT_CARD_WIDTH,
-                    GdkPixbuf.InterpType.BILINEAR
-                ) ?? pixbuf;
-                const texture = Gdk.Texture.new_for_pixbuf(scaled);
+                let texture = frameTextures.get(pixbuf);
+                if (!texture) {
+                    const scaled = pixbuf.scale_simple(
+                        PROJECT_CARD_WIDTH,
+                        PROJECT_CARD_WIDTH,
+                        GdkPixbuf.InterpType.BILINEAR
+                    ) ?? pixbuf;
+                    texture = Gdk.Texture.new_for_pixbuf(scaled);
+                    frameTextures.set(pixbuf, texture);
+                }
                 image.set_paintable(texture);
             }
 
             const delay = Math.max(iter.get_delay_time(), 16);
-            GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
+            timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
+                if (destroyed) {
+                    timerId = 0;
+                    return GLib.SOURCE_REMOVE;
+                }
+
+                timerId = 0;
                 iter.advance(null);
                 return updateFrame();
             });
@@ -384,6 +412,15 @@ function createAnimatedProjectPreview(path) {
         };
 
         updateFrame();
+        image.connect('destroy', () => {
+            destroyed = true;
+            if (timerId) {
+                GLib.source_remove(timerId);
+                timerId = 0;
+            }
+            frameTextures.clear();
+            image.set_paintable(null);
+        });
     } catch (_e) {
         const picture = Gtk.Picture.new_for_file(Gio.File.new_for_path(path));
         picture.set({
@@ -653,7 +690,7 @@ function prefsRowProjectChooser(window, prefsGroup) {
         dialog.present();
     });
 
-    settings.connect(`changed::${currentProjectKey}`, () => {
+    connectTracked(window, settings, `changed::${currentProjectKey}`, () => {
         row.subtitle = formatProjectSubtitle(settings.get_string(currentProjectKey));
     });
 }

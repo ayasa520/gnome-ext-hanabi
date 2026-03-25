@@ -155,7 +155,7 @@ export class PlaybackState {
                 },
             },
         };
-        this._renderer.proxy.connectSignal(
+        this._isPlayingChangedId = this._renderer.proxy.connectSignal(
             'isPlayingChanged',
             (_proxy, _sender, [isPlaying]) => {
                 if (isPlaying && this.getCurrentState() !== 'playing') {
@@ -193,5 +193,12 @@ export class PlaybackState {
 
     autoPause() {
         this._machine.transition(this.getCurrentState(), 'autoPause');
+    }
+
+    destroy() {
+        if (this._isPlayingChangedId) {
+            this._renderer.proxy.disconnectSignal(this._isPlayingChangedId);
+            this._isPlayingChangedId = 0;
+        }
     }
 }
