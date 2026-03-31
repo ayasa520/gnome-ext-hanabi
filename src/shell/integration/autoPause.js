@@ -21,8 +21,8 @@ import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import * as Logger from './logger.js';
-import * as DBus from './dbus.js';
+import * as Logger from '../logger.js';
+import * as DBus from '../services/dbus.js';
 import UPower from 'gi://UPowerGlib';
 
 const applicationId = 'io.github.jeffshee.HanabiRenderer';

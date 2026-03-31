@@ -16,7 +16,7 @@
  */
 
 import * as DBus from './dbus.js';
-import * as Logger from './logger.js';
+import * as Logger from '../logger.js';
 
 
 /**

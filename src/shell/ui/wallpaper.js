@@ -24,10 +24,10 @@ import Graphene from 'gi://Graphene';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import * as DBus from './dbus.js';
-import * as Logger from './logger.js';
-import {loadProject, ProjectType} from './project.js';
-import * as RoundedCornersEffect from './roundedCornersEffect.js';
+import * as DBus from '../services/dbus.js';
+import * as Logger from '../logger.js';
+import {loadProject, ProjectType} from '../../project.js';
+import * as RoundedCornersEffect from '../integration/roundedCornersEffect.js';
 
 const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const logger = new Logger.Logger();

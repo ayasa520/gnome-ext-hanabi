@@ -19,6 +19,18 @@
 
 imports.gi.versions.Gtk = '4.0';
 const {GObject, Gtk, Gio, GLib, Gdk, Gst} = imports.gi;
+const System = imports.system;
+
+const rendererDir = GLib.path_get_dirname(System.programInvocationName);
+const sourceDir = GLib.path_get_dirname(rendererDir);
+const commonDir = GLib.build_filenamev([sourceDir, 'common']);
+if (!imports.searchPath.some(path => path === commonDir))
+    imports.searchPath.unshift(commonDir);
+if (!imports.searchPath.some(path => path === rendererDir))
+    imports.searchPath.unshift(rendererDir);
+
+const ProjectLoader = imports.projectLoader;
+const RendererBackends = imports.backends;
 
 // [major, minor, micro, nano]
 const gstVersion = Gst.version();
@@ -141,109 +153,14 @@ let isDebugMode = extSettings ? extSettings.get_boolean('debug-mode') : true;
 let changeWallpaperTimerId = null;
 let argvContentFitOverride = false;
 
+const {ProjectType, loadProject, listProjects} = ProjectLoader;
+
 const hasArg = arg => ARGV.includes(arg);
 
 if (hasArg('-S') || hasArg('--standalone')) {
     standalone = true;
     applicationId = `${rendererDbusName}.Standalone`;
 }
-
-const ProjectType = {
-    VIDEO: 'video',
-    WEB: 'web',
-    SCENE: 'scene',
-};
-
-const readJsonFile = path => {
-    try {
-        const [ok, contents] = GLib.file_get_contents(path);
-        if (!ok)
-            return null;
-
-        return JSON.parse(new TextDecoder().decode(contents));
-    } catch (e) {
-        return null;
-    }
-};
-
-const resolveRegularFile = (projectDirPath, relativePath) => {
-    if (!relativePath)
-        return null;
-
-    const filePath = GLib.build_filenamev([projectDirPath, relativePath]);
-    const file = Gio.File.new_for_path(filePath);
-    if (file.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.REGULAR)
-        return null;
-
-    return filePath;
-};
-
-const loadProject = path => {
-    if (!path)
-        return null;
-
-    const projectDir = Gio.File.new_for_path(path);
-    if (projectDir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
-        return null;
-
-    const manifestPath = GLib.build_filenamev([path, 'project.json']);
-    const manifest = readJsonFile(manifestPath);
-    const type = `${manifest?.type ?? ''}`.toLowerCase();
-    if (![ProjectType.VIDEO, ProjectType.WEB, ProjectType.SCENE].includes(type))
-        return null;
-
-    let entry = typeof manifest?.file === 'string' && manifest.file !== ''
-        ? manifest.file
-        : null;
-    if (!entry && type === ProjectType.WEB)
-        entry = 'index.html';
-
-    let entryPath = resolveRegularFile(path, entry);
-    if (type === ProjectType.SCENE && !entryPath)
-        entryPath = resolveRegularFile(path, 'scene.pkg');
-    if (entry && !entryPath && type !== ProjectType.SCENE)
-        return null;
-
-    let previewPath = resolveRegularFile(path, manifest?.preview);
-    if (!previewPath)
-        previewPath = resolveRegularFile(path, 'preview.jpg');
-
-    return {
-        type,
-        path,
-        entryPath,
-        previewPath,
-    };
-};
-
-const listProjects = parentDirPath => {
-    const projects = [];
-    if (!parentDirPath)
-        return projects;
-
-    const dir = Gio.File.new_for_path(parentDirPath);
-    if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
-        return projects;
-
-    const enumerator = dir.enumerate_children(
-        'standard::*',
-        Gio.FileQueryInfoFlags.NONE,
-        null
-    );
-
-    let info;
-    while ((info = enumerator.next_file(null))) {
-        if (info.get_file_type() !== Gio.FileType.DIRECTORY)
-            continue;
-
-        const child = dir.get_child(info.get_name());
-        const project = loadProject(child.get_path());
-        if (project)
-            projects.push(project);
-    }
-
-    return projects.sort((a, b) => a.path.localeCompare(b.path));
-};
 
 const parseContentFit = value => {
     if (!haveContentFit)
@@ -275,6 +192,35 @@ if (haveContentFit) {
         : Gtk.ContentFit.CONTAIN;
 }
 
+const createBackend = RendererBackends.createBackendFactory({
+    Gtk,
+    Gio,
+    GLib,
+    Gst,
+    GstPlay,
+    GstAudio,
+    WebKit,
+    HanabiScene,
+    ProjectType,
+    flags: {
+        forceMediaFile,
+        forceGtk4PaintableSink,
+        haveGstPlay,
+        haveGstAudio,
+        haveWebKit,
+        haveSceneBackend,
+        haveContentFit,
+        useGstGL,
+        haveGraphicsOffload,
+    },
+    state: {
+        getContentFit: () => contentFit,
+        getMute: () => mute,
+        getVolume: () => volume,
+        getSceneFps: () => sceneFps,
+    },
+});
+
 
 const HanabiRenderer = GObject.registerClass(
     {
@@ -290,15 +236,8 @@ const HanabiRenderer = GObject.registerClass(
             GLib.log_set_debug_enabled(isDebugMode);
 
             this._hanabiWindows = [];
-            this._pictures = [];
-            this._sharedPaintable = null;
-            this._gstImplName = '';
             this._project = null;
-            this._play = null;
-            this._media = null;
-            this._webViews = new Map();
-            this._webPausePictures = new Map();
-            this._sceneWidgets = [];
+            this._backend = null;
             this._isPlaying = false;
             this._dbus = null;
             if (!standalone)
@@ -371,9 +310,7 @@ const HanabiRenderer = GObject.registerClass(
                     if (argvContentFitOverride)
                         return;
                     contentFit = settings.get_int(key);
-                    this._pictures.forEach(picture =>
-                        picture.set_content_fit(contentFit)
-                    );
+                    this._backend?.applyContentFit(contentFit);
                     break;
                 case 'debug-mode':
                     isDebugMode = settings.get_boolean(key);
@@ -508,6 +445,7 @@ const HanabiRenderer = GObject.registerClass(
 
         _buildUI() {
             this._project = loadProject(projectPath);
+            this._backend = this._createBackend(this._project);
 
             this._monitors.forEach((gdkMonitor, index) => {
                 let widget = this._getWidgetForMonitor(index);
@@ -521,7 +459,7 @@ const HanabiRenderer = GObject.registerClass(
                 let window = new HanabiRendererWindow(
                     this,
                     nohide
-                        ? `Hanabi Renderer #${index} (using ${this._gstImplName})`
+                        ? this._getWindowTitle(index)
                         : `@${applicationId}!${JSON.stringify(state)}|${index}`,
                     widget,
                     gdkMonitor
@@ -529,20 +467,27 @@ const HanabiRenderer = GObject.registerClass(
 
                 this._hanabiWindows.push(window);
             });
-            console.log(`using ${this._gstImplName}`);
+            this._backend.applyContentFit(contentFit);
+            this.setAutoWallpaper();
+            console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
         }
 
         _switchProject() {
             this._project = loadProject(projectPath);
             this._resetBackend();
+            this._backend = this._createBackend(this._project);
 
             this._hanabiWindows.forEach((window, index) => {
                 const widget = this._getWidgetForMonitor(index);
                 window.setWallpaperWidget(widget);
+                if (nohide)
+                    window.set_title(this._getWindowTitle(index));
             });
 
             this.setVolume(volume);
             this.setMute(mute);
+            this.setSceneFps(sceneFps);
+            this.setPlay();
             this.setAutoWallpaper();
         }
 
@@ -552,491 +497,28 @@ const HanabiRenderer = GObject.registerClass(
                 changeWallpaperTimerId = null;
             }
 
-            if (this._sceneWidgets?.length) {
-                const oldSceneWidgets = [...this._sceneWidgets];
-                oldSceneWidgets.forEach(widget => {
-                    try {
-                        widget.pause();
-                    } catch (_e) {
-                    }
-                });
-
-                // Scene audio shutdown can be asynchronous on some systems.
-                // Retry pause shortly after switch to suppress trailing sound.
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
-                    oldSceneWidgets.forEach(widget => {
-                        try {
-                            widget.pause();
-                        } catch (_e) {
-                        }
-                    });
-                    return GLib.SOURCE_REMOVE;
-                });
-            }
-
-            if (this._play) {
-                try {
-                    this._play.pause();
-                } catch (_e) {
-                }
-            }
-            if (this._media) {
-                try {
-                    this._media.pause();
-                    this._media.stream_unprepared();
-                } catch (_e) {
-                }
-            }
-
-            this._pictures = [];
-            this._sharedPaintable = null;
-            this._play = null;
-            this._media = null;
-            this._webViews = new Map();
-            this._webPausePictures = new Map();
-            this._scenePicture = null;
-            this._sceneWidgets = [];
-            this._adapter = null;
-            this._gstImplName = '';
+            this._backend?.destroy();
+            this._backend = null;
             this._setPlayingState(false);
         }
 
+        _createBackend(project) {
+            return createBackend(this, project);
+        }
+
         _getWidgetForMonitor(index) {
+            return this._backend.createWidgetForMonitor(index);
+        }
+
+        _getProjectLabel() {
             if (!this._project)
-                return this._getPlaceholderWidget('Invalid wallpaper project');
+                return 'Invalid wallpaper project';
 
-            switch (this._project.type) {
-            case ProjectType.WEB:
-                return this._getWebWidget(index);
-            case ProjectType.SCENE:
-                return this._getSceneWidget();
-            case ProjectType.VIDEO:
-            default:
-                return this._getVideoWidget(index);
-            }
+            return this._project.title || this._project.basename || this._project.path || 'Untitled project';
         }
 
-        _getVideoWidget(index) {
-            let widget = this._getWidgetFromSharedPaintable();
-
-            if (index > 0 && !widget)
-                return this._getPlaceholderWidget('Video renderer could not be shared across monitors');
-
-            if (!widget) {
-                if (!forceMediaFile && haveGstPlay) {
-                    let sink = null;
-                    if (!forceGtk4PaintableSink)
-                        sink = Gst.ElementFactory.make('clappersink', 'clappersink');
-
-                    if (!sink)
-                        sink = Gst.ElementFactory.make('gtk4paintablesink', 'gtk4paintablesink');
-
-                    if (sink)
-                        widget = this._getWidgetFromSink(sink);
-                }
-
-                if (!widget)
-                    widget = this._getGtkStockWidget();
-            }
-
-            return widget;
-        }
-
-        _getPlaceholderWidget(message) {
-            this._gstImplName = this._gstImplName || 'Placeholder';
-
-            const box = new Gtk.Box({
-                hexpand: true,
-                vexpand: true,
-                halign: Gtk.Align.FILL,
-                valign: Gtk.Align.FILL,
-            });
-            box.add_css_class('background');
-
-            const label = new Gtk.Label({
-                label: message,
-                wrap: true,
-                justify: Gtk.Justification.CENTER,
-                halign: Gtk.Align.CENTER,
-                valign: Gtk.Align.CENTER,
-            });
-            box.append(label);
-
-            return box;
-        }
-
-        _getSceneWidget() {
-            this._gstImplName = 'HanabiScene';
-
-            if (!this._project.entryPath)
-                return this._getPlaceholderWidget('Scene package not found');
-
-            if (haveSceneBackend) {
-                const sceneWidget = new HanabiScene.Widget({
-                    'project-dir': this._project.path,
-                    muted: mute,
-                    volume,
-                    fps: sceneFps,
-                    'fill-mode': this._getSceneFillMode(),
-                    playing: true,
-                    hexpand: true,
-                    vexpand: true,
-                    halign: Gtk.Align.FILL,
-                    valign: Gtk.Align.FILL,
-                });
-                this._sceneWidgets.push(sceneWidget);
-                this._setPlayingState(true);
-                this.setAutoWallpaper();
-                return sceneWidget;
-            }
-
-            if (!this._project.previewPath)
-                return this._getPlaceholderWidget('Scene preview is not available');
-
-            const picture = Gtk.Picture.new_for_file(
-                Gio.File.new_for_path(this._project.previewPath)
-            );
-            picture.set({
-                hexpand: true,
-                vexpand: true,
-                can_shrink: true,
-                halign: Gtk.Align.FILL,
-                valign: Gtk.Align.FILL,
-            });
-            if (haveContentFit)
-                picture.set_content_fit(contentFit);
-
-            this._scenePicture = picture;
-            this._setPlayingState(true);
-            this.setAutoWallpaper();
-
-            return picture;
-        }
-
-        _getSceneFillMode() {
-            if (!haveContentFit)
-                return 2;
-
-            switch (contentFit) {
-            case Gtk.ContentFit.FILL:
-                return 0;
-            case Gtk.ContentFit.CONTAIN:
-            case Gtk.ContentFit.SCALE_DOWN:
-                return 1;
-            case Gtk.ContentFit.COVER:
-            default:
-                return 2;
-            }
-        }
-
-        _getWebWidget(index) {
-            this._gstImplName = 'WebKitWebView';
-
-            if (!haveWebKit)
-                return this._getPlaceholderWidget('WebKitGTK is not available');
-
-            const userContentManager = new WebKit.UserContentManager();
-            userContentManager.add_script(
-                new WebKit.UserScript(
-                    `
-                    (() => {
-                        if (window.__hanabiPlaybackBridgeInstalled)
-                            return;
-                        window.__hanabiPlaybackBridgeInstalled = true;
-
-                        window.__hanabiAudioContexts = window.__hanabiAudioContexts || [];
-                        const wrapAudioContext = key => {
-                            const Original = window[key];
-                            if (typeof Original !== 'function')
-                                return;
-
-                            const Wrapped = class extends Original {
-                                constructor(...args) {
-                                    super(...args);
-                                    window.__hanabiAudioContexts.push(this);
-                                }
-                            };
-                            Object.setPrototypeOf(Wrapped, Original);
-                            window[key] = Wrapped;
-                        };
-
-                        wrapAudioContext('AudioContext');
-                        wrapAudioContext('webkitAudioContext');
-                    })();
-                    `,
-                    WebKit.UserContentInjectedFrames.ALL_FRAMES,
-                    WebKit.UserScriptInjectionTime.START,
-                    null,
-                    null
-                )
-            );
-
-            const webView = new WebKit.WebView({
-                user_content_manager: userContentManager,
-                hexpand: true,
-                vexpand: true,
-            });
-            const pausePicture = new Gtk.Picture({
-                hexpand: true,
-                vexpand: true,
-                visible: false,
-                can_shrink: true,
-            });
-            if (haveContentFit)
-                pausePicture.set_content_fit(contentFit);
-
-            const overlay = new Gtk.Overlay({
-                hexpand: true,
-                vexpand: true,
-            });
-            overlay.set_child(webView);
-            overlay.add_overlay(pausePicture);
-            webView.set_can_focus(false);
-
-            const settings = webView.get_settings();
-            if (settings.set_enable_webaudio)
-                settings.set_enable_webaudio(true);
-            if (settings.set_enable_webgl)
-                settings.set_enable_webgl(true);
-            if (settings.set_allow_file_access_from_file_urls)
-                settings.set_allow_file_access_from_file_urls(true);
-
-            webView.connect('load-changed', (_view, loadEvent) => {
-                if (loadEvent !== WebKit.LoadEvent.FINISHED)
-                    return;
-
-                if (this._isPlaying)
-                    this._setWebPlayback(true);
-            });
-
-            const file = Gio.File.new_for_path(this._project.entryPath);
-            webView.load_uri(file.get_uri());
-            this._webViews.set(index, webView);
-            this._webPausePictures.set(index, pausePicture);
-
-            this._setPlayingState(true);
-            this.setAutoWallpaper();
-
-            return overlay;
-        }
-
-        _setWebPlayback(isPlaying) {
-            if (this._webViews.size === 0)
-                return;
-
-            const script = `
-                (() => {
-                    const playing = ${isPlaying ? 'true' : 'false'};
-                    const mediaElements = document.querySelectorAll('audio, video');
-                    for (const media of mediaElements) {
-                        if (playing)
-                            media.play?.().catch?.(() => {});
-                        else
-                            media.pause?.();
-                    }
-
-                    const contexts = window.__hanabiAudioContexts || [];
-                    for (const context of contexts) {
-                        if (playing)
-                            context.resume?.().catch?.(() => {});
-                        else
-                            context.suspend?.().catch?.(() => {});
-                    }
-
-                    window.dispatchEvent(new CustomEvent('hanabi-playback-change', {
-                        detail: {playing},
-                    }));
-                })();
-            `;
-
-            this._webViews.forEach((webView, index) => {
-                webView.evaluate_javascript(
-                    script,
-                    -1,
-                    null,
-                    null,
-                    null,
-                    () => {}
-                );
-
-                if (isPlaying) {
-                    webView.visible = true;
-                    const pausePicture = this._webPausePictures.get(index);
-                    if (pausePicture)
-                        pausePicture.visible = false;
-                } else {
-                    this._freezeWebView(index);
-                }
-            });
-            this._setPlayingState(isPlaying);
-        }
-
-        _freezeWebView(index) {
-            const webView = this._webViews.get(index);
-            const pausePicture = this._webPausePictures.get(index);
-            if (!webView || !pausePicture)
-                return;
-
-            webView.get_snapshot(
-                WebKit.SnapshotRegion.VISIBLE,
-                WebKit.SnapshotOptions.NONE,
-                null,
-                (webView, result) => {
-                    try {
-                        const snapshot = webView.get_snapshot_finish(result);
-                        if (!snapshot)
-                            return;
-
-                        pausePicture.paintable = snapshot;
-                        pausePicture.visible = true;
-                        webView.visible = false;
-                    } catch (e) {
-                        console.warn(e);
-                    }
-                }
-            );
-        }
-
-        _getWidgetFromSharedPaintable() {
-            if (this._sharedPaintable) {
-                let picture = new Gtk.Picture({
-                    paintable: this._sharedPaintable,
-                    hexpand: true,
-                    vexpand: true,
-                });
-
-                if (haveContentFit)
-                    picture.set_content_fit(contentFit);
-                this._pictures.push(picture);
-
-                if (haveGraphicsOffload) {
-                    let offload = Gtk.GraphicsOffload.new(picture);
-                    offload.set_enabled(Gtk.GraphicsOffloadEnabled.ENABLED);
-                    return offload;
-                }
-
-                return picture;
-            }
-            return null;
-        }
-
-        _getWidgetFromSink(sink) {
-            this._gstImplName = sink.name;
-
-            // If sink already offers GTK widget, use it.
-            // Otherwise use GtkPicture with paintable from sink.
-            let widget = null;
-
-            if (sink.widget) {
-                if (sink.widget instanceof Gtk.Picture) {
-                    // Workaround for clappersink.
-                    // We use a Gtk.Box here to piggyback the sink.widget from clappersink,
-                    // otherwise the sink.widget will spawn a window for itself.
-                    // This workaround is only needed for the first window.
-                    this._sharedPaintable = sink.widget.paintable;
-                    let box = new Gtk.Box();
-                    box.append(sink.widget);
-                    box.append(this._getWidgetFromSharedPaintable());
-                    // Hide the sink.widget to show our Gtk.Picture only
-                    sink.widget.hide();
-                    widget = box;
-                } else {
-                    // Just in case clappersink doesn't use GtkPicture internally anymore
-                    widget = sink.widget;
-                }
-            } else if (sink.paintable) {
-                this._sharedPaintable = sink.paintable;
-                widget = this._getWidgetFromSharedPaintable();
-            }
-
-            if (!widget)
-                return null;
-
-            if (useGstGL) {
-                let glsink = Gst.ElementFactory.make(
-                    'glsinkbin',
-                    'glsinkbin'
-                );
-                if (glsink) {
-                    this._gstImplName = `glsinkbin + ${this._gstImplName}`;
-                    glsink.set_property('sink', sink);
-                    sink = glsink;
-                }
-            }
-            this._play = GstPlay.Play.new(
-                GstPlay.PlayVideoOverlayVideoRenderer.new_with_sink(null, sink)
-            );
-            this._adapter = GstPlay.PlaySignalAdapter.new(this._play);
-
-            // Loop video
-            this._adapter.connect('end-of-stream', adapter =>
-                adapter.play.seek(0)
-            );
-
-            // Error handling
-            this._adapter.connect('warning', (_adapter, err) => console.warn(err));
-            this._adapter.connect('error', (_adapter, err) => console.error(err));
-
-            // Set the volume and mute after paused state, otherwise it won't work.
-            // Use paused or greater, as some states might be skipped.
-            let stateSignal = this._adapter.connect(
-                'state-changed',
-                (adapter, state) => {
-                    if (state >= GstPlay.PlayState.PAUSED) {
-                        this.setVolume(volume);
-                        this.setMute(mute);
-
-                        this._adapter.disconnect(stateSignal);
-                        stateSignal = null;
-                    }
-                }
-            );
-            // Monitor playing state.
-            this._adapter.connect(
-                'state-changed',
-                (adapter, state) => {
-                    // Monitor playing state.
-                    this._isPlaying = state === GstPlay.PlayState.PLAYING;
-                    this._emitPlayingChanged();
-                }
-            );
-
-            let file = Gio.File.new_for_path(this._project.entryPath);
-            this._play.set_uri(file.get_uri());
-
-            this.setPlay();
-            this.setAutoWallpaper();
-
-            return widget;
-        }
-
-        _getGtkStockWidget() {
-            this._gstImplName = 'GtkMediaFile';
-
-            // The constructor of MediaFile doesn't work in gjs.
-            // Have to call the `new_for_xxx` function here.
-            this._media = Gtk.MediaFile.new_for_filename(this._project.entryPath);
-            this._media.set({
-                loop: true,
-            });
-            // Set the volume and mute after prepared, otherwise it won't work.
-            this._media.connect('notify::prepared', () => {
-                this.setVolume(volume);
-                this.setMute(mute);
-            });
-            // Monitor playing state.
-            this._media.connect('notify::playing', media => {
-                this._isPlaying = media.get_playing();
-                this._emitPlayingChanged();
-            });
-
-            this._sharedPaintable = this._media;
-            let widget = this._getWidgetFromSharedPaintable();
-
-            this.setPlay();
-            this.setAutoWallpaper();
-
-            return widget;
+        _getWindowTitle(index) {
+            return `Hanabi Renderer #${index}: ${this._getProjectLabel()} (using ${this._backend.displayName})`;
         }
 
         _exportDbus() {
@@ -1113,29 +595,7 @@ const HanabiRenderer = GObject.registerClass(
          * @param _volume
          */
         setVolume(_volume) {
-            let player = this._play != null ? this._play : this._media;
-            if (!player) {
-                if (this._sceneWidgets?.length)
-                    this._sceneWidgets.forEach(widget => widget.set_volume(_volume));
-                return;
-            }
-
-            // GstPlay uses linear volume
-            if (this._play) {
-                if (haveGstAudio) {
-                    _volume = GstAudio.StreamVolume.convert_volume(
-                        GstAudio.StreamVolumeFormat.CUBIC,
-                        GstAudio.StreamVolumeFormat.LINEAR,
-                        _volume
-                    );
-                } else {
-                    _volume = Math.pow(_volume, 3);
-                }
-            }
-
-            if (player.volume === _volume)
-                player.volume = null;
-            player.volume = _volume;
+            this._backend?.setVolume(_volume);
         }
 
         setMute(_mute) {
@@ -1143,32 +603,11 @@ const HanabiRenderer = GObject.registerClass(
             if (extSettings && extSettings.get_boolean('mute') !== _mute)
                 extSettings.set_boolean('mute', _mute);
 
-            if (!this._play && !this._media && this._webViews.size === 0 && !this._sceneWidgets?.length)
-                return;
-
-            if (this._play) {
-                if (this._play.mute === _mute)
-                    this._play.mute = !_mute;
-                this._play.mute = _mute;
-            } else if (this._media) {
-                if (this._media.muted === _mute)
-                    this._media.muted = !_mute;
-                this._media.muted = _mute;
-            } else if (this._webViews.size > 0) {
-                this._webViews.forEach(webView => {
-                    if (webView.is_muted === _mute)
-                        webView.is_muted = !_mute;
-                    webView.is_muted = _mute;
-                });
-            } else if (this._sceneWidgets?.length) {
-                this._sceneWidgets.forEach(widget => widget.set_muted(_mute));
-            }
+            this._backend?.setMute(_mute);
         }
 
         setSceneFps(fps) {
-            if (!this._sceneWidgets?.length)
-                return;
-            this._sceneWidgets.forEach(widget => widget.set_fps?.(fps));
+            this._backend?.setSceneFps(fps);
         }
 
         _setPlayingState(isPlaying) {
@@ -1177,37 +616,17 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         setPlay() {
-            if (this._play) {
-                this._play.play();
-            } else if (this._media) {
-                this._media.play();
-            } else if (this._webViews.size > 0) {
-                this._setWebPlayback(true);
-            } else if (this._sceneWidgets?.length) {
-                this._sceneWidgets.forEach(widget => widget.play());
+            if (this._backend)
+                this._backend.setPlay();
+            else
                 this._setPlayingState(true);
-            } else if (this._project?.type === ProjectType.SCENE) {
-                this._setPlayingState(true);
-            } else {
-                this._setPlayingState(true);
-            }
         }
 
         setPause() {
-            if (this._play) {
-                this._play.pause();
-            } else if (this._media) {
-                this._media.pause();
-            } else if (this._webViews.size > 0) {
-                this._setWebPlayback(false);
-            } else if (this._sceneWidgets?.length) {
-                this._sceneWidgets.forEach(widget => widget.pause());
+            if (this._backend)
+                this._backend.setPause();
+            else
                 this._setPlayingState(false);
-            } else if (this._project?.type === ProjectType.SCENE) {
-                this._setPlayingState(false);
-            } else {
-                this._setPlayingState(false);
-            }
         }
 
         setAutoWallpaper() {
@@ -1276,275 +695,15 @@ const HanabiRenderer = GObject.registerClass(
             const deltaX = Number(event.deltaX ?? 0);
             const deltaY = Number(event.deltaY ?? 0);
 
-            if (this._project?.type === ProjectType.WEB) {
-                const webView = this._webViews.get(monitorIndex);
-                if (!webView)
-                    return;
-
-                const scriptEvent = {
-                    type,
-                    x,
-                    y,
-                    button,
-                    deltaX,
-                    deltaY,
-                };
-                const script = `
-                    (() => {
-                        const data = ${JSON.stringify(scriptEvent)};
-                        const state = window.__hanabiPointerState || (window.__hanabiPointerState = {
-                            isDown: false,
-                            isDragging: false,
-                            downX: 0,
-                            downY: 0,
-                            downButton: -1,
-                            downTarget: null,
-                            dragTarget: null,
-                            dragDataTransfer: null,
-                            hasMovedSinceDown: false,
-                            lastClickAt: 0,
-                            lastClickX: 0,
-                            lastClickY: 0,
-                        });
-                        const target = document.elementFromPoint(data.x, data.y) || document.body;
-                        if (!target)
-                            return;
-                        const normalizedButton = Math.max(0, data.button - 1);
-
-                        const common = {
-                            bubbles: true,
-                            cancelable: true,
-                            clientX: data.x,
-                            clientY: data.y,
-                            screenX: data.x,
-                            screenY: data.y,
-                            button: normalizedButton,
-                            buttons: data.type === 'mousedown'
-                                ? (1 << normalizedButton)
-                                : (data.type === 'mouseup' ? 0 : (state.isDown ? (1 << Math.max(0, state.downButton)) : 0)),
-                        };
-
-                        const pointerEventType = data.type === 'mousedown'
-                            ? 'pointerdown'
-                            : (data.type === 'mouseup' ? 'pointerup' : (data.type === 'mousemove' ? 'pointermove' : data.type));
-                        if (typeof PointerEvent !== 'undefined' && pointerEventType !== 'wheel') {
-                            const pointerEvent = new PointerEvent(pointerEventType, {
-                                ...common,
-                                pointerId: 1,
-                                pointerType: 'mouse',
-                                isPrimary: true,
-                                pressure: data.type === 'mouseup' ? 0 : (state.isDown || data.type === 'mousedown' ? 0.5 : 0),
-                            });
-                            target.dispatchEvent(pointerEvent);
-                        }
-
-                        let domEvent;
-                        if (data.type === 'wheel') {
-                            domEvent = new WheelEvent('wheel', {
-                                ...common,
-                                deltaX: data.deltaX,
-                                deltaY: data.deltaY,
-                            });
-                        } else {
-                            domEvent = new MouseEvent(data.type, common);
-                        }
-                        target.dispatchEvent(domEvent);
-
-                        const distance = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
-                        const CLICK_MOVE_TOLERANCE = 8;
-                        const DBLCLICK_MOVE_TOLERANCE = 8;
-                        const DBLCLICK_INTERVAL_MS = 400;
-                        const DRAG_START_TOLERANCE = 8;
-                        const updateRangeValueFromPointer = (rangeEl, shouldDispatchChange) => {
-                            if (!rangeEl || rangeEl.tagName !== 'INPUT' || String(rangeEl.type).toLowerCase() !== 'range')
-                                return;
-
-                            const min = Number(rangeEl.min || 0);
-                            const max = Number(rangeEl.max || 100);
-                            const step = Number(rangeEl.step || 1);
-                            const rect = rangeEl.getBoundingClientRect();
-                            if (!rect || rect.width <= 0 || max <= min)
-                                return;
-
-                            const rawRatio = (data.x - rect.left) / rect.width;
-                            const ratio = Math.max(0, Math.min(1, rawRatio));
-                            const rawValue = min + ratio * (max - min);
-                            const steppedValue = step > 0 ? Math.round(rawValue / step) * step : rawValue;
-                            const clampedValue = Math.max(min, Math.min(max, steppedValue));
-                            const nextValue = String(clampedValue);
-                            if (rangeEl.value === nextValue)
-                                return;
-
-                            rangeEl.value = nextValue;
-                            rangeEl.dispatchEvent(new Event('input', { bubbles: true }));
-                            if (shouldDispatchChange)
-                                rangeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                        };
-                        const createDataTransfer = () => {
-                            if (typeof DataTransfer !== 'undefined') {
-                                try {
-                                    return new DataTransfer();
-                                } catch (_e) {}
-                            }
-
-                            // Minimal fallback for environments where DataTransfer cannot be constructed.
-                            return {
-                                dropEffect: 'move',
-                                effectAllowed: 'all',
-                                files: [],
-                                items: [],
-                                types: [],
-                                _data: {},
-                                clearData(type) {
-                                    if (type)
-                                        delete this._data[type];
-                                    else
-                                        this._data = {};
-                                    this.types = Object.keys(this._data);
-                                },
-                                getData(type) {
-                                    return this._data[type] ?? '';
-                                },
-                                setData(type, value) {
-                                    this._data[type] = String(value);
-                                    this.types = Object.keys(this._data);
-                                },
-                                setDragImage() {},
-                            };
-                        };
-                        const createDragEvent = (eventType, eventTarget, dataTransfer) => {
-                            const dragCommon = {
-                                bubbles: true,
-                                cancelable: true,
-                                clientX: data.x,
-                                clientY: data.y,
-                                screenX: data.x,
-                                screenY: data.y,
-                                button: normalizedButton,
-                                buttons: state.isDown ? (1 << Math.max(0, state.downButton)) : 0,
-                            };
-
-                            let dragEvent;
-                            if (typeof DragEvent !== 'undefined') {
-                                try {
-                                    dragEvent = new DragEvent(eventType, {
-                                        ...dragCommon,
-                                        dataTransfer,
-                                    });
-                                } catch (_e) {}
-                            }
-
-                            if (!dragEvent) {
-                                dragEvent = new MouseEvent(eventType, dragCommon);
-                                try {
-                                    Object.defineProperty(dragEvent, 'dataTransfer', {
-                                        value: dataTransfer,
-                                        configurable: true,
-                                    });
-                                } catch (_e) {}
-                            }
-
-                            eventTarget.dispatchEvent(dragEvent);
-                        };
-
-                        if (data.type === 'mousedown') {
-                            state.isDown = true;
-                            state.isDragging = false;
-                            state.downX = data.x;
-                            state.downY = data.y;
-                            state.downButton = normalizedButton;
-                            state.downTarget = target;
-                            state.dragTarget = null;
-                            state.dragDataTransfer = null;
-                            state.hasMovedSinceDown = false;
-                        } else if (data.type === 'mousemove' && state.isDown) {
-                            if (distance(data.x, data.y, state.downX, state.downY) > CLICK_MOVE_TOLERANCE)
-                                state.hasMovedSinceDown = true;
-
-                            const shouldStartDrag =
-                                !state.isDragging &&
-                                state.downButton === 0 &&
-                                distance(data.x, data.y, state.downX, state.downY) > DRAG_START_TOLERANCE;
-                            if (shouldStartDrag && state.downTarget) {
-                                state.isDragging = true;
-                                state.dragTarget = state.downTarget;
-                                state.dragDataTransfer = createDataTransfer();
-                                createDragEvent('dragstart', state.dragTarget, state.dragDataTransfer);
-                            }
-
-                            if (state.isDragging && state.dragTarget) {
-                                createDragEvent('drag', state.dragTarget, state.dragDataTransfer);
-                                createDragEvent('dragover', target, state.dragDataTransfer);
-                            }
-
-                            if (state.downButton === 0 && state.downTarget)
-                                updateRangeValueFromPointer(state.downTarget, false);
-                        } else if (data.type === 'mouseup') {
-                            const releasedButton = normalizedButton;
-                            const sameButton = state.downButton === releasedButton;
-                            const isDrag = state.hasMovedSinceDown;
-                            const sameTarget = state.downTarget && (target === state.downTarget || state.downTarget.contains(target));
-
-                            if (state.isDragging && state.dragTarget) {
-                                createDragEvent('drop', target, state.dragDataTransfer);
-                                createDragEvent('dragend', state.dragTarget, state.dragDataTransfer);
-                            }
-
-                            if (state.downButton === 0 && state.downTarget)
-                                updateRangeValueFromPointer(state.downTarget, true);
-
-                            if (state.isDown && sameButton && !isDrag && sameTarget) {
-                                const clickTarget = state.downTarget;
-                                const clickEvent = new MouseEvent('click', {
-                                    ...common,
-                                    detail: 1,
-                                });
-                                clickTarget.dispatchEvent(clickEvent);
-
-                                const now = Date.now();
-                                const isDoubleClick =
-                                    now - state.lastClickAt <= DBLCLICK_INTERVAL_MS &&
-                                    distance(data.x, data.y, state.lastClickX, state.lastClickY) <= DBLCLICK_MOVE_TOLERANCE;
-
-                                if (isDoubleClick) {
-                                    const dblClickEvent = new MouseEvent('dblclick', {
-                                        ...common,
-                                        detail: 2,
-                                    });
-                                    clickTarget.dispatchEvent(dblClickEvent);
-                                    state.lastClickAt = 0;
-                                } else {
-                                    state.lastClickAt = now;
-                                    state.lastClickX = data.x;
-                                    state.lastClickY = data.y;
-                                }
-                            }
-
-                            state.isDown = false;
-                            state.isDragging = false;
-                            state.downButton = -1;
-                            state.downTarget = null;
-                            state.dragTarget = null;
-                            state.dragDataTransfer = null;
-                            state.hasMovedSinceDown = false;
-                        }
-                    })();
-                `;
-                webView.evaluate_javascript(
-                    script,
-                    -1,
-                    null,
-                    null,
-                    null,
-                    () => {}
-                );
-            } else if (this._project?.type === ProjectType.SCENE) {
-                const sceneWidget = this._sceneWidgets?.[monitorIndex];
-                if (!sceneWidget)
-                    return;
-                if (type === 'mousemove' && sceneWidget.set_mouse_pos)
-                    sceneWidget.set_mouse_pos(x, y);
-            }
+            this._backend?.dispatchPointerEvent({
+                monitorIndex,
+                type,
+                x,
+                y,
+                button,
+                deltaX,
+                deltaY,
+            });
         }
 
         get isPlaying() {

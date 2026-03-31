@@ -19,7 +19,7 @@
 import GObject from 'gi://GObject';
 import Shell from 'gi://Shell';
 
-import * as Logger from './logger.js';
+import * as Logger from '../logger.js';
 
 const logger = new Logger.Logger('roundedCorners');
 

@@ -28,8 +28,8 @@ import * as Workspace from 'resource:///org/gnome/shell/ui/workspace.js';
 import * as WorkspaceThumbnail from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';
 import * as Util from 'resource:///org/gnome/shell/misc/util.js';
 
-import * as Logger from './logger.js';
-import * as Wallpaper from './wallpaper.js';
+import * as Logger from '../logger.js';
+import * as Wallpaper from '../ui/wallpaper.js';
 
 // eslint-disable-next-line no-unused-vars
 const logger = new Logger.Logger();

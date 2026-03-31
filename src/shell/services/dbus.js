@@ -18,7 +18,7 @@
 import Gio from 'gi://Gio';
 
 import * as DBusUtil from 'resource://org/gnome/shell/misc/dbusUtils.js';
-import * as Logger from './logger.js';
+import * as Logger from '../logger.js';
 
 
 // Ref: https://gjs.guide/guides/gio/dbus.html#high-level-proxies

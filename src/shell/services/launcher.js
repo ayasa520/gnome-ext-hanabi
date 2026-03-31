@@ -26,7 +26,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
-import * as Logger from './logger.js';
+import * as Logger from '../logger.js';
 
 const logger = new Logger.Logger();
 const rendererLogger = new Logger.Logger('renderer');

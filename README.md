@@ -72,8 +72,8 @@ Currently supported project types:
 ### Repository Layout
 
 - [src](./src): GNOME Shell extension code
-- [native/scene](./native/scene): Hanabi's native scene bridge
-- [third_party/wallpaper-scene-renderer](./third_party/wallpaper-scene-renderer): upstream scene renderer source used by the native bridge
+- [native/scene](./native/scene): Hanabi's native scene bridge and scene backend sources
+- [native/scene/third_party/wallpaper-scene-renderer](./native/scene/third_party/wallpaper-scene-renderer): upstream scene renderer source used by the native bridge
 
 Only the compiled native artifacts are installed into the extension directory at runtime. The third-party renderer sources are kept in this repository for development and build purposes.
 

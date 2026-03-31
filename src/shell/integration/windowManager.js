@@ -26,7 +26,7 @@ import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
-import * as Logger from './logger.js';
+import * as Logger from '../logger.js';
 
 const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const logger = new Logger.Logger();

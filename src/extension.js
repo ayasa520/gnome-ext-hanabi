@@ -15,38 +15,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import * as GnomeShellOverride from './gnomeShellOverride.js';
-import * as Launcher from './launcher.js';
-import * as WindowManager from './windowManager.js';
-import * as PlaybackState from './playbackState.js';
-import * as AutoPause from './autoPause.js';
-import * as PanelMenu from './panelMenu.js';
-import * as DBus from './dbus.js';
-import {loadProject} from './project.js';
+import * as GnomeShellOverride from './shell/integration/gnomeShellOverride.js';
+import * as WindowManager from './shell/integration/windowManager.js';
+import * as PlaybackState from './shell/services/playbackState.js';
+import * as AutoPause from './shell/integration/autoPause.js';
+import * as PanelMenu from './shell/ui/panelMenu.js';
+import * as DBus from './shell/services/dbus.js';
+import * as RendererManager from './shell/services/rendererManager.js';
+import * as SettingsBindings from './shell/services/settingsBindings.js';
 
 export default class HanabiExtension extends Extension {
     constructor(metadata) {
         super(metadata);
         this.isEnabled = false;
-        this.launchRendererId = 0;
         this.startupDelayId = 0;
         this.startupCompleteId = 0;
         this.startupOverviewRestoreId = 0;
-        this.currentProcess = null;
-        this.currentProjectType = null;
-        this.reloadTime = 100;
-        this._settingsSignals = [];
 
-        /**
-         * This is a safeguard measure for the case of Gnome Shell being relaunched
-         *  (for example, under X11, with Alt+F2 and R), to kill any old renderer process.
-         */
-        this.killAllProcesses();
+        // RendererManager also clears any stale renderer subprocess left by a shell reload.
+        this.rendererManager = new RendererManager.RendererManager(this);
     }
 
     enable() {
@@ -61,27 +52,8 @@ export default class HanabiExtension extends Extension {
         if (this.settings.get_boolean('show-panel-menu'))
             this.panelMenu.enable();
 
-        this._settingsSignals.push(this.settings.connect('changed::show-panel-menu', () => {
-            if (this.settings.get_boolean('show-panel-menu'))
-                this.panelMenu.enable();
-            else
-                this.panelMenu.disable();
-        }));
-        this._settingsSignals.push(this.settings.connect('changed::project-path', () => {
-            if (!this.isEnabled)
-                return;
-
-            const projectPath = this.settings.get_string('project-path');
-            this.renderer.setProjectPath(projectPath);
-        }));
-        this._settingsSignals.push(this.settings.connect('changed::mute', () => {
-            if (this.isEnabled)
-                this.renderer.setMute(this.settings.get_boolean('mute'));
-        }));
-        this._settingsSignals.push(this.settings.connect('changed::volume', () => {
-            if (this.isEnabled)
-                this.renderer.setVolume(this.settings.get_int('volume') / 100.0);
-        }));
+        this.settingsBindings = new SettingsBindings.SettingsBindings(this);
+        this.settingsBindings.enable();
         /**
          * Disable startup animation (Workaround for issue #65)
          */
@@ -137,93 +109,11 @@ export default class HanabiExtension extends Extension {
         this.autoPause.enable();
 
         this.isEnabled = true;
-        if (this.launchRendererId)
-            GLib.source_remove(this.launchRendererId);
-
-        this.launchRenderer();
+        this.rendererManager.launch();
     }
 
     getPlaybackState() {
         return this.playbackState;
-    }
-
-    launchRenderer() {
-        if (!this.isEnabled)
-            return;
-
-        // Launch preferences dialog for first-time user
-        let projectPath = this.settings.get_string('project-path');
-        let contentFit = this.settings.get_int('content-fit');
-        const project = loadProject(projectPath);
-        if (!project) {
-            this.openPreferences();
-            return;
-        }
-        this.currentProjectType = project.type;
-
-        this.reloadTime = 100;
-        const argv = [
-            GLib.build_filenamev([
-                this.path,
-                'renderer',
-                'renderer.js',
-            ]),
-        ];
-        argv.push('-P', this.path);
-        argv.push('-F', projectPath);
-        argv.push('--content-fit', `${contentFit}`);
-
-        this.currentProcess = new Launcher.LaunchSubprocess();
-        this.currentProcess.set_cwd(GLib.get_home_dir());
-        const nativeTypelibDir = GLib.build_filenamev([this.path, 'native', 'scene', 'girepository-1.0']);
-        const nativeLibDir = GLib.build_filenamev([this.path, 'native', 'scene', 'lib']);
-        this.currentProcess.setenv(
-            'GI_TYPELIB_PATH',
-            [nativeTypelibDir, GLib.getenv('GI_TYPELIB_PATH')].filter(Boolean).join(':')
-        );
-        this.currentProcess.setenv(
-            'LD_LIBRARY_PATH',
-            [nativeLibDir, GLib.getenv('LD_LIBRARY_PATH')].filter(Boolean).join(':')
-        );
-        this.currentProcess.spawnv(argv);
-        this.manager.set_wayland_client(this.currentProcess);
-        const process = this.currentProcess;
-
-        /**
-         * If the renderer dies, wait 100ms and relaunch it, unless the exit status is different than zero,
-         * in which case it will wait one second. This is done this way to avoid relaunching the renderer
-         * too fast if it has a bug that makes it fail continuously, avoiding filling the journal too fast.
-         */
-        process.subprocess.wait_async(null, (obj, res) => {
-            obj.wait_finish(res);
-            if (this.currentProcess !== process || obj !== process.subprocess)
-                return;
-
-            if (obj.get_if_exited()) {
-                let retval = obj.get_exit_status();
-                if (retval !== 0)
-                    this.reloadTime = 1000;
-            } else {
-                this.reloadTime = 1000;
-            }
-            this.currentProcess = null;
-            this.currentProjectType = null;
-            this.manager.set_wayland_client(null);
-            if (this.isEnabled) {
-                if (this.launchRendererId)
-                    GLib.source_remove(this.launchRendererId);
-
-                this.launchRendererId = GLib.timeout_add(
-                    GLib.PRIORITY_DEFAULT,
-                    this.reloadTime,
-                    () => {
-                        this.launchRendererId = 0;
-                        this.launchRenderer();
-                        return false;
-                    }
-                );
-            }
-        });
     }
 
     disable() {
@@ -242,8 +132,7 @@ export default class HanabiExtension extends Extension {
             this.startupOverviewRestoreId = 0;
         }
 
-        this._settingsSignals.forEach(signalId => this.settings?.disconnect(signalId));
-        this._settingsSignals = [];
+        this.settingsBindings?.destroy();
 
         this.panelMenu?.disable();
         Main.sessionMode.hasOverview = this.old_hasOverview;
@@ -252,72 +141,16 @@ export default class HanabiExtension extends Extension {
         this.autoPause?.disable();
 
         this.isEnabled = false;
-        this.killCurrentProcess();
+        this.rendererManager?.stop();
         this.playbackState?.destroy();
 
         this.settings = null;
+        this.settingsBindings = null;
         this.renderer = null;
         this.panelMenu = null;
         this.override = null;
         this.manager = null;
         this.autoPause = null;
         this.playbackState = null;
-    }
-
-    killCurrentProcess() {
-        if (this.launchRendererId) {
-            GLib.source_remove(this.launchRendererId);
-            this.launchRendererId = 0;
-        }
-
-        if (this.currentProcess && this.currentProcess.subprocess) {
-            this.currentProcess.cancellable.cancel();
-            this.currentProcess.subprocess.send_signal(15);
-        }
-    }
-
-    killAllProcesses() {
-        let procFolder = Gio.File.new_for_path('/proc');
-        if (!procFolder.query_exists(null))
-            return;
-
-        let fileEnum = procFolder.enumerate_children(
-            'standard::*',
-            Gio.FileQueryInfoFlags.NONE,
-            null
-        );
-        let info;
-        while ((info = fileEnum.next_file(null))) {
-            let filename = info.get_name();
-            if (!filename)
-                break;
-
-            let processPath = GLib.build_filenamev(['/proc', filename, 'cmdline']);
-            let processUser = Gio.File.new_for_path(processPath);
-            if (!processUser.query_exists(null))
-                continue;
-
-            let [binaryData, etag_] = processUser.load_bytes(null);
-            let contents = '';
-            let readData = binaryData.get_data();
-            for (let i = 0; i < readData.length; i++) {
-                if (readData[i] < 32)
-                    contents += ' ';
-                else
-                    contents += String.fromCharCode(readData[i]);
-            }
-            let path =
-                `gjs ${
-                    GLib.build_filenamev([
-                        this.path,
-                        'renderer',
-                        'renderer.js',
-                    ])}`;
-            if (contents.startsWith(path)) {
-                let proc = new Gio.Subprocess({argv: ['/bin/kill', filename]});
-                proc.init(null);
-                proc.wait(null);
-            }
-        }
     }
 }

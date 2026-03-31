@@ -14,7 +14,7 @@ pkg_check_modules(JSON_GLIB REQUIRED json-glib-1.0)
 find_program(G_IR_SCANNER g-ir-scanner REQUIRED)
 find_program(G_IR_COMPILER g-ir-compiler REQUIRED)
 
-set(WESCENE_RENDERER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/wallpaper-scene-renderer)
+set(WESCENE_RENDERER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/wallpaper-scene-renderer)
 
 add_subdirectory(${WESCENE_RENDERER_DIR}
                  ${CMAKE_CURRENT_BINARY_DIR}/wallpaper-scene-renderer)
