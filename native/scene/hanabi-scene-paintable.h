@@ -33,6 +33,7 @@ int  hanabi_scene_paintable_get_fps(HanabiScenePaintable* self);
 void     hanabi_scene_paintable_play(HanabiScenePaintable* self);
 void     hanabi_scene_paintable_pause(HanabiScenePaintable* self);
 gboolean hanabi_scene_paintable_get_playing(HanabiScenePaintable* self);
+gboolean hanabi_scene_paintable_get_ready(HanabiScenePaintable* self);
 
 void hanabi_scene_paintable_set_mouse_pos(HanabiScenePaintable* self, double x, double y);
 

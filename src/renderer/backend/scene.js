@@ -13,6 +13,10 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._scenePictures = [];
             this._sceneOffloads = [];
             this._previewPictures = [];
+            this._readyStates = new Map();
+            this._readySignalHandlers = [];
+            this._readyCallback = null;
+            this._readyResolved = false;
         }
 
         destroy() {
@@ -61,6 +65,16 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._scenePictures = [];
             this._sceneOffloads = [];
             this._previewPictures = [];
+            this._readySignalHandlers.forEach(([target, signalId]) => {
+                try {
+                    target.disconnect(signalId);
+                } catch (_e) {
+                }
+            });
+            this._readySignalHandlers = [];
+            this._readyStates.clear();
+            this._readyCallback = null;
+            this._readyResolved = true;
         }
 
         createWidgetForMonitor(_index) {
@@ -94,6 +108,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                         playing: true,
                     });
                     this._scenePaintables.push(paintable);
+                    this._trackReady(_index, paintable);
 
                     const picture = createConfiguredPicture(new Gtk.Picture({
                         paintable,
@@ -137,6 +152,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                     playing: true,
                 }));
                 this._sceneWidgets.push(sceneWidget);
+                this._trackReady(_index, sceneWidget);
                 return sceneWidget;
             }
 
@@ -147,19 +163,16 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                 Gtk.Picture.new_for_file(Gio.File.new_for_path(this._project.previewPath))
             );
             this._previewPictures.push(picture);
+            this._readyStates.set(_index, true);
             return picture;
         }
 
         setPlay() {
-            this._scenePaintables.forEach(paintable => paintable.play());
-            this._sceneWidgets.forEach(widget => widget.play());
-            this._renderer._setPlayingState(true);
+            this._setScenePlayback(true, true);
         }
 
         setPause() {
-            this._scenePaintables.forEach(paintable => paintable.pause());
-            this._sceneWidgets.forEach(widget => widget.pause());
-            this._renderer._setPlayingState(false);
+            this._setScenePlayback(false, true);
         }
 
         setMute(_mute) {
@@ -197,6 +210,15 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._previewPictures.forEach(picture => picture.set_content_fit(fit));
         }
 
+        waitUntilReady(callback) {
+            this._readyCallback = callback;
+            this._resolveReadyIfNeeded();
+        }
+
+        prepareForTransitionOut() {
+            this._setScenePlayback(false, false);
+        }
+
         _getSceneFillMode() {
             if (!haveContentFit)
                 return 2;
@@ -211,6 +233,41 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             default:
                 return 2;
             }
+        }
+
+        _trackReady(index, target) {
+            const updateReadyState = () => {
+                this._readyStates.set(index, Boolean(target.ready));
+                this._resolveReadyIfNeeded();
+            };
+
+            updateReadyState();
+            this._readySignalHandlers.push([target, target.connect('notify::ready', updateReadyState)]);
+        }
+
+        _resolveReadyIfNeeded() {
+            if (this._readyResolved || !this._readyCallback)
+                return;
+
+            if (this._readyStates.size === 0 || [...this._readyStates.values()].every(Boolean)) {
+                this._readyResolved = true;
+                const callback = this._readyCallback;
+                this._readyCallback = null;
+                callback();
+            }
+        }
+
+        _setScenePlayback(isPlaying, updateState) {
+            if (isPlaying) {
+                this._scenePaintables.forEach(paintable => paintable.play());
+                this._sceneWidgets.forEach(widget => widget.play());
+            } else {
+                this._scenePaintables.forEach(paintable => paintable.pause());
+                this._sceneWidgets.forEach(widget => widget.pause());
+            }
+
+            if (updateState)
+                this._renderer._setPlayingState(isPlaying);
         }
     };
 };

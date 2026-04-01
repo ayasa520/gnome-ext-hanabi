@@ -28,6 +28,10 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             this._play = null;
             this._media = null;
             this._adapter = null;
+            this._readyCallback = null;
+            this._readyResolved = false;
+            this._desiredVolume = state.getVolume();
+            this._desiredMute = state.getMute();
         }
 
         destroy() {
@@ -51,6 +55,8 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             this._play = null;
             this._media = null;
             this._adapter = null;
+            this._readyCallback = null;
+            this._readyResolved = true;
         }
 
         createWidgetForMonitor(index) {
@@ -90,16 +96,15 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
         }
 
         setPause() {
-            if (this._play) {
-                this._play.pause();
-            } else if (this._media) {
-                this._media.pause();
+            if (this._play || this._media) {
+                this._pauseInternal();
             } else {
                 this._renderer._setPlayingState(false);
             }
         }
 
         setVolume(_volume) {
+            this._desiredVolume = _volume;
             let player = this._play != null ? this._play : this._media;
             if (!player)
                 return;
@@ -122,6 +127,7 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
         }
 
         setMute(_mute) {
+            this._desiredMute = _mute;
             if (this._play) {
                 if (this._play.mute === _mute)
                     this._play.mute = !_mute;
@@ -138,6 +144,15 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
                 return;
 
             this._pictures.forEach(picture => picture.set_content_fit(fit));
+        }
+
+        waitUntilReady(callback) {
+            this._readyCallback = callback;
+            this._resolveReadyIfNeeded();
+        }
+
+        prepareForTransitionOut() {
+            this._pauseInternal();
         }
 
         _getWidgetFromSharedPaintable() {
@@ -202,8 +217,9 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
 
             let stateSignal = this._adapter.connect('state-changed', (_adapter, currentState) => {
                 if (currentState >= GstPlay.PlayState.PAUSED) {
-                    this.setVolume(state.getVolume());
-                    this.setMute(state.getMute());
+                    this.setVolume(this._desiredVolume);
+                    this.setMute(this._desiredMute);
+                    this._markReady();
 
                     this._adapter.disconnect(stateSignal);
                     stateSignal = null;
@@ -227,8 +243,9 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
                 loop: true,
             });
             this._media.connect('notify::prepared', () => {
-                this.setVolume(state.getVolume());
-                this.setMute(state.getMute());
+                this._markReady();
+                this.setVolume(this._desiredVolume);
+                this.setMute(this._desiredMute);
             });
             this._media.connect('notify::playing', media => {
                 this._renderer._setPlayingState(media.get_playing());
@@ -236,6 +253,35 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
 
             this._sharedPaintable = this._media;
             return this._getWidgetFromSharedPaintable();
+        }
+
+        _markReady() {
+            if (this._readyResolved)
+                return;
+
+            this._readyResolved = true;
+            const callback = this._readyCallback;
+            this._readyCallback = null;
+            callback?.();
+        }
+
+        _resolveReadyIfNeeded() {
+            if (this._readyResolved) {
+                const callback = this._readyCallback;
+                this._readyCallback = null;
+                callback?.();
+                return;
+            }
+
+            if (!this._play && !this._media)
+                this._markReady();
+        }
+
+        _pauseInternal() {
+            if (this._play)
+                this._play.pause();
+            else if (this._media)
+                this._media.pause();
         }
     };
 };

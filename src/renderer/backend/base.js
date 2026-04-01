@@ -39,6 +39,13 @@ var createBaseBackendClasses = (env, helpers) => {
         applyContentFit(_fit) {
         }
 
+        waitUntilReady(callback) {
+            callback();
+        }
+
+        prepareForTransitionOut() {
+        }
+
         _createPlaceholderWidget(message) {
             this.displayName = this.displayName || 'Placeholder';
 

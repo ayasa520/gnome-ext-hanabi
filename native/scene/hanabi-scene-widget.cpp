@@ -33,6 +33,7 @@ enum {
     PROP_FILL_MODE,
     PROP_FPS,
     PROP_PLAYING,
+    PROP_READY,
     N_PROPS,
 };
 
@@ -369,6 +370,10 @@ G_DEFINE_TYPE(HanabiSceneWidget, hanabi_scene_widget, GTK_TYPE_GL_AREA)
 
 static GParamSpec *properties[N_PROPS] = {};
 
+static gboolean hanabi_scene_widget_is_ready(HanabiSceneWidget *self) {
+    return self->current_texture != 0;
+}
+
 static void request_render(HanabiSceneWidget *self) {
     gtk_gl_area_queue_render(GTK_GL_AREA(self));
     gtk_widget_queue_draw(GTK_WIDGET(self));
@@ -403,6 +408,7 @@ static void ensure_render_retry(HanabiSceneWidget *self) {
 }
 
 static void reset_scene_state(HanabiSceneWidget *self) {
+    const gboolean was_ready = hanabi_scene_widget_is_ready(self);
     clear_render_retry(self);
     self->scene.reset();
     self->scene_ready = false;
@@ -410,6 +416,8 @@ static void reset_scene_state(HanabiSceneWidget *self) {
     self->current_texture = 0;
     self->current_width = 0;
     self->current_height = 0;
+    if (was_ready)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_READY]);
 }
 
 static void hanabi_scene_widget_dispose(GObject *object) {
@@ -452,6 +460,9 @@ static void hanabi_scene_widget_set_property(GObject *object, guint prop_id, con
         else
             hanabi_scene_widget_pause(self);
         break;
+    case PROP_READY:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
     }
@@ -477,6 +488,9 @@ static void hanabi_scene_widget_get_property(GObject *object, guint prop_id, GVa
         break;
     case PROP_PLAYING:
         g_value_set_boolean(value, self->playing);
+        break;
+    case PROP_READY:
+        g_value_set_boolean(value, hanabi_scene_widget_is_ready(self));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -730,6 +744,7 @@ static gboolean hanabi_scene_widget_render(GtkGLArea *area, GdkGLContext *) {
 
     if (self->scene && self->scene->exSwapchain()) {
         if (auto *handle = self->scene->exSwapchain()->eatFrame()) {
+            const gboolean was_ready = hanabi_scene_widget_is_ready(self);
             if (self->textures.find(handle->id()) == self->textures.end())
                 import_texture(self, *handle);
 
@@ -738,6 +753,8 @@ static gboolean hanabi_scene_widget_render(GtkGLArea *area, GdkGLContext *) {
                 self->current_texture = it->second.texture;
                 self->current_width = it->second.width;
                 self->current_height = it->second.height;
+                if (!was_ready && hanabi_scene_widget_is_ready(self))
+                    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_READY]);
             }
         }
     }
@@ -802,6 +819,9 @@ static void hanabi_scene_widget_class_init(HanabiSceneWidgetClass *klass) {
     properties[PROP_PLAYING] =
         g_param_spec_boolean("playing", nullptr, nullptr, TRUE,
                              static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_READY] =
+        g_param_spec_boolean("ready", nullptr, nullptr, FALSE,
+                             static_cast<GParamFlags>(G_PARAM_READABLE | G_PARAM_EXPLICIT_NOTIFY));
 
     g_object_class_install_properties(object_class, N_PROPS, properties);
 }
@@ -941,6 +961,11 @@ void hanabi_scene_widget_pause(HanabiSceneWidget *self) {
 gboolean hanabi_scene_widget_get_playing(HanabiSceneWidget *self) {
     g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), FALSE);
     return self->playing;
+}
+
+gboolean hanabi_scene_widget_get_ready(HanabiSceneWidget *self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), FALSE);
+    return hanabi_scene_widget_is_ready(self);
 }
 
 void hanabi_scene_widget_set_mouse_pos(HanabiSceneWidget *self, double x, double y) {

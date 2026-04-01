@@ -35,6 +35,7 @@ enum {
     PROP_FILL_MODE,
     PROP_FPS,
     PROP_PLAYING,
+    PROP_READY,
     N_PROPS,
 };
 
@@ -293,7 +294,12 @@ struct _HanabiScenePaintable {
     uint64_t imported_texture_count { 0 };
 };
 
+static GParamSpec* properties[N_PROPS] = {};
+
+static gboolean hanabi_scene_paintable_is_ready(HanabiScenePaintable* self);
+
 void clear_cached_textures(HanabiScenePaintable* self) {
+    const gboolean was_ready = hanabi_scene_paintable_is_ready(self);
     if (!self->textures.empty())
         g_message("HanabiScene: clearing %zu cached dma-buf textures", self->textures.size());
 
@@ -307,6 +313,8 @@ void clear_cached_textures(HanabiScenePaintable* self) {
     self->logged_no_texture = FALSE;
     self->last_logged_frame_id = -1;
     self->last_logged_frame_from_cache = FALSE;
+    if (was_ready)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_READY]);
 }
 
 G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
@@ -444,6 +452,8 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                         auto* handle = self->scene->exSwapchain()->eatFrame();
 
                                         if (handle) {
+                                            const gboolean was_ready =
+                                                hanabi_scene_paintable_is_ready(self);
                                             self->logged_waiting_for_frame = FALSE;
                                             const auto cached = self->textures.find(handle->id());
                                             if (cached != self->textures.end()) {
@@ -499,6 +509,11 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                                 self->last_logged_frame_id = handle->id();
                                                 self->last_logged_frame_from_cache = FALSE;
                                             }
+
+                                            if (!was_ready && hanabi_scene_paintable_is_ready(self))
+                                                g_object_notify_by_pspec(
+                                                    G_OBJECT(self),
+                                                    properties[PROP_READY]);
                                         } else if (!self->logged_waiting_for_frame) {
                                             g_message("HanabiScene: swapchain has no frame available yet");
                                             self->logged_waiting_for_frame = TRUE;
@@ -551,7 +566,9 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                 };
                             }))
 
-static GParamSpec* properties[N_PROPS] = {};
+static gboolean hanabi_scene_paintable_is_ready(HanabiScenePaintable* self) {
+    return self->current_texture != nullptr;
+}
 
 static void hanabi_scene_paintable_dispose(GObject* object) {
     auto* self = HANABI_SCENE_PAINTABLE(object);
@@ -599,6 +616,9 @@ static void hanabi_scene_paintable_set_property(GObject* object,
         else
             hanabi_scene_paintable_pause(self);
         break;
+    case PROP_READY:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
     }
@@ -627,6 +647,9 @@ static void hanabi_scene_paintable_get_property(GObject* object,
         break;
     case PROP_PLAYING:
         g_value_set_boolean(value, self->playing);
+        break;
+    case PROP_READY:
+        g_value_set_boolean(value, hanabi_scene_paintable_is_ready(self));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -658,6 +681,9 @@ static void hanabi_scene_paintable_class_init(HanabiScenePaintableClass* klass) 
     properties[PROP_PLAYING] =
         g_param_spec_boolean("playing", nullptr, nullptr, TRUE,
                              static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_READY] =
+        g_param_spec_boolean("ready", nullptr, nullptr, FALSE,
+                             static_cast<GParamFlags>(G_PARAM_READABLE | G_PARAM_EXPLICIT_NOTIFY));
 
     g_object_class_install_properties(object_class, N_PROPS, properties);
 }
@@ -825,6 +851,11 @@ void hanabi_scene_paintable_pause(HanabiScenePaintable* self) {
 gboolean hanabi_scene_paintable_get_playing(HanabiScenePaintable* self) {
     g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), FALSE);
     return self->playing;
+}
+
+gboolean hanabi_scene_paintable_get_ready(HanabiScenePaintable* self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), FALSE);
+    return hanabi_scene_paintable_is_ready(self);
 }
 
 void hanabi_scene_paintable_set_mouse_pos(HanabiScenePaintable* self, double x, double y) {

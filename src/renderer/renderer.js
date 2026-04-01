@@ -186,6 +186,9 @@ let fullscreened = true;
 let isDebugMode = extSettings ? extSettings.get_boolean('debug-mode') : true;
 let changeWallpaperTimerId = null;
 let argvContentFitOverride = false;
+const wallpaperSwitchTransitionDurationMs = 1000;
+const wallpaperSwitchTransitionCleanupDelayMs = wallpaperSwitchTransitionDurationMs + 150;
+const wallpaperSwitchReadyTimeoutMs = 15000;
 
 const {ProjectType, loadProject, listProjects} = ProjectLoader;
 
@@ -273,7 +276,11 @@ const HanabiRenderer = GObject.registerClass(
             this._project = null;
             this._backend = null;
             this._isPlaying = false;
+            this._requestedPlaying = false;
             this._dbus = null;
+            this._backendDestroySourceIds = new Set();
+            this._pendingSwitch = null;
+            this._switchSerial = 0;
             if (!standalone)
                 this._exportDbus();
             if (!standalone)
@@ -347,6 +354,7 @@ const HanabiRenderer = GObject.registerClass(
                         return;
                     contentFit = settings.get_int(key);
                     this._backend?.applyContentFit(contentFit);
+                    this._pendingSwitch?.backend?.applyContentFit(contentFit);
                     break;
                 case 'debug-mode':
                     isDebugMode = settings.get_boolean(key);
@@ -503,28 +511,58 @@ const HanabiRenderer = GObject.registerClass(
 
                 this._hanabiWindows.push(window);
             });
-            this._backend.applyContentFit(contentFit);
+            this._applyActiveBackendSettings(this._backend);
             this.setAutoWallpaper();
             console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
         }
 
         _switchProject() {
-            this._project = loadProject(projectPath);
-            this._resetBackend();
-            this._backend = this._createBackend(this._project);
+            this._cancelPendingSwitch();
 
-            this._hanabiWindows.forEach((window, index) => {
-                const widget = this._getWidgetForMonitor(index);
-                window.setWallpaperWidget(widget);
-                if (nohide)
-                    window.set_title(this._getWindowTitle(index));
-            });
+            const nextProject = loadProject(projectPath);
+            const nextBackend = this._createBackend(nextProject);
+            const previousBackend = this._backend;
 
-            this.setVolume(volume);
-            this.setMute(mute);
-            this.setSceneFps(sceneFps);
-            this.setPlay();
+            if (!previousBackend) {
+                this._project = nextProject;
+                this._backend = nextBackend;
+                this._hanabiWindows.forEach((window, index) => {
+                    const widget = nextBackend.createWidgetForMonitor(index);
+                    window.setWallpaperWidget(widget);
+                    if (nohide)
+                        window.set_title(this._getWindowTitle(index));
+                });
+                this._applyActiveBackendSettings(this._backend);
+                this.setAutoWallpaper();
+                console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
+                return;
+            }
+
+            const nextWidgets = this._hanabiWindows.map((_window, index) => nextBackend.createWidgetForMonitor(index));
+            this._hanabiWindows.forEach((window, index) => window.stageWallpaperWidget(nextWidgets[index]));
+            this._applyPendingBackendSettings(nextBackend);
             this.setAutoWallpaper();
+
+            const switchId = ++this._switchSerial;
+            const readyTimeoutId = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                wallpaperSwitchReadyTimeoutMs,
+                () => {
+                    if (this._pendingSwitch?.id === switchId)
+                        console.warn(`Wallpaper switch readiness timed out after ${wallpaperSwitchReadyTimeoutMs}ms`);
+                    this._completePendingSwitch(switchId);
+                    return GLib.SOURCE_REMOVE;
+                }
+            );
+
+            this._pendingSwitch = {
+                id: switchId,
+                project: nextProject,
+                backend: nextBackend,
+                previousBackend,
+                readyTimeoutId,
+            };
+            nextBackend.waitUntilReady(() => this._completePendingSwitch(switchId));
         }
 
         _resetBackend() {
@@ -533,9 +571,87 @@ const HanabiRenderer = GObject.registerClass(
                 changeWallpaperTimerId = null;
             }
 
+            this._cancelPendingSwitch();
             this._backend?.destroy();
             this._backend = null;
+            this._project = null;
             this._setPlayingState(false);
+
+            this._backendDestroySourceIds.forEach(sourceId => GLib.source_remove(sourceId));
+            this._backendDestroySourceIds.clear();
+        }
+
+        _cancelPendingSwitch() {
+            if (!this._pendingSwitch)
+                return;
+
+            if (this._pendingSwitch.readyTimeoutId)
+                GLib.source_remove(this._pendingSwitch.readyTimeoutId);
+            this._hanabiWindows.forEach(window => window.cancelWallpaperTransition());
+            this._pendingSwitch.backend.destroy();
+            this._pendingSwitch = null;
+            this._applyActiveBackendSettings(this._backend);
+        }
+
+        _completePendingSwitch(switchId) {
+            if (!this._pendingSwitch || this._pendingSwitch.id !== switchId)
+                return;
+
+            const {backend, previousBackend, project, readyTimeoutId} = this._pendingSwitch;
+            if (readyTimeoutId)
+                GLib.source_remove(readyTimeoutId);
+            this._pendingSwitch = null;
+            this._project = project;
+            this._backend = backend;
+            previousBackend.prepareForTransitionOut?.();
+            this._applyActiveBackendSettings(this._backend);
+
+            this._hanabiWindows.forEach((window, index) => {
+                window.commitWallpaperTransition();
+                if (nohide)
+                    window.set_title(this._getWindowTitle(index));
+            });
+
+            this._scheduleBackendDestroy(previousBackend);
+            console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
+        }
+
+        _applyActiveBackendSettings(backend) {
+            if (!backend)
+                return;
+
+            backend.applyContentFit(contentFit);
+            backend.setVolume(volume);
+            backend.setMute(mute);
+            backend.setSceneFps(sceneFps);
+            if (this._requestedPlaying)
+                backend.setPlay();
+            else
+                backend.setPause();
+        }
+
+        _applyPendingBackendSettings(backend) {
+            if (!backend)
+                return;
+
+            backend.applyContentFit(contentFit);
+            backend.setVolume(volume);
+            backend.setMute(true);
+            backend.setSceneFps(sceneFps);
+            backend.setPlay();
+        }
+
+        _scheduleBackendDestroy(backend) {
+            const sourceId = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                wallpaperSwitchTransitionCleanupDelayMs,
+                () => {
+                    this._backendDestroySourceIds.delete(sourceId);
+                    backend.destroy();
+                    return GLib.SOURCE_REMOVE;
+                }
+            );
+            this._backendDestroySourceIds.add(sourceId);
         }
 
         _createBackend(project) {
@@ -725,6 +841,7 @@ const HanabiRenderer = GObject.registerClass(
          */
         setVolume(_volume) {
             this._backend?.setVolume(_volume);
+            this._pendingSwitch?.backend?.setVolume(_volume);
         }
 
         setMute(_mute) {
@@ -737,6 +854,7 @@ const HanabiRenderer = GObject.registerClass(
 
         setSceneFps(fps) {
             this._backend?.setSceneFps(fps);
+            this._pendingSwitch?.backend?.setSceneFps(fps);
         }
 
         dispatchPointerEvent(event) {
@@ -776,6 +894,7 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         setPlay() {
+            this._requestedPlaying = true;
             if (this._backend)
                 this._backend.setPlay();
             else
@@ -783,6 +902,7 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         setPause() {
+            this._requestedPlaying = false;
             if (this._backend)
                 this._backend.setPause();
             else
@@ -811,7 +931,7 @@ const HanabiRenderer = GObject.registerClass(
                 currentIndex = activeProjectIndex;
 
             let operation = () => {
-                if (this._isPlaying) {
+                if (this._requestedPlaying) {
                     extSettings.set_string('project-path', projects[currentIndex].path);
 
                     if (changeWallpaperMode === 0)
@@ -856,6 +976,15 @@ const HanabiRendererWindow = GObject.registerClass(
                 title,
             });
             this._gdkMonitor = gdkMonitor;
+            this._wallpaperOverlay = new Gtk.Overlay({
+                hexpand: true,
+                vexpand: true,
+                halign: Gtk.Align.FILL,
+                valign: Gtk.Align.FILL,
+            });
+            this._transitionRevealer = null;
+            this._transitionCleanupId = 0;
+            this._transitionCommitted = false;
 
             // Load CSS with custom style
             let cssProvider = new Gtk.CssProvider();
@@ -871,6 +1000,7 @@ const HanabiRendererWindow = GObject.registerClass(
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             );
 
+            super.set_child(this._wallpaperOverlay);
             this.setWallpaperWidget(widget);
             if (!windowed) {
                 // In extension mode (nohide=false), fullscreen may transiently mark the
@@ -887,7 +1017,91 @@ const HanabiRendererWindow = GObject.registerClass(
         }
 
         setWallpaperWidget(widget) {
-            this.set_child(widget);
+            this._prepareWallpaperWidget(widget);
+            this._discardWallpaperTransition();
+            this._wallpaperOverlay.set_child(widget);
+        }
+
+        stageWallpaperWidget(widget) {
+            this._prepareWallpaperWidget(widget);
+
+            const previousWidget = this._wallpaperOverlay.get_child();
+            this.cancelWallpaperTransition();
+            this._wallpaperOverlay.set_child(widget);
+
+            if (!previousWidget)
+                return;
+
+            const revealer = new Gtk.Revealer({
+                hexpand: true,
+                vexpand: true,
+                halign: Gtk.Align.FILL,
+                valign: Gtk.Align.FILL,
+                can_target: false,
+                reveal_child: true,
+                transition_duration: wallpaperSwitchTransitionDurationMs,
+                transition_type: Gtk.RevealerTransitionType.CROSSFADE,
+            });
+            revealer.set_child(previousWidget);
+            this._wallpaperOverlay.add_overlay(revealer);
+            this._transitionRevealer = revealer;
+            this._transitionCommitted = false;
+        }
+
+        commitWallpaperTransition() {
+            if (!this._transitionRevealer)
+                return;
+
+            this._transitionCommitted = true;
+
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                if (this._transitionRevealer)
+                    this._transitionRevealer.set_reveal_child(false);
+                return GLib.SOURCE_REMOVE;
+            });
+
+            this._transitionCleanupId = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                wallpaperSwitchTransitionCleanupDelayMs,
+                () => {
+                    this._discardWallpaperTransition();
+                    return GLib.SOURCE_REMOVE;
+                }
+            );
+        }
+
+        cancelWallpaperTransition() {
+            if (!this._transitionRevealer)
+                return;
+
+            const previousWidget = this._transitionCommitted ? null : this._transitionRevealer.get_child();
+            this._discardWallpaperTransition();
+            if (previousWidget)
+                this._wallpaperOverlay.set_child(previousWidget);
+        }
+
+        _prepareWallpaperWidget(widget) {
+            widget.set({
+                hexpand: true,
+                vexpand: true,
+                halign: Gtk.Align.FILL,
+                valign: Gtk.Align.FILL,
+            });
+        }
+
+        _discardWallpaperTransition() {
+            if (this._transitionCleanupId) {
+                GLib.source_remove(this._transitionCleanupId);
+                this._transitionCleanupId = 0;
+            }
+
+            if (this._transitionRevealer) {
+                this._transitionRevealer.set_child(null);
+                this._wallpaperOverlay.remove_overlay(this._transitionRevealer);
+                this._transitionRevealer = null;
+            }
+
+            this._transitionCommitted = false;
         }
     }
 );

@@ -10,11 +10,17 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this.displayName = 'WebKitWebView';
             this._webViews = new Map();
             this._webPausePictures = new Map();
+            this._webViewReadyStates = new Map();
+            this._readyCallback = null;
+            this._readyResolved = false;
         }
 
         destroy() {
+            this._readyCallback = null;
+            this._readyResolved = true;
             this._webViews.clear();
             this._webPausePictures.clear();
+            this._webViewReadyStates.clear();
         }
 
         createWidgetForMonitor(index) {
@@ -81,24 +87,37 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 if (loadEvent !== WebKit.LoadEvent.FINISHED)
                     return;
 
+                this._webViewReadyStates.set(index, true);
+                this._resolveReadyIfNeeded();
+
                 if (this._renderer.isPlaying)
-                    this._setPlayback(true);
+                    this._setPlayback(true, true);
             });
 
             const file = Gio.File.new_for_path(this._project.entryPath);
             webView.load_uri(file.get_uri());
             this._webViews.set(index, webView);
             this._webPausePictures.set(index, pausePicture);
+            this._webViewReadyStates.set(index, false);
 
             return overlay;
         }
 
+        waitUntilReady(callback) {
+            this._readyCallback = callback;
+            this._resolveReadyIfNeeded();
+        }
+
+        prepareForTransitionOut() {
+            this._setPlayback(false, false);
+        }
+
         setPlay() {
-            this._setPlayback(true);
+            this._setPlayback(true, true);
         }
 
         setPause() {
-            this._setPlayback(false);
+            this._setPlayback(false, true);
         }
 
         setMute(_mute) {
@@ -138,9 +157,10 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webPausePictures.forEach(picture => picture.set_content_fit(fit));
         }
 
-        _setPlayback(isPlaying) {
+        _setPlayback(isPlaying, updateState) {
             if (this._webViews.size === 0) {
-                this._renderer._setPlayingState(isPlaying);
+                if (updateState)
+                    this._renderer._setPlayingState(isPlaying);
                 return;
             }
 
@@ -188,7 +208,8 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                     this._freezeWebView(index);
                 }
             });
-            this._renderer._setPlayingState(isPlaying);
+            if (updateState)
+                this._renderer._setPlayingState(isPlaying);
         }
 
         _freezeWebView(index) {
@@ -215,6 +236,18 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                     }
                 }
             );
+        }
+
+        _resolveReadyIfNeeded() {
+            if (this._readyResolved || !this._readyCallback)
+                return;
+
+            if (this._webViews.size === 0 || [...this._webViewReadyStates.values()].every(Boolean)) {
+                this._readyResolved = true;
+                const callback = this._readyCallback;
+                this._readyCallback = null;
+                callback();
+            }
         }
     };
 };
