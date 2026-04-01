@@ -30,6 +30,8 @@ g-ir-scanner \
   --library=HanabiScene \
   --library-path="${SCENE_LIB_DIR}" \
   --output "${SCENE_GIR_DIR}/HanabiScene-1.0.gir" \
+  "${SCENE_SRC_DIR}/hanabi-scene-paintable.h" \
+  "${SCENE_SRC_DIR}/hanabi-scene-paintable.cpp" \
   "${SCENE_SRC_DIR}/hanabi-scene-widget.h" \
   "${SCENE_SRC_DIR}/hanabi-scene-widget.cpp" \
   --include=GObject-2.0 \

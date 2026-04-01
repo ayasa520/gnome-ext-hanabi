@@ -23,7 +23,25 @@ elif [ "$1" == "uninstall" ]; then
     gnome-extensions uninstall "$UUID"
 elif [ "$1" == "renderer" ]; then
     shift
-    ./src/renderer/renderer.js --standalone "$@"
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    NATIVE_BUILD_DIR="$SCRIPT_DIR/native/scene/build/out"
+    NATIVE_BUILD_GIR_DIR="$NATIVE_BUILD_DIR/gir"
+    NATIVE_INSTALL_GIR_DIR="$SCRIPT_DIR/native/scene/girepository-1.0"
+    NATIVE_INSTALL_LIB_DIR="$SCRIPT_DIR/native/scene/lib"
+
+    if [ -d "$NATIVE_BUILD_GIR_DIR" ]; then
+        export GI_TYPELIB_PATH="$NATIVE_BUILD_GIR_DIR${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
+    elif [ -d "$NATIVE_INSTALL_GIR_DIR" ]; then
+        export GI_TYPELIB_PATH="$NATIVE_INSTALL_GIR_DIR${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
+    fi
+
+    if [ -d "$NATIVE_BUILD_DIR" ]; then
+        export LD_LIBRARY_PATH="$NATIVE_BUILD_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    elif [ -d "$NATIVE_INSTALL_LIB_DIR" ]; then
+        export LD_LIBRARY_PATH="$NATIVE_INSTALL_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    fi
+
+    "$SCRIPT_DIR/src/renderer/renderer.js" --standalone "$@"
 elif [ "$1" == "log" ]; then
     journalctl -f -o cat /usr/bin/gnome-shell
 elif [ "$1" == "pot" ]; then

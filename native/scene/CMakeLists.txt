@@ -20,6 +20,8 @@ add_subdirectory(${WESCENE_RENDERER_DIR}
                  ${CMAKE_CURRENT_BINARY_DIR}/wallpaper-scene-renderer)
 
 add_library(HanabiScene SHARED
+  hanabi-scene-dmabuf-texture.cpp
+  hanabi-scene-paintable.cpp
   hanabi-scene-widget.cpp
 )
 
@@ -49,12 +51,14 @@ set(SCENE_GIR ${SCENE_GIR_DIR}/HanabiScene-1.0.gir)
 set(SCENE_TYPELIB ${SCENE_GIR_DIR}/HanabiScene-1.0.typelib)
 
 file(MAKE_DIRECTORY ${SCENE_GIR_DIR})
+set(SCENE_GIR_CACHE_DIR ${CMAKE_CURRENT_BINARY_DIR}/gir-cache)
+file(MAKE_DIRECTORY ${SCENE_GIR_CACHE_DIR})
 
 add_custom_command(
   OUTPUT ${SCENE_GIR}
   COMMAND ${CMAKE_COMMAND} -E make_directory ${SCENE_GIR_DIR}
   COMMAND ${CMAKE_COMMAND} -E env
-          XDG_CACHE_HOME=/tmp/gir-cache
+          XDG_CACHE_HOME=${SCENE_GIR_CACHE_DIR}
           LD_LIBRARY_PATH=${SCENE_OUT_DIR}:$ENV{LD_LIBRARY_PATH}
           ${G_IR_SCANNER}
           --warn-all
@@ -63,6 +67,8 @@ add_custom_command(
           --library=HanabiScene
           --library-path=${SCENE_OUT_DIR}
           --output ${SCENE_GIR}
+          ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-paintable.h
+          ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-paintable.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-widget.h
           ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-widget.cpp
           --include=GObject-2.0
@@ -78,6 +84,8 @@ add_custom_command(
           -I${CMAKE_CURRENT_SOURCE_DIR}
           --cflags-end
   DEPENDS HanabiScene
+          ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-paintable.h
+          ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-paintable.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-widget.h
           ${CMAKE_CURRENT_SOURCE_DIR}/hanabi-scene-widget.cpp
   VERBATIM

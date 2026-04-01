@@ -611,6 +611,7 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
 
     wallpaper::RenderInitInfo info {};
     info.offscreen = true;
+    info.export_mode = wallpaper::ExternalFrameExportMode::OPAQUE_FD;
     info.width = static_cast<uint16_t>(width * gtk_widget_get_scale_factor(GTK_WIDGET(self)));
     info.height = static_cast<uint16_t>(height * gtk_widget_get_scale_factor(GTK_WIDGET(self)));
     if (self->has_gl_uuid)
@@ -675,12 +676,23 @@ static bool ensure_gl_initialized(HanabiSceneWidget *self) {
 }
 
 static void import_texture(HanabiSceneWidget *self, wallpaper::ExHandle &handle) {
+    if (!handle.isOpaqueFd()) {
+        g_warning("HanabiScene: GL importer only supports opaque-fd frames");
+        return;
+    }
+
+    const int import_fd = handle.primaryFd();
+    if (import_fd < 0) {
+        g_warning("HanabiScene: opaque-fd frame is missing a valid file descriptor");
+        return;
+    }
+
     TextureEntry entry {};
     entry.width = handle.width;
     entry.height = handle.height;
 
     glCreateMemoryObjectsEXT(1, &entry.memory_object);
-    glImportMemoryFdEXT(entry.memory_object, handle.size, GL_HANDLE_TYPE_OPAQUE_FD_EXT, handle.fd);
+    glImportMemoryFdEXT(entry.memory_object, handle.size, GL_HANDLE_TYPE_OPAQUE_FD_EXT, import_fd);
 
     glGenTextures(1, &entry.texture);
     glBindTexture(GL_TEXTURE_2D, entry.texture);

@@ -18,16 +18,48 @@
  */
 
 imports.gi.versions.Gtk = '4.0';
-const {GObject, Gtk, Gio, GLib, Gdk, Gst} = imports.gi;
+const {GObject, Gtk, Gio, GLib, Gdk, Gst, GIRepository} = imports.gi;
 const System = imports.system;
 
 const rendererDir = GLib.path_get_dirname(System.programInvocationName);
 const sourceDir = GLib.path_get_dirname(rendererDir);
+const repoDir = GLib.path_get_dirname(sourceDir);
 const commonDir = GLib.build_filenamev([sourceDir, 'common']);
 if (!imports.searchPath.some(path => path === commonDir))
     imports.searchPath.unshift(commonDir);
 if (!imports.searchPath.some(path => path === rendererDir))
     imports.searchPath.unshift(rendererDir);
+
+const nativeSceneBuildDir = GLib.build_filenamev([repoDir, 'native', 'scene', 'build', 'out']);
+const nativeSceneBuildGirDir = GLib.build_filenamev([nativeSceneBuildDir, 'gir']);
+const nativeSceneInstallGirDir = GLib.build_filenamev([repoDir, 'native', 'scene', 'girepository-1.0']);
+const nativeSceneInstallLibDir = GLib.build_filenamev([repoDir, 'native', 'scene', 'lib']);
+const giRepository = GIRepository.Repository.dup_default();
+
+const prependRepositoryDir = (path, prependFn) => {
+    if (!GLib.file_test(path, GLib.FileTest.IS_DIR))
+        return false;
+
+    prependFn.call(giRepository, path);
+    return true;
+};
+
+const usingBuildGirDir = prependRepositoryDir(
+    nativeSceneBuildGirDir,
+    giRepository.prepend_search_path
+);
+const usingBuildLibDir = prependRepositoryDir(
+    nativeSceneBuildDir,
+    giRepository.prepend_library_path
+);
+const usingInstallGirDir = !usingBuildGirDir && prependRepositoryDir(
+    nativeSceneInstallGirDir,
+    giRepository.prepend_search_path
+);
+const usingInstallLibDir = !usingBuildLibDir && prependRepositoryDir(
+    nativeSceneInstallLibDir,
+    giRepository.prepend_library_path
+);
 
 const ProjectLoader = imports.projectLoader;
 const RendererBackends = imports.backends;
