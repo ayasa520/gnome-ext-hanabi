@@ -24,7 +24,6 @@ import Graphene from 'gi://Graphene';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import * as DBus from '../services/dbus.js';
 import * as Logger from '../logger.js';
 import {loadProject, ProjectType} from '../../project.js';
 import * as RoundedCornersEffect from '../integration/roundedCornersEffect.js';
@@ -36,7 +35,6 @@ const BACKGROUND_FADE_ANIMATION_TIME = 1000;
 const MOTION_EVENT_INTERVAL_US = 33000;
 const MOTION_MIN_DELTA_PX = 1;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
-
 // const CUSTOM_BACKGROUND_BOUNDS_PADDING = 2;
 
 /**
@@ -44,7 +42,7 @@ const extSchemaId = 'io.github.jeffshee.hanabi-extension';
  */
 export const LiveWallpaper = GObject.registerClass(
     class LiveWallpaper extends St.Widget {
-        constructor(backgroundActor) {
+        constructor(backgroundActor, rendererManager = null) {
             super({
                 layout_manager: new Clutter.BinLayout(),
                 width: backgroundActor.width,
@@ -58,16 +56,13 @@ export const LiveWallpaper = GObject.registerClass(
             this._backgroundActor = backgroundActor;
             this._metaBackgroundGroup = backgroundActor.get_parent();
             this._monitorIndex = backgroundActor.monitor;
-            this._renderer = new DBus.RendererWrapper();
+            this._rendererManager = rendererManager;
             this._lastMotionEventTimeUs = 0;
             this._lastMotionPos = null;
-            this._bridgeProjectType = null;
+            this._captureProjectType = null;
             this._settings = Gio.Settings.new(extSchemaId);
             this._settingsProjectPathSignal = this._settings.connect('changed::project-path', () => {
                 this._refreshProjectType();
-            });
-            this._rendererOwnerSignal = this._renderer.proxy.connect('notify::g-name-owner', () => {
-                this._lastMotionPos = null;
             });
             this._applyWallpaperId = 0;
             this._refreshProjectType();
@@ -100,7 +95,7 @@ export const LiveWallpaper = GObject.registerClass(
             this.setPixelStep(this._monitorWidth, this._monitorHeight);
             this.setRoundedClipRadius(0.0);
             this.setRoundedClipBounds(0, 0, this._monitorWidth, this._monitorHeight);
-            this._setupPointerBridge();
+            this._setupPointerCapture();
             this.connect('destroy', () => this._onDestroy());
 
             // FIXME: Bounds calculation is wrong if the layout isn't vanilla (with custom dock, panel, etc.), disabled for now.
@@ -210,36 +205,36 @@ export const LiveWallpaper = GObject.registerClass(
             });
         }
 
-        _setupPointerBridge() {
+        _setupPointerCapture() {
             this.connect('motion-event', (_actor, event) => {
                 const now = GLib.get_monotonic_time();
-                // Cap high-frequency pointer move events to around 30Hz.
+                // Preserve the original producer throttling so we can isolate capture cost.
                 if (now - this._lastMotionEventTimeUs < MOTION_EVENT_INTERVAL_US)
                     return Clutter.EVENT_PROPAGATE;
 
                 this._lastMotionEventTimeUs = now;
-                this._dispatchPointerEvent('mousemove', event);
+                this._capturePointerEvent('mousemove', event);
                 return Clutter.EVENT_PROPAGATE;
             });
 
             this.connect('button-press-event', (_actor, event) => {
-                this._dispatchPointerEvent('mousedown', event);
+                this._capturePointerEvent('mousedown', event);
                 return Clutter.EVENT_PROPAGATE;
             });
 
             this.connect('button-release-event', (_actor, event) => {
-                this._dispatchPointerEvent('mouseup', event);
+                this._capturePointerEvent('mouseup', event);
                 return Clutter.EVENT_PROPAGATE;
             });
 
             this.connect('scroll-event', (_actor, event) => {
-                this._dispatchPointerEvent('wheel', event);
+                this._capturePointerEvent('wheel', event);
                 return Clutter.EVENT_PROPAGATE;
             });
         }
 
-        _dispatchPointerEvent(type, event) {
-            if (!this._isBridgeActive())
+        _capturePointerEvent(type, event) {
+            if (!this._isCaptureActive())
                 return;
 
             const [stageX, stageY] = event.get_coords();
@@ -280,7 +275,7 @@ export const LiveWallpaper = GObject.registerClass(
                 }
             }
 
-            const payload = JSON.stringify({
+            const wasSent = this._rendererManager?.sendPointerEvent({
                 type,
                 monitorIndex: this._monitorIndex,
                 x,
@@ -289,19 +284,20 @@ export const LiveWallpaper = GObject.registerClass(
                 deltaX,
                 deltaY,
             });
-            this._renderer.dispatchPointerEvent(payload);
+            if (!wasSent && type === 'mousemove')
+                this._lastMotionPos = null;
         }
 
         _refreshProjectType() {
             const projectPath = this._settings.get_string('project-path');
             const project = loadProject(projectPath);
-            this._bridgeProjectType = [ProjectType.WEB, ProjectType.SCENE].includes(project?.type)
+            this._captureProjectType = [ProjectType.WEB, ProjectType.SCENE].includes(project?.type)
                 ? project.type
                 : null;
         }
 
-        _isBridgeActive() {
-            return !!this._bridgeProjectType && this._renderer.proxy.g_name_owner;
+        _isCaptureActive() {
+            return !!this._captureProjectType;
         }
 
         _onDestroy() {
@@ -315,15 +311,10 @@ export const LiveWallpaper = GObject.registerClass(
                 this._settingsProjectPathSignal = 0;
             }
 
-            if (this._rendererOwnerSignal) {
-                this._renderer.proxy.disconnect(this._rendererOwnerSignal);
-                this._rendererOwnerSignal = 0;
-            }
-
             this._wallpaper?.destroy();
             this._wallpaper = null;
+            this._rendererManager = null;
             this._settings = null;
-            this._renderer = null;
         }
     }
 );

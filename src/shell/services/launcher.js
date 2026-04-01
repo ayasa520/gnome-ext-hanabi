@@ -47,11 +47,16 @@ export class LaunchSubprocess {
 
         this._flags =
             flags |
+            Gio.SubprocessFlags.STDIN_PIPE |
             Gio.SubprocessFlags.STDOUT_PIPE |
             Gio.SubprocessFlags.STDERR_MERGE;
 
         this.cancellable = new Gio.Cancellable();
         this._launcher = new Gio.SubprocessLauncher({flags: this._flags});
+        this._stdinPipe = null;
+        this._stdinQueue = [];
+        this._stdinWritePending = false;
+        this._stdinEncoder = new TextEncoder();
 
         // For GNOME Shell < 49, initialize WaylandClient in constructor
         if (!this._isX11 && shellVersion < 49)
@@ -81,6 +86,7 @@ export class LaunchSubprocess {
 
         this._launcher = null;
         if (this.subprocess) {
+            this._stdinPipe = this.subprocess.get_stdin_pipe();
             // Read STDOUT and STDERR from the renderer
             this._dataInputStream = Gio.DataInputStream.new(
                 this.subprocess.get_stdout_pipe()
@@ -89,6 +95,9 @@ export class LaunchSubprocess {
             this.subprocess.wait_async(this.cancellable, () => {
                 this.running = false;
                 this._dataInputStream = null;
+                this._stdinPipe = null;
+                this._stdinQueue = [];
+                this._stdinWritePending = false;
                 this.cancellable = null;
             });
             this.running = true;
@@ -153,6 +162,83 @@ export class LaunchSubprocess {
 
         const pid = this.subprocess.get_identifier();
         return pid ? parseInt(pid) : 0;
+    }
+
+    sendPointerEvent(event) {
+        if (!this.running || !this._stdinPipe || !this.cancellable)
+            return false;
+
+        const payload = this._serializePointerEvent(event);
+        if (!payload)
+            return false;
+
+        this._stdinQueue.push(this._stdinEncoder.encode(payload));
+        this._flushPointerQueue();
+        return true;
+    }
+
+    _serializePointerEvent(event) {
+        if (!event)
+            return null;
+
+        const monitorIndex = Number(event.monitorIndex);
+        const x = Number(event.x);
+        const y = Number(event.y);
+        if (!Number.isFinite(monitorIndex) || !Number.isFinite(x) || !Number.isFinite(y))
+            return null;
+
+        switch (event.type) {
+        case 'mousemove':
+            return `m\t${monitorIndex}\t${x}\t${y}\n`;
+        case 'mousedown':
+        case 'mouseup': {
+            const button = Number(event.button ?? 0);
+            if (!Number.isFinite(button))
+                return null;
+            const opcode = event.type === 'mousedown' ? 'd' : 'u';
+            return `${opcode}\t${monitorIndex}\t${x}\t${y}\t${button}\n`;
+        }
+        case 'wheel': {
+            const deltaX = Number(event.deltaX ?? 0);
+            const deltaY = Number(event.deltaY ?? 0);
+            if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY))
+                return null;
+            return `w\t${monitorIndex}\t${x}\t${y}\t${deltaX}\t${deltaY}\n`;
+        }
+        default:
+            return null;
+        }
+    }
+
+    _flushPointerQueue() {
+        if (this._stdinWritePending || !this._stdinPipe || this._stdinQueue.length === 0)
+            return;
+
+        const chunk = this._stdinQueue[0];
+        this._stdinWritePending = true;
+        this._stdinPipe.write_all_async(
+            chunk,
+            GLib.PRIORITY_DEFAULT,
+            this.cancellable,
+            (stream, res) => {
+                try {
+                    stream.write_all_finish(res);
+                    this._stdinQueue.shift();
+                } catch (e) {
+                    if (
+                        !e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED) &&
+                        !e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CLOSED)
+                    )
+                        logger.trace(e);
+
+                    this._stdinQueue = [];
+                    this._stdinPipe = null;
+                }
+
+                this._stdinWritePending = false;
+                this._flushPointerQueue();
+            }
+        );
     }
 
     // show_in_window_list(window) {

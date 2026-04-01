@@ -39,7 +39,8 @@ const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const BACKGROUND_CORNER_RADIUS_PIXELS = 30;
 
 export class GnomeShellOverride {
-    constructor() {
+    constructor(extension) {
+        this._extension = extension;
         this._injectionManager = new InjectionManager();
         this._wallpaperActors = new Set();
     }
@@ -82,7 +83,10 @@ export class GnomeShellOverride {
                     const backgroundActor = originalMethod.call(this);
 
                     // We need to pass radius to actors, so save a ref in bgManager.
-                    this.videoActor = new Wallpaper.LiveWallpaper(backgroundActor);
+                    this.videoActor = new Wallpaper.LiveWallpaper(
+                        backgroundActor,
+                        thisRef._extension.rendererManager
+                    );
                     thisRef._wallpaperActors.add(this.videoActor);
 
                     this.videoActor.connect('destroy', actor => {

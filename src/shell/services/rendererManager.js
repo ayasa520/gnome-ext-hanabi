@@ -19,6 +19,10 @@ export class RendererManager {
         return this._currentProjectType;
     }
 
+    sendPointerEvent(event) {
+        return this._currentProcess?.sendPointerEvent(event) ?? false;
+    }
+
     launch() {
         if (!this._extension.isEnabled)
             return;

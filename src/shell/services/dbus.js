@@ -43,9 +43,6 @@ export class RendererWrapper {
                 <method name="setProjectPath">
                     <arg name="projectPath" type="s" direction="in"/>
                 </method>
-                <method name="dispatchPointerEvent">
-                    <arg name="payload" type="s" direction="in"/>
-                </method>
                 <property name="isPlaying" type="b" access="read"/>
                 <signal name="isPlayingChanged">
                     <arg name="isPlaying" type="b"/>
@@ -93,14 +90,6 @@ export class RendererWrapper {
     async setVolume(volume) {
         try {
             await this.proxy.setVolumeAsync(volume);
-        } catch (e) {
-            this._logger.warn(e);
-        }
-    }
-
-    async dispatchPointerEvent(payload) {
-        try {
-            await this.proxy.dispatchPointerEventAsync(payload);
         } catch (e) {
             this._logger.warn(e);
         }

@@ -18,7 +18,9 @@
  */
 
 imports.gi.versions.Gtk = '4.0';
+imports.gi.versions.GioUnix = '2.0';
 const {GObject, Gtk, Gio, GLib, Gdk, Gst, GIRepository} = imports.gi;
+const GioUnix = imports.gi.GioUnix;
 const System = imports.system;
 
 const rendererDir = GLib.path_get_dirname(System.programInvocationName);
@@ -274,6 +276,8 @@ const HanabiRenderer = GObject.registerClass(
             this._dbus = null;
             if (!standalone)
                 this._exportDbus();
+            if (!standalone)
+                this._setupPointerInput();
             this._setupGst();
 
             this.connect('activate', app => {
@@ -568,9 +572,6 @@ const HanabiRenderer = GObject.registerClass(
                     <method name="setProjectPath">
                         <arg name="projectPath" type="s" direction="in"/>
                     </method>
-                    <method name="dispatchPointerEvent">
-                        <arg name="payload" type="s" direction="in"/>
-                    </method>
                     <property name="isPlaying" type="b" access="read"/>
                     <signal name="isPlayingChanged">
                         <arg name="isPlaying" type="b"/>
@@ -584,7 +585,6 @@ const HanabiRenderer = GObject.registerClass(
                 setMute: _mute => this.setMute(_mute),
                 setVolume: _volume => this.setVolume(_volume),
                 setProjectPath: _projectPath => this.setProjectPath(_projectPath),
-                dispatchPointerEvent: payload => this.dispatchPointerEvent(payload),
                 get isPlaying() {
                     return this._renderer.isPlaying;
                 },
@@ -603,6 +603,103 @@ const HanabiRenderer = GObject.registerClass(
 
         _unexportDbus() {
             this._dbus?.unexport();
+        }
+
+        _setupPointerInput() {
+            try {
+                this._pointerInputStream = Gio.DataInputStream.new(
+                    new GioUnix.InputStream({fd: 0, close_fd: false})
+                );
+                this._readPointerInput();
+            } catch (e) {
+                console.warn(e);
+                this._pointerInputStream = null;
+            }
+        }
+
+        _readPointerInput() {
+            if (!this._pointerInputStream)
+                return;
+
+            this._pointerInputStream.read_line_async(
+                GLib.PRIORITY_DEFAULT,
+                null,
+                (stream, res) => {
+                    try {
+                        const [line, length] = stream.read_line_finish_utf8(res);
+                        if (!length || line === null) {
+                            this._pointerInputStream = null;
+                            return;
+                        }
+
+                        this._handlePointerInput(line);
+                    } catch (e) {
+                        console.warn(e);
+                        this._pointerInputStream = null;
+                        return;
+                    }
+
+                    this._readPointerInput();
+                }
+            );
+        }
+
+        _handlePointerInput(line) {
+            const [opcode, monitorIndexRaw, xRaw, yRaw, aRaw = '0', bRaw = '0'] = line.split('\t');
+            const monitorIndex = Number(monitorIndexRaw);
+            const x = Number(xRaw);
+            const y = Number(yRaw);
+
+            if (!Number.isFinite(monitorIndex) || !Number.isFinite(x) || !Number.isFinite(y))
+                return;
+
+            switch (opcode) {
+            case 'm':
+                this.dispatchPointerEvent({
+                    monitorIndex,
+                    type: 'mousemove',
+                    x,
+                    y,
+                    button: 0,
+                    deltaX: 0,
+                    deltaY: 0,
+                });
+                break;
+            case 'd':
+            case 'u': {
+                const button = Number(aRaw);
+                if (!Number.isFinite(button))
+                    return;
+
+                this.dispatchPointerEvent({
+                    monitorIndex,
+                    type: opcode === 'd' ? 'mousedown' : 'mouseup',
+                    x,
+                    y,
+                    button,
+                    deltaX: 0,
+                    deltaY: 0,
+                });
+                break;
+            }
+            case 'w': {
+                const deltaX = Number(aRaw);
+                const deltaY = Number(bRaw);
+                if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY))
+                    return;
+
+                this.dispatchPointerEvent({
+                    monitorIndex,
+                    type: 'wheel',
+                    x,
+                    y,
+                    button: 0,
+                    deltaX,
+                    deltaY,
+                });
+                break;
+            }
+            }
         }
 
         _emitPlayingChanged() {
@@ -640,6 +737,37 @@ const HanabiRenderer = GObject.registerClass(
 
         setSceneFps(fps) {
             this._backend?.setSceneFps(fps);
+        }
+
+        dispatchPointerEvent(event) {
+            const monitorIndex = Number(event.monitorIndex);
+            const type = String(event.type ?? '');
+            if (!['mousemove', 'mousedown', 'mouseup', 'wheel'].includes(type) || Number.isNaN(monitorIndex))
+                return;
+
+            const x = Number(event.x ?? 0);
+            const y = Number(event.y ?? 0);
+            const button = Number(event.button ?? 0);
+            const deltaX = Number(event.deltaX ?? 0);
+            const deltaY = Number(event.deltaY ?? 0);
+            if (
+                !Number.isFinite(x) ||
+                !Number.isFinite(y) ||
+                !Number.isFinite(button) ||
+                !Number.isFinite(deltaX) ||
+                !Number.isFinite(deltaY)
+            )
+                return;
+
+            this._backend?.dispatchPointerEvent({
+                monitorIndex,
+                type,
+                x,
+                y,
+                button,
+                deltaX,
+                deltaY,
+            });
         }
 
         _setPlayingState(isPlaying) {
@@ -706,36 +834,6 @@ const HanabiRenderer = GObject.registerClass(
                 operation();
                 changeWallpaperTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, changeWallpaperInterval * 60, operation);
             }
-        }
-
-        dispatchPointerEvent(payload) {
-            let event;
-            try {
-                event = JSON.parse(payload);
-            } catch (_e) {
-                return;
-            }
-
-            const monitorIndex = Number(event.monitorIndex);
-            const type = String(event.type ?? '');
-            if (!['mousemove', 'mousedown', 'mouseup', 'wheel'].includes(type) || Number.isNaN(monitorIndex))
-                return;
-
-            const x = Number(event.x ?? 0);
-            const y = Number(event.y ?? 0);
-            const button = Number(event.button ?? 0);
-            const deltaX = Number(event.deltaX ?? 0);
-            const deltaY = Number(event.deltaY ?? 0);
-
-            this._backend?.dispatchPointerEvent({
-                monitorIndex,
-                type,
-                x,
-                y,
-                button,
-                deltaX,
-                deltaY,
-            });
         }
 
         get isPlaying() {
