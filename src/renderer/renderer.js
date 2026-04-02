@@ -32,10 +32,10 @@ if (!imports.searchPath.some(path => path === commonDir))
 if (!imports.searchPath.some(path => path === rendererDir))
     imports.searchPath.unshift(rendererDir);
 
-const nativeSceneBuildDir = GLib.build_filenamev([repoDir, 'native', 'scene', 'build', 'out']);
+const nativeSceneBuildDir = GLib.build_filenamev([sourceDir, 'native', 'scene', 'build', 'out']);
 const nativeSceneBuildGirDir = GLib.build_filenamev([nativeSceneBuildDir, 'gir']);
-const nativeSceneInstallGirDir = GLib.build_filenamev([repoDir, 'native', 'scene', 'girepository-1.0']);
-const nativeSceneInstallLibDir = GLib.build_filenamev([repoDir, 'native', 'scene', 'lib']);
+const nativeSceneInstallGirDir = GLib.build_filenamev([sourceDir, 'native', 'scene', 'girepository-1.0']);
+const nativeSceneInstallLibDir = GLib.build_filenamev([sourceDir, 'native', 'scene', 'lib']);
 const giRepository = GIRepository.Repository.dup_default();
 
 const prependRepositoryDir = (path, prependFn) => {

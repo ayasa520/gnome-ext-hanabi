@@ -24,10 +24,10 @@ elif [ "$1" == "uninstall" ]; then
 elif [ "$1" == "renderer" ]; then
     shift
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    NATIVE_BUILD_DIR="$SCRIPT_DIR/native/scene/build/out"
+    NATIVE_BUILD_DIR="$SCRIPT_DIR/src/native/scene/build/out"
     NATIVE_BUILD_GIR_DIR="$NATIVE_BUILD_DIR/gir"
-    NATIVE_INSTALL_GIR_DIR="$SCRIPT_DIR/native/scene/girepository-1.0"
-    NATIVE_INSTALL_LIB_DIR="$SCRIPT_DIR/native/scene/lib"
+    NATIVE_INSTALL_GIR_DIR="$SCRIPT_DIR/src/native/scene/girepository-1.0"
+    NATIVE_INSTALL_LIB_DIR="$SCRIPT_DIR/src/native/scene/lib"
 
     if [ -d "$NATIVE_BUILD_GIR_DIR" ]; then
         export GI_TYPELIB_PATH="$NATIVE_BUILD_GIR_DIR${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"

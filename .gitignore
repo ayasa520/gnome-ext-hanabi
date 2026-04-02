@@ -2,7 +2,7 @@
 src/video.*
 .build
 src/schemas/gschemas.compiled
-native/scene/build/
+src/native/scene/build/
 
 # Logs
 logs
