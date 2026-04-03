@@ -75,7 +75,7 @@ Currently supported project types:
 - [src/native/scene](./src/native/scene): Hanabi's native scene bridge and scene backend sources
 - [src/native/third_party/wallpaper-scene-renderer](./src/native/third_party/wallpaper-scene-renderer): upstream scene renderer source used by the native bridge
 
-Only the compiled native artifacts are installed into the extension directory at runtime. The third-party renderer sources are kept in this repository for development and build purposes.
+The native scene bridge is installed under the selected Meson prefix's library directories at install time. The third-party renderer sources are kept in this repository for development and build purposes.
 
 ### Distro-specific Guides
 
@@ -99,7 +99,7 @@ Only the compiled native artifacts are installed into the extension directory at
      After that, check if `gst-inspect-1.0 nvcodec` reports all its features.
 
 3. Scene wallpapers do not work after building from source
-   The native scene bridge and its typelib are built and installed during `meson install`. If you move files around manually without reinstalling, the extension will not be able to load the scene backend.
+   The native scene bridge and its typelib are installed into the selected Meson `--prefix` during `meson install`. If you move files around manually without reinstalling, the extension will not be able to load the scene backend.
 
 4. The GNOME Shell keeps crashing after enabling Hanabi, help!
    You can try to disable the extension from tty ( <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>F3</kbd> ):

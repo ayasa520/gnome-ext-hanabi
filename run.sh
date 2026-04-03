@@ -9,8 +9,22 @@ fi
 UUID="hanabi-extension@jeffshee.github.io"
 
 if [ "$1" == "install" ]; then
+    shift
     rm -rf .build
-    meson setup .build --prefix=$HOME/.local/ && ninja -C .build install
+    MESON_ARGS=("$@")
+    HAS_PREFIX=0
+    for arg in "${MESON_ARGS[@]}"; do
+        case "$arg" in
+            --prefix|--prefix=*)
+                HAS_PREFIX=1
+                break
+                ;;
+        esac
+    done
+    if [ "$HAS_PREFIX" -eq 0 ]; then
+        MESON_ARGS=(--prefix="$HOME/.local/" "${MESON_ARGS[@]}")
+    fi
+    meson setup .build "${MESON_ARGS[@]}" && ninja -C .build install
 elif [ "$1" == "enable" ]; then
     gnome-extensions enable "$UUID"
 elif [ "$1" == "disable" ]; then
@@ -24,24 +38,22 @@ elif [ "$1" == "uninstall" ]; then
 elif [ "$1" == "renderer" ]; then
     shift
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    NATIVE_BUILD_DIR="$SCRIPT_DIR/src/native/scene/build/out"
-    NATIVE_BUILD_GIR_DIR="$NATIVE_BUILD_DIR/gir"
-    NATIVE_INSTALL_GIR_DIR="$SCRIPT_DIR/src/native/scene/girepository-1.0"
-    NATIVE_INSTALL_LIB_DIR="$SCRIPT_DIR/src/native/scene/lib"
-
-    if [ -d "$NATIVE_BUILD_GIR_DIR" ]; then
-        export GI_TYPELIB_PATH="$NATIVE_BUILD_GIR_DIR${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
-    elif [ -d "$NATIVE_INSTALL_GIR_DIR" ]; then
-        export GI_TYPELIB_PATH="$NATIVE_INSTALL_GIR_DIR${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
+    RUN_CONFIG="$SCRIPT_DIR/.build/run-config.sh"
+    if [ ! -f "$RUN_CONFIG" ]; then
+        echo "Error: renderer requires an installed build. Run '$0 install' first." >&2
+        exit 1
     fi
 
-    if [ -d "$NATIVE_BUILD_DIR" ]; then
-        export LD_LIBRARY_PATH="$NATIVE_BUILD_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-    elif [ -d "$NATIVE_INSTALL_LIB_DIR" ]; then
-        export LD_LIBRARY_PATH="$NATIVE_INSTALL_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    # shellcheck source=/dev/null
+    . "$RUN_CONFIG"
+
+    RENDERER_SCRIPT="$HANABI_EXTENSION_INSTALL_DIR/renderer/renderer.js"
+    if [ ! -f "$RENDERER_SCRIPT" ]; then
+        echo "Error: Installed renderer not found at '$RENDERER_SCRIPT'. Run '$0 install' first." >&2
+        exit 1
     fi
 
-    "$SCRIPT_DIR/src/renderer/renderer.js" --standalone "$@"
+    "$RENDERER_SCRIPT" --standalone "$@"
 elif [ "$1" == "log" ]; then
     journalctl -f -o cat /usr/bin/gnome-shell
 elif [ "$1" == "pot" ]; then

@@ -24,42 +24,30 @@ const GioUnix = imports.gi.GioUnix;
 const System = imports.system;
 
 const rendererDir = GLib.path_get_dirname(System.programInvocationName);
-const sourceDir = GLib.path_get_dirname(rendererDir);
-const repoDir = GLib.path_get_dirname(sourceDir);
-const commonDir = GLib.build_filenamev([sourceDir, 'common']);
+const extensionDir = GLib.path_get_dirname(rendererDir);
+const commonDir = GLib.build_filenamev([extensionDir, 'common']);
 if (!imports.searchPath.some(path => path === commonDir))
     imports.searchPath.unshift(commonDir);
 if (!imports.searchPath.some(path => path === rendererDir))
     imports.searchPath.unshift(rendererDir);
 
-const nativeSceneBuildDir = GLib.build_filenamev([sourceDir, 'native', 'scene', 'build', 'out']);
-const nativeSceneBuildGirDir = GLib.build_filenamev([nativeSceneBuildDir, 'gir']);
-const nativeSceneInstallGirDir = GLib.build_filenamev([sourceDir, 'native', 'scene', 'girepository-1.0']);
-const nativeSceneInstallLibDir = GLib.build_filenamev([sourceDir, 'native', 'scene', 'lib']);
+const NativeRuntimeConfig = imports.nativeRuntimeConfig;
 const giRepository = GIRepository.Repository.dup_default();
 
 const prependRepositoryDir = (path, prependFn) => {
-    if (!GLib.file_test(path, GLib.FileTest.IS_DIR))
+    if (!path || !GLib.file_test(path, GLib.FileTest.IS_DIR))
         return false;
 
     prependFn.call(giRepository, path);
     return true;
 };
 
-const usingBuildGirDir = prependRepositoryDir(
-    nativeSceneBuildGirDir,
+prependRepositoryDir(
+    NativeRuntimeConfig.nativeSceneTypelibDir,
     giRepository.prepend_search_path
 );
-const usingBuildLibDir = prependRepositoryDir(
-    nativeSceneBuildDir,
-    giRepository.prepend_library_path
-);
-const usingInstallGirDir = !usingBuildGirDir && prependRepositoryDir(
-    nativeSceneInstallGirDir,
-    giRepository.prepend_search_path
-);
-const usingInstallLibDir = !usingBuildLibDir && prependRepositoryDir(
-    nativeSceneInstallLibDir,
+prependRepositoryDir(
+    NativeRuntimeConfig.nativeSceneLibDir,
     giRepository.prepend_library_path
 );
 
@@ -168,7 +156,6 @@ const isEnableGraphicsOffload = extSettings
     : false;
 const haveGraphicsOffload = isGtkVersionAtLeast(4, 14) && isEnableGraphicsOffload;
 
-let codePath = 'src';
 let contentFit = null;
 let mute = extSettings ? extSettings.get_boolean('mute') : false;
 let nohide = false;
@@ -385,8 +372,6 @@ const HanabiRenderer = GObject.registerClass(
                         break;
                     case '-W':
                     case '--windowed':
-                    case '-P':
-                    case '--codepath':
                     case '-F':
                     case '--project-path':
                     case '-T':
@@ -413,10 +398,6 @@ const HanabiRenderer = GObject.registerClass(
                     };
                     break;
                 }
-                case '-P':
-                case '--codepath':
-                    codePath = arg;
-                    break;
                 case '-F':
                 case '--project-path':
                     projectPath = arg;
@@ -990,7 +971,7 @@ const HanabiRendererWindow = GObject.registerClass(
             let cssProvider = new Gtk.CssProvider();
             cssProvider.load_from_file(
                 Gio.File.new_for_path(
-                    GLib.build_filenamev([codePath, 'renderer', 'stylesheet.css'])
+                    GLib.build_filenamev([extensionDir, 'renderer', 'stylesheet.css'])
                 )
             );
 

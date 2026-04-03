@@ -3,11 +3,21 @@ metaconf.set('settings_schema', schema)
 metaconf.set('uuid', uuid)
 metaconf.set('version', meson.project_version())
 
+runtimeconf = configuration_data()
+runtimeconf.set('native_scene_libdir', libdir)
+runtimeconf.set('native_scene_typelib_dir', typelib_dir)
+
 configure_file(
   input: 'metadata.json.in',
   output: 'metadata.json',
   configuration: metaconf,
   install_dir: install_dir
+)
+
+configured_native_runtime = configure_file(
+  input: 'renderer/nativeRuntimeConfig.js.in',
+  output: 'nativeRuntimeConfig.js',
+  configuration: runtimeconf,
 )
 
 root_sources = [
@@ -76,17 +86,12 @@ install_data(shell_service_sources, install_dir: join_paths(install_dir, 'shell'
 install_data(shell_ui_sources, install_dir: join_paths(install_dir, 'shell', 'ui'))
 
 install_data(renderer, install_dir: join_paths(install_dir, 'renderer'))
+install_data(configured_native_runtime, install_dir: join_paths(install_dir, 'renderer'))
 install_data(renderer_backends, install_dir: join_paths(install_dir, 'renderer', 'backend'))
 
 install_data('schemas/@0@.gschema.xml'.format(schema),
   install_dir: schema_dir
 )
 
+subdir('native/scene')
 subdir('po')
-
-meson.add_install_script(
-  meson.project_source_root() / 'build-aux' / 'install-scene-native.sh',
-  install_dir
-)
-
-meson.add_install_script(meson.project_source_root() / 'build-aux' / 'meson-postinstall.sh')

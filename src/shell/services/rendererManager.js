@@ -48,22 +48,11 @@ export class RendererManager {
                 'renderer.js',
             ]),
         ];
-        argv.push('-P', this._extension.path);
         argv.push('-F', projectPath);
         argv.push('--content-fit', `${contentFit}`);
 
         this._currentProcess = new Launcher.LaunchSubprocess();
         this._currentProcess.set_cwd(GLib.get_home_dir());
-        const nativeTypelibDir = GLib.build_filenamev([this._extension.path, 'native', 'scene', 'girepository-1.0']);
-        const nativeLibDir = GLib.build_filenamev([this._extension.path, 'native', 'scene', 'lib']);
-        this._currentProcess.setenv(
-            'GI_TYPELIB_PATH',
-            [nativeTypelibDir, GLib.getenv('GI_TYPELIB_PATH')].filter(Boolean).join(':')
-        );
-        this._currentProcess.setenv(
-            'LD_LIBRARY_PATH',
-            [nativeLibDir, GLib.getenv('LD_LIBRARY_PATH')].filter(Boolean).join(':')
-        );
         this._currentProcess.spawnv(argv);
         this._extension.manager.set_wayland_client(this._currentProcess);
         const process = this._currentProcess;

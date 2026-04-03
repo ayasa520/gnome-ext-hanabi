@@ -1,0 +1,2 @@
+var nativeSceneLibDir = '@native_scene_libdir@';
+var nativeSceneTypelibDir = '@native_scene_typelib_dir@';
