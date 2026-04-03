@@ -15,6 +15,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._previewPictures = [];
             this._readyStates = new Map();
             this._readySignalHandlers = [];
+            this._scaleSignalHandlers = [];
             this._readyCallback = null;
             this._readyResolved = false;
         }
@@ -72,12 +73,19 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                 }
             });
             this._readySignalHandlers = [];
+            this._scaleSignalHandlers.forEach(([target, signalId]) => {
+                try {
+                    target.disconnect(signalId);
+                } catch (_e) {
+                }
+            });
+            this._scaleSignalHandlers = [];
             this._readyStates.clear();
             this._readyCallback = null;
             this._readyResolved = true;
         }
 
-        createWidgetForMonitor(_index) {
+        createWidgetForMonitor(index) {
             if (!this._project.entryPath)
                 return this._createPlaceholderWidget('Scene package not found');
 
@@ -108,7 +116,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                         playing: true,
                     });
                     this._scenePaintables.push(paintable);
-                    this._trackReady(_index, paintable);
+                    this._trackReady(index, paintable);
 
                     const picture = createConfiguredPicture(new Gtk.Picture({
                         paintable,
@@ -124,6 +132,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                         const offload = setExpandFill(Gtk.GraphicsOffload.new(picture));
                         offload.set_enabled(Gtk.GraphicsOffloadEnabled.ENABLED);
                         this._sceneOffloads.push(offload);
+                        this._trackRenderScale(index, paintable, offload);
                         return offload;
                     }
 
@@ -132,6 +141,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                         `(haveGraphicsOffload=${haveGraphicsOffload}, ` +
                         `supportsGraphicsOffloadWidget=${supportsGraphicsOffloadWidget})`
                     );
+                    this._trackRenderScale(index, paintable, picture);
                     return picture;
                 }
 
@@ -152,7 +162,8 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                     playing: true,
                 }));
                 this._sceneWidgets.push(sceneWidget);
-                this._trackReady(_index, sceneWidget);
+                this._trackReady(index, sceneWidget);
+                this._trackRenderScale(index, sceneWidget, sceneWidget);
                 return sceneWidget;
             }
 
@@ -163,7 +174,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                 Gtk.Picture.new_for_file(Gio.File.new_for_path(this._project.previewPath))
             );
             this._previewPictures.push(picture);
-            this._readyStates.set(_index, true);
+            this._readyStates.set(index, true);
             return picture;
         }
 
@@ -243,6 +254,25 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
 
             updateReadyState();
             this._readySignalHandlers.push([target, target.connect('notify::ready', updateReadyState)]);
+        }
+
+        _trackRenderScale(index, sceneTarget, widget) {
+            if (!sceneTarget?.set_property || !widget?.connect)
+                return;
+
+            const monitor = this._renderer._monitors?.[index] ?? null;
+            const updateRenderScale = () => {
+                const scale = Math.max(
+                    1,
+                    widget.get_scale_factor?.() ?? 1,
+                    monitor?.get_scale_factor?.() ?? 1
+                );
+                sceneTarget.set_property('render-scale', scale);
+            };
+
+            updateRenderScale();
+            this._scaleSignalHandlers.push([widget, widget.connect('map', updateRenderScale)]);
+            this._scaleSignalHandlers.push([widget, widget.connect('notify::scale-factor', updateRenderScale)]);
         }
 
         _resolveReadyIfNeeded() {

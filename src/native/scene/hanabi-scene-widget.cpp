@@ -32,6 +32,7 @@ enum {
     PROP_VOLUME,
     PROP_FILL_MODE,
     PROP_FPS,
+    PROP_RENDER_SCALE,
     PROP_PLAYING,
     PROP_READY,
     N_PROPS,
@@ -357,6 +358,9 @@ struct _HanabiSceneWidget {
     GLuint current_texture;
     gint current_width;
     gint current_height;
+    gint render_width;
+    gint render_height;
+    gdouble render_scale;
     guint render_retry_id;
     std::array<std::uint8_t, GL_UUID_SIZE_EXT> gl_uuid;
     bool has_gl_uuid;
@@ -372,6 +376,16 @@ static GParamSpec *properties[N_PROPS] = {};
 
 static gboolean hanabi_scene_widget_is_ready(HanabiSceneWidget *self) {
     return self->current_texture != 0;
+}
+
+static double get_render_scale(HanabiSceneWidget *self) {
+    return std::max(self->render_scale, static_cast<double>(gtk_widget_get_scale_factor(GTK_WIDGET(self))));
+}
+
+static void get_render_dimensions(HanabiSceneWidget *self, int logical_width, int logical_height, int *render_width, int *render_height) {
+    const double scale = get_render_scale(self);
+    *render_width = std::max(1, static_cast<int>(std::lround(logical_width * scale)));
+    *render_height = std::max(1, static_cast<int>(std::lround(logical_height * scale)));
 }
 
 static void request_render(HanabiSceneWidget *self) {
@@ -416,6 +430,8 @@ static void reset_scene_state(HanabiSceneWidget *self) {
     self->current_texture = 0;
     self->current_width = 0;
     self->current_height = 0;
+    self->render_width = 0;
+    self->render_height = 0;
     if (was_ready)
         g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_READY]);
 }
@@ -454,6 +470,9 @@ static void hanabi_scene_widget_set_property(GObject *object, guint prop_id, con
     case PROP_FPS:
         hanabi_scene_widget_set_fps(self, g_value_get_int(value));
         break;
+    case PROP_RENDER_SCALE:
+        hanabi_scene_widget_set_render_scale(self, g_value_get_double(value));
+        break;
     case PROP_PLAYING:
         if (g_value_get_boolean(value))
             hanabi_scene_widget_play(self);
@@ -486,6 +505,9 @@ static void hanabi_scene_widget_get_property(GObject *object, guint prop_id, GVa
     case PROP_FPS:
         g_value_set_int(value, self->fps);
         break;
+    case PROP_RENDER_SCALE:
+        g_value_set_double(value, self->render_scale);
+        break;
     case PROP_PLAYING:
         g_value_set_boolean(value, self->playing);
         break;
@@ -497,17 +519,41 @@ static void hanabi_scene_widget_get_property(GObject *object, guint prop_id, GVa
     }
 }
 
-static void destroy_gl_resources(HanabiSceneWidget *self) {
-    if (!self->gl_ready)
-        return;
-
+static void clear_imported_textures(HanabiSceneWidget *self) {
     for (auto &[id, entry] : self->textures) {
+        static_cast<void>(id);
         if (entry.texture)
             glDeleteTextures(1, &entry.texture);
         if (entry.memory_object)
             glDeleteMemoryObjectsEXT(1, &entry.memory_object);
     }
     self->textures.clear();
+    self->current_texture = 0;
+}
+
+static void discard_cached_textures(HanabiSceneWidget *self) {
+    if (self->textures.empty()) {
+        self->current_texture = 0;
+        return;
+    }
+
+    if (self->gl_ready && gtk_widget_get_realized(GTK_WIDGET(self))) {
+        gtk_gl_area_make_current(GTK_GL_AREA(self));
+        if (!gtk_gl_area_get_error(GTK_GL_AREA(self))) {
+            clear_imported_textures(self);
+            return;
+        }
+    }
+
+    self->textures.clear();
+    self->current_texture = 0;
+}
+
+static void destroy_gl_resources(HanabiSceneWidget *self) {
+    if (!self->gl_ready)
+        return;
+
+    clear_imported_textures(self);
 
     if (self->ebo)
         glDeleteBuffers(1, &self->ebo);
@@ -611,14 +657,29 @@ static bool ensure_scene_initialized(HanabiSceneWidget *self) {
 }
 
 static bool ensure_render_initialized(HanabiSceneWidget *self) {
-    if (self->render_ready)
-        return true;
-
     int width = gtk_widget_get_width(GTK_WIDGET(self));
     int height = gtk_widget_get_height(GTK_WIDGET(self));
     if (width <= 0 || height <= 0) {
         return false;
     }
+
+    int render_width = 0;
+    int render_height = 0;
+    get_render_dimensions(self, width, height, &render_width, &render_height);
+
+    if (self->render_ready &&
+        (self->render_width != render_width || self->render_height != render_height)) {
+        g_message("HanabiScene: render size changed %dx%d -> %dx%d, recreating scene",
+                  self->render_width,
+                  self->render_height,
+                  render_width,
+                  render_height);
+        reset_scene_state(self);
+        discard_cached_textures(self);
+    }
+
+    if (self->render_ready)
+        return true;
 
     if (!ensure_scene_initialized(self))
         return false;
@@ -626,8 +687,8 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
     wallpaper::RenderInitInfo info {};
     info.offscreen = true;
     info.export_mode = wallpaper::ExternalFrameExportMode::OPAQUE_FD;
-    info.width = static_cast<uint16_t>(width * gtk_widget_get_scale_factor(GTK_WIDGET(self)));
-    info.height = static_cast<uint16_t>(height * gtk_widget_get_scale_factor(GTK_WIDGET(self)));
+    info.width = static_cast<uint16_t>(render_width);
+    info.height = static_cast<uint16_t>(render_height);
     if (self->has_gl_uuid)
         info.uuid = self->gl_uuid;
     info.offscreen_tiling = pick_tiling();
@@ -636,6 +697,8 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
     };
     self->scene->initVulkan(info);
 
+    self->render_width = render_width;
+    self->render_height = render_height;
     self->render_ready = true;
     if (self->playing)
         self->scene->play();
@@ -759,9 +822,8 @@ static gboolean hanabi_scene_widget_render(GtkGLArea *area, GdkGLContext *) {
         }
     }
 
-    const int scale = gtk_widget_get_scale_factor(GTK_WIDGET(self));
-    const int viewport_width = gtk_widget_get_width(GTK_WIDGET(self)) * scale;
-    const int viewport_height = gtk_widget_get_height(GTK_WIDGET(self)) * scale;
+    const int viewport_width = std::max(1, self->render_width);
+    const int viewport_height = std::max(1, self->render_height);
     glViewport(0, 0, viewport_width, viewport_height);
     glClearColor(0.f, 0.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -816,6 +878,9 @@ static void hanabi_scene_widget_class_init(HanabiSceneWidgetClass *klass) {
     properties[PROP_FPS] =
         g_param_spec_int("fps", nullptr, nullptr, 5, 240, 30,
                          static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_RENDER_SCALE] =
+        g_param_spec_double("render-scale", nullptr, nullptr, 1.0, G_MAXDOUBLE, 1.0,
+                            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
     properties[PROP_PLAYING] =
         g_param_spec_boolean("playing", nullptr, nullptr, TRUE,
                              static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
@@ -833,6 +898,7 @@ static void hanabi_scene_widget_init(HanabiSceneWidget *self) {
     self->volume = 1.0;
     self->fill_mode = 2;
     self->fps = 30;
+    self->render_scale = 1.0;
     self->playing = TRUE;
 
     gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(self), FALSE);
@@ -863,6 +929,7 @@ void hanabi_scene_widget_set_project_dir(HanabiSceneWidget *self, const char *pr
     self->project_dir = g_strdup(project_dir);
     self->project = std::move(project);
     reset_scene_state(self);
+    discard_cached_textures(self);
     g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_PROJECT_DIR]);
     request_render(self);
     ensure_render_retry(self);
@@ -934,6 +1001,24 @@ void hanabi_scene_widget_set_fps(HanabiSceneWidget *self, int fps) {
 int hanabi_scene_widget_get_fps(HanabiSceneWidget *self) {
     g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), 30);
     return self->fps;
+}
+
+void hanabi_scene_widget_set_render_scale(HanabiSceneWidget *self, double render_scale) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+
+    const double effective_scale = MAX(1.0, render_scale);
+    if (std::abs(self->render_scale - effective_scale) < 0.0001)
+        return;
+
+    self->render_scale = effective_scale;
+    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_RENDER_SCALE]);
+    request_render(self);
+    ensure_render_retry(self);
+}
+
+double hanabi_scene_widget_get_render_scale(HanabiSceneWidget *self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), 1.0);
+    return self->render_scale;
 }
 
 void hanabi_scene_widget_play(HanabiSceneWidget *self) {

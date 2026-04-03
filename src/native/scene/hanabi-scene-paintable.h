@@ -30,6 +30,9 @@ int  hanabi_scene_paintable_get_fill_mode(HanabiScenePaintable* self);
 void hanabi_scene_paintable_set_fps(HanabiScenePaintable* self, int fps);
 int  hanabi_scene_paintable_get_fps(HanabiScenePaintable* self);
 
+void   hanabi_scene_paintable_set_render_scale(HanabiScenePaintable* self, double render_scale);
+double hanabi_scene_paintable_get_render_scale(HanabiScenePaintable* self);
+
 void     hanabi_scene_paintable_play(HanabiScenePaintable* self);
 void     hanabi_scene_paintable_pause(HanabiScenePaintable* self);
 gboolean hanabi_scene_paintable_get_playing(HanabiScenePaintable* self);

@@ -34,6 +34,7 @@ enum {
     PROP_VOLUME,
     PROP_FILL_MODE,
     PROP_FPS,
+    PROP_RENDER_SCALE,
     PROP_PLAYING,
     PROP_READY,
     N_PROPS,
@@ -279,6 +280,7 @@ struct _HanabiScenePaintable {
     gint render_height;
     gint intrinsic_width;
     gint intrinsic_height;
+    gdouble render_scale;
 
     GdkTexture* current_texture;
     GdkDisplay* display;
@@ -329,8 +331,11 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                                        double        height) {
                                     auto* self = HANABI_SCENE_PAINTABLE(paintable);
 
-                                    const int target_width = MAX(1, static_cast<int>(std::ceil(width)));
-                                    const int target_height = MAX(1, static_cast<int>(std::ceil(height)));
+                                    const double render_scale = MAX(1.0, self->render_scale);
+                                    const int target_width =
+                                        MAX(1, static_cast<int>(std::ceil(width * render_scale)));
+                                    const int target_height =
+                                        MAX(1, static_cast<int>(std::ceil(height * render_scale)));
 
                                     if (self->render_ready &&
                                         (self->render_width != target_width ||
@@ -610,6 +615,9 @@ static void hanabi_scene_paintable_set_property(GObject* object,
     case PROP_FPS:
         hanabi_scene_paintable_set_fps(self, g_value_get_int(value));
         break;
+    case PROP_RENDER_SCALE:
+        hanabi_scene_paintable_set_render_scale(self, g_value_get_double(value));
+        break;
     case PROP_PLAYING:
         if (g_value_get_boolean(value))
             hanabi_scene_paintable_play(self);
@@ -645,6 +653,9 @@ static void hanabi_scene_paintable_get_property(GObject* object,
     case PROP_FPS:
         g_value_set_int(value, self->fps);
         break;
+    case PROP_RENDER_SCALE:
+        g_value_set_double(value, self->render_scale);
+        break;
     case PROP_PLAYING:
         g_value_set_boolean(value, self->playing);
         break;
@@ -678,6 +689,9 @@ static void hanabi_scene_paintable_class_init(HanabiScenePaintableClass* klass) 
     properties[PROP_FPS] =
         g_param_spec_int("fps", nullptr, nullptr, 5, 240, 30,
                          static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_RENDER_SCALE] =
+        g_param_spec_double("render-scale", nullptr, nullptr, 1.0, G_MAXDOUBLE, 1.0,
+                            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
     properties[PROP_PLAYING] =
         g_param_spec_boolean("playing", nullptr, nullptr, TRUE,
                              static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
@@ -695,6 +709,7 @@ static void hanabi_scene_paintable_init(HanabiScenePaintable* self) {
     self->volume = 1.0;
     self->fill_mode = 2;
     self->fps = 30;
+    self->render_scale = 1.0;
     self->playing = TRUE;
     self->last_logged_frame_id = -1;
 }
@@ -827,6 +842,23 @@ int hanabi_scene_paintable_get_fps(HanabiScenePaintable* self) {
     return self->fps;
 }
 
+void hanabi_scene_paintable_set_render_scale(HanabiScenePaintable* self, double render_scale) {
+    g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
+
+    const double effective_scale = MAX(1.0, render_scale);
+    if (std::abs(self->render_scale - effective_scale) < 0.0001)
+        return;
+
+    self->render_scale = effective_scale;
+    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_RENDER_SCALE]);
+    gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+}
+
+double hanabi_scene_paintable_get_render_scale(HanabiScenePaintable* self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), 1.0);
+    return self->render_scale;
+}
+
 void hanabi_scene_paintable_play(HanabiScenePaintable* self) {
     g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
     if (self->playing)
@@ -863,7 +895,8 @@ void hanabi_scene_paintable_set_mouse_pos(HanabiScenePaintable* self, double x, 
     if (!self->scene || self->render_width <= 0 || self->render_height <= 0)
         return;
 
-    const double nx = CLAMP(x / static_cast<double>(self->render_width), 0.0, 1.0);
-    const double ny = CLAMP(y / static_cast<double>(self->render_height), 0.0, 1.0);
+    const double render_scale = MAX(1.0, self->render_scale);
+    const double nx = CLAMP((x * render_scale) / static_cast<double>(self->render_width), 0.0, 1.0);
+    const double ny = CLAMP((y * render_scale) / static_cast<double>(self->render_height), 0.0, 1.0);
     self->scene->mouseInput(nx, ny);
 }
