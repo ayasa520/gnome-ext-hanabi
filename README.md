@@ -29,13 +29,46 @@ Please click on the image to view <i>(redirect to YouTube)</i>
 
 ## GNOME Shell Support
 
-| Version | ≤41 | 42  | 43  | 44  | 45  | 46  | 47  | 48  | 49  |
-| :-----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| Status  | ⛔  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
+| Version | ≤41 | 42  | 43  | 44  | 45  | 46  | 47  | 48  | 49  | 50  |
+| :-----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| Status  | ⛔  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
 
 See also the section [Troubleshooting](#troubleshooting), for version-specific known issues.
 
 ## Installation
+
+### System Dependencies
+
+Hanabi depends on several libraries and tools that must be installed system-wide through your distribution's package manager.
+
+Required for building and installing from source:
+
+- `git`
+- `meson`
+- `ninja`
+- `cmake`
+- `pkg-config`
+- `gobject-introspection` (`g-ir-scanner`, `g-ir-compiler`)
+- GTK 4 development files
+- a C/C++ toolchain
+
+Required at runtime:
+
+- GJS / GNOME Shell extension support
+- GTK 4
+- libadwaita with GI typelibs for the preferences window
+- `libgtk-4-media-gstreamer` or your distro's GTK4 GStreamer media backend package
+- GStreamer typelibs for `GstPlay` and `GstAudio`
+- WPE stack for web wallpapers: `wpewebkit`, `wpebackend-fdo`, and the GI typelibs providing `WPEWebKit-2.0`, `WPEPlatform-2.0`, and `WPEPlatformHeadless-2.0`
+
+Required for the bundled native backends built by Hanabi:
+
+- `json-glib`
+- `epoxy`
+- `liblz4`
+- `wpe-platform-2.0`
+
+If any of these are missing, Hanabi may still install but some project types will fall back to placeholders or reduced functionality.
 
 1. Clone the repo
 
@@ -66,7 +99,7 @@ Hanabi now selects a project directory containing `project.json`, instead of sel
 Currently supported project types:
 
 - `video`: video wallpaper projects
-- `web`: web wallpaper projects rendered with WebKitGTK
+- `web`: web wallpaper projects rendered with WPEWebKit
 - `scene`: scene wallpaper projects rendered through Hanabi's native scene bridge
 
 ### Repository Layout
