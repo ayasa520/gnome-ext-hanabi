@@ -7,10 +7,15 @@ var createBaseBackendClasses = (env, helpers) => {
             this._renderer = renderer;
             this._project = project;
             this.displayName = '';
+            this.usesNativeWindows = false;
         }
 
         createWidgetForMonitor(_index) {
             return this._createPlaceholderWidget('Not supported wallpaper project');
+        }
+
+        createNativeWindowForMonitor(_index, _monitor, _title) {
+            return null;
         }
 
         destroy() {

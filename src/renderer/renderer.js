@@ -90,23 +90,45 @@ try {
 }
 const haveGstAudio = GstAudio !== null;
 
-let WebKit = null;
+let WPEWebKit = null;
 try {
-    for (const version of ['6.0', '4.1', '4.0']) {
-        try {
-            imports.gi.versions.WebKit = version;
-            WebKit = imports.gi.WebKit;
-            break;
-        } catch (e) {
-            WebKit = null;
-        }
-    }
+    imports.gi.versions.WPEWebKit = '2.0';
+    WPEWebKit = imports.gi.WPEWebKit;
 } catch (_e) {
-    WebKit = null;
+    WPEWebKit = null;
 }
-const haveWebKit = WebKit !== null;
-if (!haveWebKit)
-    console.warn('WebKit, or the typelib is not installed. Web projects will fallback to a placeholder.');
+const haveWPEWebKit = WPEWebKit !== null;
+if (!haveWPEWebKit)
+    console.warn('WPEWebKit, or the typelib is not installed.');
+
+let WPEPlatform = null;
+try {
+    imports.gi.versions.WPEPlatform = '2.0';
+    WPEPlatform = imports.gi.WPEPlatform;
+} catch (_e) {
+    WPEPlatform = null;
+}
+const haveWPEPlatform = WPEPlatform !== null;
+if (!haveWPEPlatform)
+    console.warn('WPEPlatform, or the typelib is not installed.');
+
+let WPEPlatformHeadless = null;
+try {
+    imports.gi.versions.WPEPlatformHeadless = '2.0';
+    WPEPlatformHeadless = imports.gi.WPEPlatformHeadless;
+} catch (_e) {
+    WPEPlatformHeadless = null;
+}
+const haveWPEPlatformHeadless = WPEPlatformHeadless !== null;
+if (!haveWPEPlatformHeadless)
+    console.warn('WPEPlatformHeadless, or the typelib is not installed.');
+
+console.log(
+    `Web backend capabilities: haveWPEWebKit=${haveWPEWebKit}, haveWPEPlatform=${haveWPEPlatform}, haveWPEPlatformHeadless=${haveWPEPlatformHeadless}`
+);
+
+if (!(haveWPEWebKit && haveWPEPlatform && haveWPEPlatformHeadless))
+    console.warn('WPEWebKit platform support is unavailable. Web projects will fallback to a placeholder.');
 
 let HanabiScene = null;
 try {
@@ -117,6 +139,17 @@ try {
 const haveSceneBackend = HanabiScene !== null;
 if (!haveSceneBackend)
     console.warn('HanabiScene typelib is not installed. Scene projects will fallback to a placeholder.');
+
+let HanabiWpe = null;
+try {
+    HanabiWpe = imports.gi.HanabiWpe;
+} catch (e) {
+    HanabiWpe = null;
+    console.warn(`Failed to import HanabiWpe: ${e}`);
+}
+const haveWpeBridge = HanabiWpe !== null;
+if (!haveWpeBridge)
+    console.warn('HanabiWpe typelib is not installed. WPE web projects may fail to import dma-buf textures.');
 
 // ContentFit is available from Gtk 4.8+
 const haveContentFit = isGtkVersionAtLeast(4, 8);
@@ -217,22 +250,30 @@ if (haveContentFit) {
 }
 
 const createBackend = RendererBackends.createBackendFactory({
+    GObject,
     Gtk,
     Gio,
     GLib,
+    Gdk,
     Gst,
     GstPlay,
     GstAudio,
-    WebKit,
+    WPEWebKit,
+    WPEPlatform,
+    WPEPlatformHeadless,
     HanabiScene,
+    HanabiWpe,
     ProjectType,
     flags: {
         forceMediaFile,
         forceGtk4PaintableSink,
         haveGstPlay,
         haveGstAudio,
-        haveWebKit,
+        haveWPEWebKit,
+        haveWPEPlatform,
+        haveWPEPlatformHeadless,
         haveSceneBackend,
+        haveWpeBridge,
         haveContentFit,
         useGstGL,
         haveGraphicsOffload,
@@ -268,6 +309,7 @@ const HanabiRenderer = GObject.registerClass(
             this._backendDestroySourceIds = new Set();
             this._pendingSwitch = null;
             this._switchSerial = 0;
+            this._nativeWindowHold = false;
             if (!standalone)
                 this._exportDbus();
             if (!standalone)
@@ -279,7 +321,7 @@ const HanabiRenderer = GObject.registerClass(
                 this._monitors = this._display ? [...this._display.get_monitors()] : [];
 
                 let activeWindow = app.activeWindow;
-                if (!activeWindow) {
+                if (!activeWindow && this._hanabiWindows.length === 0) {
                     this._buildUI();
                     this._hanabiWindows.forEach(window => {
                         window.present();
@@ -471,27 +513,8 @@ const HanabiRenderer = GObject.registerClass(
         _buildUI() {
             this._project = loadProject(projectPath);
             this._backend = this._createBackend(this._project);
-
-            this._monitors.forEach((gdkMonitor, index) => {
-                let widget = this._getWidgetForMonitor(index);
-
-                let state = {
-                    position: [gdkMonitor.get_geometry().x, gdkMonitor.get_geometry().y],
-                    keepAtBottom: true,
-                    keepMinimized: true,
-                    keepPosition: true,
-                };
-                let window = new HanabiRendererWindow(
-                    this,
-                    nohide
-                        ? this._getWindowTitle(index)
-                        : `@${applicationId}!${JSON.stringify(state)}|${index}`,
-                    widget,
-                    gdkMonitor
-                );
-
-                this._hanabiWindows.push(window);
-            });
+            this._syncApplicationHoldForBackend(this._backend);
+            this._rebuildRendererWindows(this._backend);
             this._applyActiveBackendSettings(this._backend);
             this.setAutoWallpaper();
             console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
@@ -507,12 +530,23 @@ const HanabiRenderer = GObject.registerClass(
             if (!previousBackend) {
                 this._project = nextProject;
                 this._backend = nextBackend;
-                this._hanabiWindows.forEach((window, index) => {
-                    const widget = nextBackend.createWidgetForMonitor(index);
-                    window.setWallpaperWidget(widget);
-                    if (nohide)
-                        window.set_title(this._getWindowTitle(index));
-                });
+                this._syncApplicationHoldForBackend(this._backend);
+                this._rebuildRendererWindows(this._backend);
+                this._applyActiveBackendSettings(this._backend);
+                this.setAutoWallpaper();
+                console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
+                return;
+            }
+
+            if (this._backendUsesNativeWindows(previousBackend) || this._backendUsesNativeWindows(nextBackend)) {
+                if (this._backendUsesNativeWindows(nextBackend))
+                    this._syncApplicationHoldForBackend(nextBackend);
+                this._destroyRendererWindows();
+                previousBackend.destroy();
+                this._project = nextProject;
+                this._backend = nextBackend;
+                this._rebuildRendererWindows(this._backend);
+                this._syncApplicationHoldForBackend(this._backend);
                 this._applyActiveBackendSettings(this._backend);
                 this.setAutoWallpaper();
                 console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
@@ -553,9 +587,11 @@ const HanabiRenderer = GObject.registerClass(
             }
 
             this._cancelPendingSwitch();
+            this._destroyRendererWindows();
             this._backend?.destroy();
             this._backend = null;
             this._project = null;
+            this._syncApplicationHoldForBackend(null);
             this._setPlayingState(false);
 
             this._backendDestroySourceIds.forEach(sourceId => GLib.source_remove(sourceId));
@@ -643,11 +679,83 @@ const HanabiRenderer = GObject.registerClass(
             return this._backend.createWidgetForMonitor(index);
         }
 
+        _backendUsesNativeWindows(backend) {
+            return backend?.usesNativeWindows === true;
+        }
+
+        _rebuildRendererWindows(backend) {
+            this._destroyRendererWindows();
+
+            this._monitors.forEach((gdkMonitor, index) => {
+                if (this._backendUsesNativeWindows(backend)) {
+                    const window = backend.createNativeWindowForMonitor(
+                        index,
+                        gdkMonitor,
+                        this._getManagedWindowTitle(index, gdkMonitor)
+                    );
+                    if (window)
+                        this._hanabiWindows.push(window);
+                    return;
+                }
+
+                const widget = backend.createWidgetForMonitor(index);
+                const window = new HanabiRendererWindow(
+                    this,
+                    this._getManagedWindowTitle(index, gdkMonitor),
+                    widget,
+                    gdkMonitor
+                );
+                this._hanabiWindows.push(window);
+            });
+        }
+
+        _destroyRendererWindows() {
+            this._hanabiWindows.forEach(window => {
+                try {
+                    if (typeof window.destroyWindow === 'function')
+                        window.destroyWindow();
+                    else if (typeof window.close === 'function')
+                        window.close();
+                    else if (typeof window.destroy === 'function')
+                        window.destroy();
+                } catch (e) {
+                    console.warn(e);
+                }
+            });
+            this._hanabiWindows = [];
+        }
+
+        _syncApplicationHoldForBackend(backend) {
+            const shouldHold = this._backendUsesNativeWindows(backend);
+            if (shouldHold === this._nativeWindowHold)
+                return;
+
+            if (shouldHold)
+                this.hold();
+            else
+                this.release();
+
+            this._nativeWindowHold = shouldHold;
+        }
+
         _getProjectLabel() {
             if (!this._project)
                 return 'Invalid wallpaper project';
 
             return this._project.title || this._project.basename || this._project.path || 'Untitled project';
+        }
+
+        _getManagedWindowTitle(index, gdkMonitor) {
+            if (nohide)
+                return this._getWindowTitle(index);
+
+            const state = {
+                position: [gdkMonitor.get_geometry().x, gdkMonitor.get_geometry().y],
+                keepAtBottom: true,
+                keepMinimized: true,
+                keepPosition: true,
+            };
+            return `@${applicationId}!${JSON.stringify(state)}|${index}`;
         }
 
         _getWindowTitle(index) {
