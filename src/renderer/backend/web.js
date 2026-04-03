@@ -228,8 +228,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webViewReadyStates.set(index, false);
             this._updateWPEViewMetrics(index);
 
-            const file = Gio.File.new_for_path(this._project.entryPath);
-            webView.load_uri(file.get_uri());
+            this._loadProjectEntry(webView);
 
             if (haveGraphicsOffload && Gtk.GraphicsOffload) {
                 console.log(
@@ -303,6 +302,34 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 )
             );
             return userContentManager;
+        }
+
+        _loadProjectEntry(webView) {
+            const file = Gio.File.new_for_path(this._project.entryPath);
+            const uri = file.get_uri();
+            if (!this._shouldLoadEntryAsHtml(this._project.entryPath)) {
+                webView.load_uri(uri);
+                return;
+            }
+
+            try {
+                const [ok, contents] = GLib.file_get_contents(this._project.entryPath);
+                if (!ok)
+                    throw new Error('GLib.file_get_contents returned false');
+
+                // Force local `.html` wallpaper entries through the HTML parser so
+                // legacy Wallpaper Engine projects with XHTML-like markup still load.
+                webView.load_html(new TextDecoder().decode(contents), uri);
+                return;
+            } catch (e) {
+                console.warn(`Failed to load HTML entry via load_html; falling back to URI load: ${e}`);
+            }
+
+            webView.load_uri(uri);
+        }
+
+        _shouldLoadEntryAsHtml(entryPath) {
+            return /\.(?:html?|xhtml)$/i.test(entryPath);
         }
 
         _createWebSettings(api) {
