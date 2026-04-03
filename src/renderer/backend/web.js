@@ -254,6 +254,28 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                             return;
                         window.__hanabiPlaybackBridgeInstalled = true;
 
+                        try {
+                            delete window.ontouchstart;
+                        } catch (_e) {
+                        }
+
+                        try {
+                            const proto = Object.getPrototypeOf(window);
+                            if (proto)
+                                delete proto.ontouchstart;
+                        } catch (_e) {
+                        }
+
+                        try {
+                            Object.defineProperty(navigator, 'maxTouchPoints', {
+                                configurable: true,
+                                get() {
+                                    return 0;
+                                },
+                            });
+                        } catch (_e) {
+                        }
+
                         window.__hanabiAudioContexts = window.__hanabiAudioContexts || [];
                         const wrapAudioContext = key => {
                             const Original = window[key];
