@@ -19,6 +19,7 @@
 #include "SceneWallpaper.hpp"
 #include "SceneWallpaperSurface.hpp"
 #include "Scene/include/Scene/SceneShader.h"
+#include "WPUserProperties.hpp"
 #include "Type.hpp"
 #include "Utils/Platform.hpp"
 
@@ -44,7 +45,7 @@ struct SceneProject {
     std::string project_dir;
     std::string scene_path;
     std::string assets_path;
-    wallpaper::ShaderValueMap user_properties;
+    wallpaper::UserPropertyMap user_properties;
 };
 
 const char* bool_to_string(bool value) { return value ? "true" : "false"; }
@@ -80,7 +81,18 @@ std::vector<uint64_t> collect_dmabuf_modifiers(GdkDisplay* display, guint32 four
 #endif
 }
 
-bool parse_property_default(JsonObject* property, wallpaper::ShaderValue* out_value) {
+bool property_prefers_string(JsonObject* property) {
+    const char* type = json_object_has_member(property, "type")
+        ? json_object_get_string_member(property, "type")
+        : "";
+    return g_ascii_strcasecmp(type, "text") == 0 ||
+        g_ascii_strcasecmp(type, "textinput") == 0 ||
+        g_ascii_strcasecmp(type, "file") == 0 ||
+        g_ascii_strcasecmp(type, "directory") == 0 ||
+        g_ascii_strcasecmp(type, "scenetexture") == 0;
+}
+
+bool parse_property_default(JsonObject* property, wallpaper::UserProperty* out_property) {
     if (!json_object_has_member(property, "value"))
         return false;
 
@@ -88,14 +100,21 @@ bool parse_property_default(JsonObject* property, wallpaper::ShaderValue* out_va
     if (!JSON_NODE_HOLDS_VALUE(value))
         return false;
 
+    if (json_object_has_member(property, "condition")) {
+        const char* condition = json_object_get_string_member(property, "condition");
+        out_property->condition = condition ? condition : "";
+    } else {
+        out_property->condition.clear();
+    }
+
     GType value_type = json_node_get_value_type(value);
     if (value_type == G_TYPE_BOOLEAN) {
-        *out_value = wallpaper::ShaderValue(json_node_get_boolean(value) ? 1.0f : 0.0f);
+        out_property->value = wallpaper::ShaderValue(json_node_get_boolean(value) ? 1.0f : 0.0f);
         return true;
     }
 
     if (value_type == G_TYPE_DOUBLE || value_type == G_TYPE_INT64) {
-        *out_value = wallpaper::ShaderValue(static_cast<float>(json_node_get_double(value)));
+        out_property->value = wallpaper::ShaderValue(static_cast<float>(json_node_get_double(value)));
         return true;
     }
 
@@ -103,8 +122,13 @@ bool parse_property_default(JsonObject* property, wallpaper::ShaderValue* out_va
         return false;
 
     const char* string_value = json_node_get_string(value);
-    if (!string_value || !*string_value)
+    if (!string_value)
         return false;
+
+    if (property_prefers_string(property)) {
+        out_property->value = std::string(string_value);
+        return true;
+    }
 
     std::vector<float> components;
     g_auto(GStrv) parts = g_strsplit_set(string_value, " ,", -1);
@@ -120,10 +144,12 @@ bool parse_property_default(JsonObject* property, wallpaper::ShaderValue* out_va
         components.push_back(static_cast<float>(component));
     }
 
-    if (components.empty())
-        return false;
+    if (components.empty()) {
+        out_property->value = std::string(string_value);
+        return true;
+    }
 
-    *out_value = wallpaper::ShaderValue(components);
+    out_property->value = wallpaper::ShaderValue(components);
     return true;
 }
 
@@ -230,9 +256,9 @@ bool load_scene_project(const char* project_dir, SceneProject& project) {
                     if (!property)
                         continue;
 
-                    wallpaper::ShaderValue parsed_value;
-                    if (parse_property_default(property, &parsed_value))
-                        project.user_properties[name] = parsed_value;
+                    wallpaper::UserProperty parsed_property;
+                    if (parse_property_default(property, &parsed_property))
+                        project.user_properties[name] = std::move(parsed_property);
                 }
             }
         }
@@ -372,7 +398,7 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                         if (self->scene) {
                                             self->scene->setPropertyObject(
                                                 wallpaper::PROPERTY_USER_PROPERTIES,
-                                                std::make_shared<wallpaper::ShaderValueMap>(self->project.user_properties));
+                                                std::make_shared<wallpaper::UserPropertyMap>(self->project.user_properties));
                                             self->scene->setPropertyString(
                                                 wallpaper::PROPERTY_ASSETS, self->project.assets_path);
                                             self->scene->setPropertyString(
