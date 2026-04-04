@@ -32,7 +32,6 @@ const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const logger = new Logger.Logger();
 // Ref: https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/layout.js
 const BACKGROUND_FADE_ANIMATION_TIME = 1000;
-const MOTION_EVENT_INTERVAL_US = 33000;
 const MOTION_MIN_DELTA_PX = 1;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
 // const CUSTOM_BACKGROUND_BOUNDS_PADDING = 2;
@@ -57,7 +56,6 @@ export const LiveWallpaper = GObject.registerClass(
             this._metaBackgroundGroup = backgroundActor.get_parent();
             this._monitorIndex = backgroundActor.monitor;
             this._rendererManager = rendererManager;
-            this._lastMotionEventTimeUs = 0;
             this._lastMotionPos = null;
             this._captureProjectType = null;
             this._settings = Gio.Settings.new(extSchemaId);
@@ -207,12 +205,6 @@ export const LiveWallpaper = GObject.registerClass(
 
         _setupPointerCapture() {
             this.connect('motion-event', (_actor, event) => {
-                const now = GLib.get_monotonic_time();
-                // Preserve the original producer throttling so we can isolate capture cost.
-                if (now - this._lastMotionEventTimeUs < MOTION_EVENT_INTERVAL_US)
-                    return Clutter.EVENT_PROPAGATE;
-
-                this._lastMotionEventTimeUs = now;
                 this._capturePointerEvent('mousemove', event);
                 return Clutter.EVENT_PROPAGATE;
             });
