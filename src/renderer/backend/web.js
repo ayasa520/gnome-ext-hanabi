@@ -166,6 +166,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 toplevel,
                 livePaintable,
                 liveUpdatesEnabled: true,
+                viewSuspended: false,
                 lastTexture: null,
                 lastWidth: 0,
                 lastHeight: 0,
@@ -406,6 +407,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
 
                 wpeState.liveUpdatesEnabled = isPlaying;
                 if (isPlaying) {
+                    this._resumeWPEView(index);
                     if (wpeState.livePaintable)
                         wpeState.livePicture.paintable = wpeState.livePaintable;
                     else if (wpeState.lastTexture)
@@ -414,6 +416,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                     wpeState.pausePicture.visible = false;
                 } else {
                     this._freezeWPEView(index);
+                    this._suspendWPEView(index);
                 }
             });
             if (updateState)
@@ -435,6 +438,42 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
 
             wpeState.pausePicture.paintable = frozenPaintable;
             wpeState.pausePicture.visible = true;
+        }
+
+        _suspendWPEView(index) {
+            const wpeState = this._wpeStates.get(index);
+            if (!wpeState || wpeState.viewSuspended)
+                return;
+
+            try {
+                wpeState.view.set_visible?.(false);
+            } catch (_e) {
+            }
+            try {
+                wpeState.view.unmap();
+            } catch (_e) {
+            }
+            wpeState.pointerInside = false;
+            wpeState.pressedButtons.clear();
+            wpeState.viewSuspended = true;
+        }
+
+        _resumeWPEView(index) {
+            const wpeState = this._wpeStates.get(index);
+            if (!wpeState || !wpeState.viewSuspended)
+                return;
+
+            try {
+                wpeState.view.set_visible?.(true);
+            } catch (_e) {
+            }
+            try {
+                if (wpeState.overlay.get_mapped?.())
+                    wpeState.view.map();
+            } catch (_e) {
+            }
+            this._updateWPEViewMetrics(index);
+            wpeState.viewSuspended = false;
         }
 
         _dispatchSyntheticPointerEvent(webView, event) {
