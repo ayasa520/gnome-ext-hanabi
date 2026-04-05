@@ -5,15 +5,33 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 import Pango from 'gi://Pango';
+import Soup from 'gi://Soup?version=3.0';
 
 import {gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import {listProjects, loadProject} from '../project.js';
+import {
+    ScenePropertyType,
+    SceneUserPropertyStoreKey,
+    areScenePropertyValuesEqual,
+    buildScenePropertyValueMap,
+    getProjectScenePropertyOverrides,
+    isScenePropertyVisible,
+    listProjects,
+    loadProject,
+    normalizeScenePropertyValue,
+    serializeStoredScenePropertyOverrides,
+    setProjectScenePropertyOverrides,
+} from '../project.js';
 import {connectTracked} from './rows.js';
 
 const haveContentFit = Gtk.get_minor_version() >= 8;
 const PROJECT_CARD_WIDTH = 180;
 const PROJECT_FLOWBOX_COLUMN_SPACING = 12;
+const SCENE_PROPERTY_PANEL_WIDTH = 360;
+const INSPECTOR_ROW_HORIZONTAL_MARGIN = 24;
+const INSPECTOR_ROW_CONTROL_SPACING = 12;
+const INSPECTOR_WIDE_CONTROL_WIDTH = 180;
+const INSPECTOR_NARROW_CONTROL_WIDTH = 56;
 
 export function formatProjectSubtitle(path) {
     if (!path)
@@ -271,6 +289,260 @@ function createProjectCard(project, onActivate) {
     return root;
 }
 
+function stripScenePropertyMarkup(text) {
+    if (typeof text !== 'string')
+        return '';
+
+    return text
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<hr\s*\/?>/gi, '\n')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, '\'')
+        .split('\n')
+        .map(line => line.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+}
+
+function formatScenePropertyLabel(text, fallback = _('Untitled')) {
+    const label = stripScenePropertyMarkup(text);
+    return label || fallback;
+}
+
+function decodeScenePropertyMarkupEntities(text) {
+    return text
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, '\'');
+}
+
+function balanceScenePropertyMarkup(markup) {
+    const supportedTags = ['big', 'b', 'i', 'small', 'u'];
+    const tagPattern = /<(\/?)(big|b|i|small|u)\s*>|<(\/?)a\b[^>]*>/gi;
+    const stack = [];
+    let match = null;
+
+    while ((match = tagPattern.exec(markup)) !== null) {
+        const fullMatch = match[0];
+        const closing = (match[1] ?? match[3] ?? '') === '/';
+        const tagName = (match[2] ?? 'a').toLowerCase();
+
+        if (closing || fullMatch.startsWith('</')) {
+            const openIndex = stack.lastIndexOf(tagName);
+            if (openIndex >= 0)
+                stack.splice(openIndex, 1);
+            continue;
+        }
+
+        stack.push(tagName);
+    }
+
+    return markup + stack.reverse().map(tag => `</${tag}>`).join('');
+}
+
+function formatScenePropertyMarkup(text, fallback = _('Untitled')) {
+    const source = typeof text === 'string' && text.trim() !== '' ? text : fallback;
+    const tagPlaceholders = new Map([
+        ['<big>', '__SCENE_BIG_OPEN__'],
+        ['</big>', '__SCENE_BIG_CLOSE__'],
+        ['<b>', '__SCENE_B_OPEN__'],
+        ['</b>', '__SCENE_B_CLOSE__'],
+        ['<i>', '__SCENE_I_OPEN__'],
+        ['</i>', '__SCENE_I_CLOSE__'],
+        ['<small>', '__SCENE_SMALL_OPEN__'],
+        ['</small>', '__SCENE_SMALL_CLOSE__'],
+        ['<u>', '__SCENE_U_OPEN__'],
+        ['</u>', '__SCENE_U_CLOSE__'],
+    ]);
+    const placeholderMarkup = new Map([...tagPlaceholders.entries()].map(([markup, token]) => [token, markup]));
+    const linkPlaceholders = [];
+    const openLinkStack = [];
+
+    let markup = source
+        .replace(/\r\n?/g, '\n')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<hr\s*\/?>/gi, '\n')
+        .replace(/<\/?(p|div|center)\b[^>]*>/gi, '\n')
+        .replace(/<img\b[^>]*>/gi, '\n')
+        .replace(/<a\b([^>]*)>|<\/a>/gi, (match, attributes) => {
+            if (match.startsWith('</')) {
+                const index = openLinkStack.pop();
+                return index !== undefined ? `__SCENE_LINK_${index}_CLOSE__` : '';
+            }
+
+            const quotedHrefMatch = attributes.match(/\bhref\s*=\s*(['"])(.*?)\1/i);
+            const unquotedHrefMatch = attributes.match(/\bhref\s*=\s*([^\s>]+)/i);
+            const href = decodeScenePropertyMarkupEntities(
+                quotedHrefMatch?.[2] ?? unquotedHrefMatch?.[1] ?? ''
+            ).trim();
+            const index = linkPlaceholders.length;
+            linkPlaceholders.push(href);
+            openLinkStack.push(index);
+            return `__SCENE_LINK_${index}_OPEN__`;
+        })
+        .replace(/<\s*(\/?)\s*(big|b|i|small|u)\s*>/gi, (_match, closing, tagName) => {
+            const key = `<${closing ? '/' : ''}${tagName.toLowerCase()}>`;
+            return tagPlaceholders.get(key) ?? '';
+        })
+        .replace(/<[^>]*>/g, ' ');
+
+    markup = decodeScenePropertyMarkupEntities(markup)
+        .split('\n')
+        .map(line => line.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+
+    if (!markup)
+        return GLib.markup_escape_text(fallback, -1);
+
+    markup = GLib.markup_escape_text(markup, -1);
+
+    for (const [token, replacement] of placeholderMarkup.entries())
+        markup = markup.split(token).join(replacement);
+
+    linkPlaceholders.forEach((href, index) => {
+        const escapedHref = GLib.markup_escape_text(href, -1);
+        markup = markup
+            .split(`__SCENE_LINK_${index}_OPEN__`)
+            .join(href ? `<a href="${escapedHref}">` : '<u>')
+            .split(`__SCENE_LINK_${index}_CLOSE__`)
+            .join(href ? '</a>' : '</u>');
+    });
+
+    return balanceScenePropertyMarkup(markup);
+}
+
+function scenePropertyUsesCenteredMarkup(text) {
+    return typeof text === 'string' && /<center\b/i.test(text);
+}
+
+function parseScenePropertyImages(text) {
+    if (typeof text !== 'string')
+        return [];
+
+    const images = [];
+    const imagePattern = /<img\b([^>]*)\/?>/gi;
+    let match = null;
+
+    while ((match = imagePattern.exec(text)) !== null) {
+        const attributes = match[1] ?? '';
+        const getAttribute = attributeName => {
+            const quotedMatch = attributes.match(new RegExp(`\\b${attributeName}\\s*=\\s*(['"])(.*?)\\1`, 'i'));
+            const unquotedMatch = attributes.match(new RegExp(`\\b${attributeName}\\s*=\\s*([^\\s>]+)`, 'i'));
+            return decodeScenePropertyMarkupEntities(
+                quotedMatch?.[2] ?? unquotedMatch?.[1] ?? ''
+            ).trim();
+        };
+        const src = getAttribute('src');
+        const width = Number.parseFloat(getAttribute('width'));
+        const height = Number.parseFloat(getAttribute('height'));
+
+        if (!src)
+            continue;
+
+        images.push({
+            src,
+            width: Number.isFinite(width) && width > 0 ? Math.round(width) : null,
+            height: Number.isFinite(height) && height > 0 ? Math.round(height) : null,
+        });
+    }
+
+    return images;
+}
+
+function formatScenePropertyDisplayTitle(text, fallback = _('Untitled')) {
+    const label = stripScenePropertyMarkup(text);
+    if (label)
+        return label;
+
+    return parseScenePropertyImages(text).length > 0 ? '' : fallback;
+}
+
+function getInspectorContentMaxWidth(suffixWidth = 0) {
+    return Math.max(
+        96,
+        SCENE_PROPERTY_PANEL_WIDTH - INSPECTOR_ROW_HORIZONTAL_MARGIN - INSPECTOR_ROW_CONTROL_SPACING - suffixWidth - 24
+    );
+}
+
+function getColorComponentCount(defaultValue) {
+    if (typeof defaultValue !== 'string')
+        return 3;
+
+    const components = defaultValue
+        .trim()
+        .split(/[\s,]+/)
+        .filter(Boolean);
+    return components.length >= 4 ? 4 : 3;
+}
+
+function parseScenePropertyColor(value) {
+    const rgba = new Gdk.RGBA();
+    if (typeof value === 'string') {
+        const components = value
+            .trim()
+            .split(/[\s,]+/)
+            .map(component => Number.parseFloat(component))
+            .filter(Number.isFinite);
+
+        if (components.length >= 3) {
+            rgba.red = components[0];
+            rgba.green = components[1];
+            rgba.blue = components[2];
+            rgba.alpha = components[3] ?? 1.0;
+            return rgba;
+        }
+
+        try {
+            if (rgba.parse(value))
+                return rgba;
+        } catch (_e) {
+        }
+    }
+
+    rgba.red = 1.0;
+    rgba.green = 1.0;
+    rgba.blue = 1.0;
+    rgba.alpha = 1.0;
+    return rgba;
+}
+
+function serializeScenePropertyColor(rgba, defaultValue) {
+    const componentCount = getColorComponentCount(defaultValue);
+    const components = [
+        rgba.red,
+        rgba.green,
+        rgba.blue,
+        rgba.alpha,
+    ].slice(0, componentCount);
+
+    return components
+        .map(component => {
+            const rounded = Math.round(component * 1000000) / 1000000;
+            return `${rounded}`;
+        })
+        .join(' ');
+}
+
+function getStepDigits(step) {
+    if (typeof step !== 'number' || !Number.isFinite(step))
+        return 0;
+
+    const trimmed = `${step}`.replace(/0+$/, '');
+    const dotIndex = trimmed.indexOf('.');
+    return dotIndex >= 0 ? trimmed.length - dotIndex - 1 : 0;
+}
+
 function createProjectBrowserDialog(window, settings) {
     const currentProjectKey = 'project-path';
     const libraryKey = 'change-wallpaper-directory-path';
@@ -324,6 +596,21 @@ function createProjectBrowserDialog(window, settings) {
     toolbar.append(searchEntry);
     content.append(toolbar);
 
+    const body = new Gtk.Box({
+        orientation: Gtk.Orientation.HORIZONTAL,
+        spacing: 12,
+        hexpand: true,
+        vexpand: true,
+    });
+    content.append(body);
+
+    const browserPane = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        hexpand: true,
+        vexpand: true,
+    });
+    body.append(browserPane);
+
     const scrolled = new Gtk.ScrolledWindow({
         min_content_height: 600,
         hscrollbar_policy: Gtk.PolicyType.NEVER,
@@ -347,23 +634,624 @@ function createProjectBrowserDialog(window, settings) {
     flowBox.set_homogeneous(false);
     flowBox.set_selection_mode(Gtk.SelectionMode.NONE);
     scrolled.set_child(flowBox);
-    content.append(scrolled);
+    browserPane.append(scrolled);
 
     const placeholder = new Gtk.Label({
         xalign: 0,
         wrap: true,
         css_classes: ['dim-label'],
     });
-    content.append(placeholder);
+    browserPane.append(placeholder);
+
+    const inspectorPane = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 8,
+        width_request: SCENE_PROPERTY_PANEL_WIDTH,
+        hexpand: false,
+        vexpand: true,
+    });
+    inspectorPane.set_size_request(SCENE_PROPERTY_PANEL_WIDTH, -1);
+    body.append(inspectorPane);
+
+    const inspectorScrolled = new Gtk.ScrolledWindow({
+        hexpand: false,
+        vexpand: true,
+        min_content_width: SCENE_PROPERTY_PANEL_WIDTH,
+        max_content_width: SCENE_PROPERTY_PANEL_WIDTH,
+        hscrollbar_policy: Gtk.PolicyType.NEVER,
+        propagate_natural_width: false,
+    });
+    inspectorPane.append(inspectorScrolled);
+
+    const inspectorStack = new Gtk.Stack({
+        hexpand: false,
+        vexpand: true,
+    });
+    inspectorScrolled.set_child(inspectorStack);
+
+    const inspectorMessage = new Gtk.Label({
+        xalign: 0,
+        yalign: 0,
+        wrap: true,
+        css_classes: ['dim-label'],
+        margin_top: 12,
+        margin_bottom: 12,
+        margin_start: 12,
+        margin_end: 12,
+    });
+    inspectorStack.add_named(inspectorMessage, 'message');
+
+    const inspectorContent = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 12,
+        hexpand: false,
+        margin_top: 4,
+        margin_bottom: 4,
+    });
+    inspectorStack.add_named(inspectorContent, 'content');
 
     let currentQuery = '';
+    let currentInspectorProject = null;
+    let currentInspectorOverrides = {};
+    let currentProjectsByPath = new Map();
+    let inspectorSections = [];
+    const sceneImageSession = new Soup.Session();
     const cards = [];
+
+    const resolveSceneImageFile = source => {
+        if (!source || /^https?:\/\//i.test(source))
+            return null;
+
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(source))
+            return Gio.File.new_for_uri(source);
+
+        if (GLib.path_is_absolute(source))
+            return Gio.File.new_for_path(source);
+
+        if (!currentInspectorProject?.path)
+            return null;
+
+        return Gio.File.new_for_path(GLib.build_filenamev([currentInspectorProject.path, source]));
+    };
+
+    const createSceneImageWidget = (image, maxWidth) => {
+        const box = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 6,
+            halign: Gtk.Align.START,
+            valign: Gtk.Align.CENTER,
+        });
+        const picture = new Gtk.Picture({
+            can_shrink: true,
+            content_fit: Gtk.ContentFit.SCALE_DOWN,
+            halign: Gtk.Align.START,
+            visible: false,
+        });
+        const spinner = new Gtk.Spinner({
+            spinning: true,
+            halign: Gtk.Align.START,
+        });
+        const errorLabel = new Gtk.Label({
+            xalign: 0,
+            wrap: true,
+            visible: false,
+            css_classes: ['dim-label'],
+            label: _('Image unavailable'),
+        });
+
+        picture.set_size_request(
+            Math.min(image.width ?? maxWidth, maxWidth),
+            image.height ?? -1
+        );
+        box.append(spinner);
+        box.append(picture);
+        box.append(errorLabel);
+
+        const showError = () => {
+            spinner.visible = false;
+            picture.visible = false;
+            errorLabel.visible = true;
+        };
+
+        const applyTexture = texture => {
+            spinner.visible = false;
+            errorLabel.visible = false;
+            picture.visible = true;
+            picture.set_paintable(texture);
+
+            if (!image.width)
+                picture.width_request = Math.min(texture.get_width(), maxWidth);
+            if (!image.height)
+                picture.height_request = -1;
+        };
+
+        try {
+            if (/^https?:\/\//i.test(image.src)) {
+                const message = Soup.Message.new('GET', image.src);
+                sceneImageSession.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (session, result) => {
+                    try {
+                        const bytes = session.send_and_read_finish(result);
+                        applyTexture(Gdk.Texture.new_from_bytes(bytes));
+                    } catch (_error) {
+                        showError();
+                    }
+                });
+            } else {
+                const file = resolveSceneImageFile(image.src);
+                if (!file) {
+                    showError();
+                    return box;
+                }
+                applyTexture(Gdk.Texture.new_from_file(file));
+            }
+        } catch (_error) {
+            showError();
+        }
+
+        return box;
+    };
+
+    const buildSceneImageStrip = (text, maxWidth) => {
+        const images = parseScenePropertyImages(text);
+        if (images.length === 0)
+            return null;
+
+        const box = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 8,
+            halign: Gtk.Align.START,
+            valign: Gtk.Align.CENTER,
+            margin_top: 4,
+            margin_bottom: 4,
+            width_request: maxWidth,
+        });
+        images.forEach(image => {
+            box.append(createSceneImageWidget(image, maxWidth));
+        });
+        return box;
+    };
+
+    const buildSceneMarkupContentWidget = (text, fallback, maxWidth) => {
+        const box = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 8,
+            hexpand: false,
+            valign: Gtk.Align.CENTER,
+        });
+        const plainText = formatScenePropertyDisplayTitle(text, fallback);
+        if (plainText) {
+            const textLabel = new Gtk.Label({
+                label: formatScenePropertyMarkup(text, fallback),
+                use_markup: true,
+                xalign: scenePropertyUsesCenteredMarkup(text) ? 0.5 : 0,
+                wrap: true,
+                wrap_mode: Pango.WrapMode.WORD_CHAR,
+                justify: scenePropertyUsesCenteredMarkup(text)
+                    ? Gtk.Justification.CENTER
+                    : Gtk.Justification.LEFT,
+                max_width_chars: 36,
+                selectable: true,
+                tooltip_text: plainText,
+                width_request: maxWidth,
+            });
+            box.append(textLabel);
+        }
+
+        const imageStrip = buildSceneImageStrip(text, maxWidth);
+        if (imageStrip)
+            box.append(imageStrip);
+
+        const clamp = new Adw.Clamp({
+            maximum_size: maxWidth,
+            tightening_threshold: maxWidth,
+            hexpand: false,
+            halign: Gtk.Align.START,
+        });
+        clamp.set_child(box);
+        return clamp;
+    };
+
+    const createInspectorControlRow = ({title, tooltipText, contentWidget, suffixWidget = null}) => {
+        const row = new Adw.PreferencesRow({
+            title: title || _('Untitled'),
+        });
+        row.tooltip_text = tooltipText || null;
+
+        const box = new Gtk.Box({
+            orientation: Gtk.Orientation.HORIZONTAL,
+            spacing: 12,
+            hexpand: true,
+            margin_top: 12,
+            margin_bottom: 12,
+            margin_start: 12,
+            margin_end: 12,
+        });
+        contentWidget.hexpand = true;
+        contentWidget.halign = Gtk.Align.FILL;
+        box.append(contentWidget);
+        if (suffixWidget) {
+            suffixWidget.valign = Gtk.Align.CENTER;
+            suffixWidget.halign = Gtk.Align.END;
+            box.append(suffixWidget);
+        }
+        row.set_child(box);
+        return row;
+    };
 
     const updateLabels = () => {
         selectedLabel.label = `${_('Current')}: ${formatProjectSubtitle(settings.get_string(currentProjectKey))}`;
         selectedLabel.tooltip_text = settings.get_string(currentProjectKey);
         libraryLabel.label = `${_('Library')}: ${formatLibrarySubtitle(settings.get_string(libraryKey))}`;
         libraryLabel.tooltip_text = settings.get_string(libraryKey);
+    };
+
+    const clearInspectorContent = () => {
+        while (true) {
+            const child = inspectorContent.get_first_child();
+            if (!child)
+                break;
+            inspectorContent.remove(child);
+        }
+        inspectorSections = [];
+    };
+
+    const openPathChooser = (property, row) => {
+        const chooser = new Gtk.FileChooserDialog({
+            title: formatScenePropertyLabel(property.text, property.name),
+            transient_for: dialog,
+            modal: true,
+            action: property.type === ScenePropertyType.DIRECTORY
+                ? Gtk.FileChooserAction.SELECT_FOLDER
+                : Gtk.FileChooserAction.OPEN,
+        });
+        chooser.add_button(_('Cancel'), Gtk.ResponseType.CANCEL);
+        chooser.add_button(_('Open'), Gtk.ResponseType.ACCEPT);
+
+        if (row.text) {
+            const currentFile = Gio.File.new_for_path(row.text);
+            if (currentFile.query_exists(null))
+                chooser.set_file(currentFile);
+        }
+
+        chooser.connect('response', (chooserDialog, responseId) => {
+            if (responseId === Gtk.ResponseType.ACCEPT) {
+                const file = chooserDialog.get_file();
+                row.text = file?.get_path() ?? '';
+            }
+            chooserDialog.destroy();
+        });
+        chooser.show();
+    };
+
+    const persistInspectorOverrides = (property, rawValue) => {
+        if (!currentInspectorProject)
+            return;
+
+        const nextValue = normalizeScenePropertyValue(property.type, rawValue, property.defaultValue);
+        if (areScenePropertyValuesEqual(property.type, nextValue, property.defaultValue))
+            delete currentInspectorOverrides[property.name];
+        else
+            currentInspectorOverrides[property.name] = nextValue;
+
+        const nextStore = setProjectScenePropertyOverrides(
+            settings.get_string(SceneUserPropertyStoreKey),
+            currentInspectorProject,
+            currentInspectorOverrides
+        );
+        currentInspectorOverrides = getProjectScenePropertyOverrides(nextStore, currentInspectorProject);
+        settings.set_string(
+            SceneUserPropertyStoreKey,
+            serializeStoredScenePropertyOverrides(nextStore)
+        );
+        updateInspectorSensitivity();
+    };
+
+    function createInspectorPropertyWidget(property) {
+        const title = formatScenePropertyDisplayTitle(property.text, property.name);
+        const currentValue = normalizeScenePropertyValue(
+            property.type,
+            currentInspectorOverrides[property.name],
+            property.defaultValue
+        );
+
+        switch (property.type) {
+        case ScenePropertyType.BOOL: {
+            const contentMaxWidth = getInspectorContentMaxWidth(INSPECTOR_NARROW_CONTROL_WIDTH);
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            const toggle = new Gtk.Switch({
+                active: currentValue,
+                valign: Gtk.Align.CENTER,
+            });
+            toggle.connect('notify::active', () => {
+                persistInspectorOverrides(property, toggle.active);
+            });
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+                suffixWidget: toggle,
+            });
+        }
+        case ScenePropertyType.SLIDER: {
+            const contentMaxWidth = getInspectorContentMaxWidth(INSPECTOR_WIDE_CONTROL_WIDTH);
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            const lower = property.min ?? 0;
+            const upper = property.max ?? Math.max(lower + 1, currentValue);
+            const digits = getStepDigits(property.step);
+            const adjustment = new Gtk.Adjustment({
+                lower: Math.min(lower, upper),
+                upper: Math.max(lower, upper),
+                step_increment: property.step ?? 0.1,
+                page_increment: Math.max((property.step ?? 0.1) * 10, 1),
+                value: currentValue,
+            });
+            const scale = new Gtk.Scale({
+                orientation: Gtk.Orientation.HORIZONTAL,
+                adjustment,
+                digits,
+                draw_value: true,
+                value_pos: Gtk.PositionType.RIGHT,
+                width_request: 180,
+                valign: Gtk.Align.CENTER,
+            });
+            adjustment.connect('value-changed', () => {
+                persistInspectorOverrides(property, adjustment.value);
+            });
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+                suffixWidget: scale,
+            });
+        }
+        case ScenePropertyType.COMBO: {
+            const contentMaxWidth = getInspectorContentMaxWidth(INSPECTOR_WIDE_CONTROL_WIDTH);
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            if (property.options.length === 0) {
+                const unsupported = new Gtk.Label({
+                    label: _('No options available'),
+                    xalign: 1,
+                    wrap: true,
+                    css_classes: ['dim-label'],
+                });
+                return createInspectorControlRow({
+                    title: title || property.name,
+                    tooltipText: title,
+                    contentWidget,
+                    suffixWidget: unsupported,
+                });
+            }
+
+            const labels = property.options.map(option => formatScenePropertyLabel(option.text, option.value));
+            const dropdown = new Gtk.DropDown({
+                model: Gtk.StringList.new(labels),
+                valign: Gtk.Align.CENTER,
+                width_request: 180,
+            });
+            const currentIndex = Math.max(
+                0,
+                property.options.findIndex(option => option.value === `${currentValue}`)
+            );
+            dropdown.selected = currentIndex >= 0 ? currentIndex : 0;
+            dropdown.connect('notify::selected', () => {
+                const option = property.options[dropdown.selected];
+                if (option)
+                    persistInspectorOverrides(property, option.value);
+            });
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+                suffixWidget: dropdown,
+            });
+        }
+        case ScenePropertyType.COLOR: {
+            const contentMaxWidth = getInspectorContentMaxWidth(INSPECTOR_NARROW_CONTROL_WIDTH);
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            const colorButton = new Gtk.ColorButton({
+                valign: Gtk.Align.CENTER,
+                use_alpha: getColorComponentCount(property.defaultValue) >= 4,
+            });
+            colorButton.set_rgba(parseScenePropertyColor(currentValue));
+            colorButton.connect('color-set', button => {
+                persistInspectorOverrides(
+                    property,
+                    serializeScenePropertyColor(button.get_rgba(), property.defaultValue)
+                );
+            });
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+                suffixWidget: colorButton,
+            });
+        }
+        case ScenePropertyType.TEXT_INPUT:
+        case ScenePropertyType.FILE:
+        case ScenePropertyType.DIRECTORY:
+        case ScenePropertyType.SCENE_TEXTURE: {
+            const contentMaxWidth = getInspectorContentMaxWidth(INSPECTOR_WIDE_CONTROL_WIDTH);
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            const entry = new Gtk.Entry({
+                text: currentValue,
+                valign: Gtk.Align.CENTER,
+                width_request: 180,
+            });
+            entry.connect('notify::text', entryWidget => {
+                persistInspectorOverrides(property, entryWidget.text);
+            });
+
+            let suffixWidget = entry;
+            if ([ScenePropertyType.FILE, ScenePropertyType.DIRECTORY, ScenePropertyType.SCENE_TEXTURE].includes(property.type)) {
+                const entryBox = new Gtk.Box({
+                    orientation: Gtk.Orientation.HORIZONTAL,
+                    spacing: 6,
+                    valign: Gtk.Align.CENTER,
+                });
+                const browseButton = new Gtk.Button({
+                    icon_name: 'document-open-symbolic',
+                    valign: Gtk.Align.CENTER,
+                });
+                browseButton.connect('clicked', () => openPathChooser(property, entry));
+                entryBox.append(entry);
+                entryBox.append(browseButton);
+                suffixWidget = entryBox;
+            }
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+                suffixWidget,
+            });
+        }
+        case ScenePropertyType.TEXT: {
+            const contentMaxWidth = getInspectorContentMaxWidth();
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+            });
+        }
+        default:
+        {
+            const contentMaxWidth = getInspectorContentMaxWidth();
+            const contentWidget = buildSceneMarkupContentWidget(property.text, property.name, contentMaxWidth);
+            const unsupported = new Gtk.Label({
+                label: _('Unsupported setting type'),
+                xalign: 1,
+                wrap: true,
+                css_classes: ['dim-label'],
+            });
+            return createInspectorControlRow({
+                title: title || property.name,
+                tooltipText: title,
+                contentWidget,
+                suffixWidget: unsupported,
+            });
+        }
+        }
+    }
+
+    function updateInspectorSensitivity() {
+        if (!currentInspectorProject)
+            return;
+
+        const valueMap = buildScenePropertyValueMap(currentInspectorProject, currentInspectorOverrides);
+        const enabledMap = new Map();
+
+        inspectorSections.forEach(section => {
+            const groupEnabled = section.groupProperty
+                ? isScenePropertyVisible(currentInspectorProject, section.groupProperty, valueMap, enabledMap)
+                : true;
+
+            section.rows.forEach(entry => {
+                const rowEnabled = isScenePropertyVisible(
+                    currentInspectorProject,
+                    entry.property,
+                    valueMap,
+                    enabledMap
+                );
+                entry.widget.sensitive = groupEnabled && rowEnabled;
+            });
+
+            if (section.groupHeader) {
+                section.groupHeader.visible = section.rows.length > 0;
+                section.groupHeader.sensitive = groupEnabled;
+            }
+            section.groupWidget.visible = section.rows.length > 0;
+            section.groupWidget.sensitive = groupEnabled;
+        });
+    }
+
+    function showInspectorMessage(project, message) {
+        clearInspectorContent();
+        currentInspectorProject = project ?? null;
+        currentInspectorOverrides = {};
+        inspectorMessage.label = message;
+        inspectorStack.set_visible_child_name('message');
+    }
+
+    function buildInspector(project) {
+        clearInspectorContent();
+        currentInspectorProject = project;
+        currentInspectorOverrides = getProjectScenePropertyOverrides(
+            settings.get_string(SceneUserPropertyStoreKey),
+            project
+        );
+
+        if (project.type !== 'scene') {
+            showInspectorMessage(project, _('Only scene wallpaper options are implemented right now'));
+            return;
+        }
+
+        if ((project.sceneProperties?.length ?? 0) === 0) {
+            showInspectorMessage(project, _('This scene wallpaper has no configurable properties'));
+            return;
+        }
+
+        const sections = [];
+        let currentSection = {
+            groupProperty: null,
+            properties: [],
+        };
+        sections.push(currentSection);
+
+        for (const property of project.sceneProperties) {
+            if (property.type === ScenePropertyType.GROUP) {
+                currentSection = {
+                    groupProperty: property,
+                    properties: [],
+                };
+                sections.push(currentSection);
+                continue;
+            }
+            currentSection.properties.push(property);
+        }
+
+        inspectorSections = sections.map(section => {
+            const groupWidget = new Adw.PreferencesGroup();
+            let groupHeader = null;
+            if (section.groupProperty) {
+                const fullTitle = formatScenePropertyDisplayTitle(section.groupProperty.text, section.groupProperty.name);
+                groupHeader = buildSceneMarkupContentWidget(
+                    section.groupProperty.text,
+                    section.groupProperty.name,
+                    getInspectorContentMaxWidth()
+                );
+                groupHeader.tooltip_text = fullTitle || null;
+                groupHeader.add_css_class('heading');
+                groupHeader.margin_top = 6;
+                inspectorContent.append(groupHeader);
+            }
+
+            const rows = [];
+            section.properties.forEach(property => {
+                const widget = createInspectorPropertyWidget(property);
+                rows.push({property, widget});
+                groupWidget.add(widget);
+            });
+            inspectorContent.append(groupWidget);
+            return {
+                ...section,
+                groupHeader,
+                groupWidget,
+                rows,
+            };
+        });
+
+        inspectorStack.set_visible_child_name('content');
+        updateInspectorSensitivity();
+    }
+
+    const refreshInspector = () => {
+        const currentPath = settings.get_string(currentProjectKey);
+        const project = currentProjectsByPath.get(currentPath) ?? loadProject(currentPath);
+        if (!project) {
+            showInspectorMessage(null, _('Select a wallpaper to configure its scene properties'));
+            return;
+        }
+        buildInspector(project);
     };
 
     const syncSelectionState = () => {
@@ -389,6 +1277,7 @@ function createProjectBrowserDialog(window, settings) {
 
     const rebuild = () => {
         const projects = listProjects(settings.get_string(libraryKey));
+        currentProjectsByPath = new Map(projects.map(project => [project.path, project]));
         while (true) {
             const child = flowBox.get_first_child();
             if (!child)
@@ -405,6 +1294,7 @@ function createProjectBrowserDialog(window, settings) {
                 ? _('No wallpaper projects were found in this directory')
                 : _('Choose a wallpaper library first');
             updateLabels();
+            refreshInspector();
             return;
         }
 
@@ -412,6 +1302,7 @@ function createProjectBrowserDialog(window, settings) {
             const card = createProjectCard(project, selectedProject => {
                 settings.set_string(currentProjectKey, selectedProject.path);
                 syncSelectionState();
+                buildInspector(selectedProject);
             });
             const flowChild = new Gtk.FlowBoxChild({
                 halign: Gtk.Align.START,
@@ -426,6 +1317,7 @@ function createProjectBrowserDialog(window, settings) {
         flowBox.invalidate_filter();
         updateEmptyState();
         syncSelectionState();
+        refreshInspector();
     };
 
     flowBox.set_filter_func(child => {
@@ -443,6 +1335,14 @@ function createProjectBrowserDialog(window, settings) {
         updateEmptyState();
     });
 
+    connectTracked(window, settings, `changed::${currentProjectKey}`, () => {
+        syncSelectionState();
+        refreshInspector();
+    });
+    connectTracked(window, settings, `changed::${libraryKey}`, () => {
+        rebuild();
+    });
+    showInspectorMessage(null, _('Select a wallpaper to configure its scene properties'));
     rebuild();
     return dialog;
 }
