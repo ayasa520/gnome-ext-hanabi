@@ -7,6 +7,12 @@
             <description>Path to the wallpaper project directory</description>
         </key>
 
+        <key name="scene-user-properties" type="s">
+            <default>''</default>
+            <summary>Scene User Properties</summary>
+            <description>Per-wallpaper overrides for scene user properties, stored as JSON</description>
+        </key>
+
         <key name="mute" type="b">
             <default>false</default>
             <summary>Mute Audio</summary>

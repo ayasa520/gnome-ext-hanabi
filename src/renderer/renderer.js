@@ -162,12 +162,11 @@ let applicationId = rendererDbusName;
 
 let extSettings = null;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
-let settingsSchemaSource = Gio.SettingsSchemaSource.get_default();
-const settingsSchema = settingsSchemaSource
-    ? settingsSchemaSource.lookup(extSchemaId, false)
-    : null;
-if (settingsSchema)
+try {
     extSettings = Gio.Settings.new(extSchemaId);
+} catch (e) {
+    console.warn(`Renderer failed to initialize Gio.Settings for ${extSchemaId}: ${e}`);
+}
 
 const forceGtk4PaintableSink = extSettings
     ? extSettings.get_boolean('force-gtk4paintablesink')
@@ -210,7 +209,31 @@ const wallpaperSwitchTransitionDurationMs = 1000;
 const wallpaperSwitchTransitionCleanupDelayMs = wallpaperSwitchTransitionDurationMs + 150;
 const wallpaperSwitchReadyTimeoutMs = 15000;
 
-const {ProjectType, loadProject, listProjects} = ProjectLoader;
+const {
+    ProjectType,
+    SceneUserPropertyStoreKey,
+    buildSceneUserPropertyPayload,
+    getProjectScenePropertyOverrides,
+    loadProject,
+    listProjects,
+} = ProjectLoader;
+
+let sceneUserPropertyStore = extSettings
+    ? extSettings.get_string(SceneUserPropertyStoreKey)
+    : '';
+
+const applyProjectScenePropertyState = project => {
+    if (!project)
+        return project;
+
+    project.scenePropertyOverrides = getProjectScenePropertyOverrides(sceneUserPropertyStore, project);
+    project.scenePropertyPayload = buildSceneUserPropertyPayload(project, project.scenePropertyOverrides);
+    return project;
+};
+
+const loadConfiguredProject = path => applyProjectScenePropertyState(loadProject(path));
+const serializeScenePropertyPayload = project =>
+    JSON.stringify(project?.scenePropertyPayload ?? {});
 
 const hasArg = arg => ARGV.includes(arg);
 
@@ -385,6 +408,10 @@ const HanabiRenderer = GObject.registerClass(
                     this._backend?.applyContentFit(contentFit);
                     this._pendingSwitch?.backend?.applyContentFit(contentFit);
                     break;
+                case SceneUserPropertyStoreKey:
+                    sceneUserPropertyStore = settings.get_string(key);
+                    this._handleSceneUserPropertyStoreChanged();
+                    break;
                 case 'debug-mode':
                     isDebugMode = settings.get_boolean(key);
                     GLib.log_set_debug_enabled(isDebugMode);
@@ -511,7 +538,7 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _buildUI() {
-            this._project = loadProject(projectPath);
+            this._project = loadConfiguredProject(projectPath);
             this._backend = this._createBackend(this._project);
             this._syncApplicationHoldForBackend(this._backend);
             this._rebuildRendererWindows(this._backend);
@@ -521,9 +548,12 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _switchProject() {
+            this._switchToProject(loadConfiguredProject(projectPath));
+        }
+
+        _switchToProject(nextProject) {
             this._cancelPendingSwitch();
 
-            const nextProject = loadProject(projectPath);
             const nextBackend = this._createBackend(nextProject);
             const previousBackend = this._backend;
 
@@ -578,6 +608,24 @@ const HanabiRenderer = GObject.registerClass(
                 readyTimeoutId,
             };
             nextBackend.waitUntilReady(() => this._completePendingSwitch(switchId));
+        }
+
+        _handleSceneUserPropertyStoreChanged() {
+            const nextProject = loadConfiguredProject(projectPath);
+            const nextPayloadJson = serializeScenePropertyPayload(nextProject);
+            const currentPayloadJson = serializeScenePropertyPayload(this._project);
+            const pendingPayloadJson = serializeScenePropertyPayload(this._pendingSwitch?.project);
+
+            if (nextProject?.type !== ProjectType.SCENE)
+                return;
+
+            if (this._pendingSwitch && pendingPayloadJson !== nextPayloadJson) {
+                this._switchToProject(nextProject);
+                return;
+            }
+
+            if (!this._pendingSwitch && currentPayloadJson !== nextPayloadJson)
+                this._switchToProject(nextProject);
         }
 
         _resetBackend() {
@@ -638,6 +686,7 @@ const HanabiRenderer = GObject.registerClass(
                 return;
 
             backend.applyContentFit(contentFit);
+            backend.setSceneUserProperties?.(this._project?.scenePropertyPayload ?? null);
             backend.setVolume(volume);
             backend.setMute(mute);
             backend.setSceneFps(sceneFps);
@@ -652,6 +701,7 @@ const HanabiRenderer = GObject.registerClass(
                 return;
 
             backend.applyContentFit(contentFit);
+            backend.setSceneUserProperties?.(this._pendingSwitch?.project?.scenePropertyPayload ?? null);
             backend.setVolume(volume);
             backend.setMute(true);
             backend.setSceneFps(sceneFps);
@@ -768,15 +818,6 @@ const HanabiRenderer = GObject.registerClass(
                 <interface name="io.github.jeffshee.HanabiRenderer">
                     <method name="setPlay"/>
                     <method name="setPause"/>
-                    <method name="setMute">
-                        <arg name="mute" type="b" direction="in"/>
-                    </method>
-                    <method name="setVolume">
-                        <arg name="volume" type="d" direction="in"/>
-                    </method>
-                    <method name="setProjectPath">
-                        <arg name="projectPath" type="s" direction="in"/>
-                    </method>
                     <property name="isPlaying" type="b" access="read"/>
                     <signal name="isPlayingChanged">
                         <arg name="isPlaying" type="b"/>
@@ -787,9 +828,6 @@ const HanabiRenderer = GObject.registerClass(
             const dbusImpl = {
                 setPlay: () => this.setPlay(),
                 setPause: () => this.setPause(),
-                setMute: _mute => this.setMute(_mute),
-                setVolume: _volume => this.setVolume(_volume),
-                setProjectPath: _projectPath => this.setProjectPath(_projectPath),
                 get isPlaying() {
                     return this._renderer.isPlaying;
                 },
@@ -929,6 +967,11 @@ const HanabiRenderer = GObject.registerClass(
          * @param _volume
          */
         setVolume(_volume) {
+            volume = _volume;
+            const storedVolume = Math.round(Math.max(0.0, Math.min(1.0, _volume)) * 100.0);
+            if (extSettings && extSettings.get_int('volume') !== storedVolume)
+                extSettings.set_int('volume', storedVolume);
+
             this._backend?.setVolume(_volume);
             this._pendingSwitch?.backend?.setVolume(_volume);
         }

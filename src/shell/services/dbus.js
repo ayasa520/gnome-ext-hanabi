@@ -34,15 +34,6 @@ export class RendererWrapper {
             <interface name="io.github.jeffshee.HanabiRenderer">
                 <method name="setPlay"/>
                 <method name="setPause"/>
-                <method name="setMute">
-                    <arg name="mute" type="b" direction="in"/>
-                </method>
-                <method name="setVolume">
-                    <arg name="volume" type="d" direction="in"/>
-                </method>
-                <method name="setProjectPath">
-                    <arg name="projectPath" type="s" direction="in"/>
-                </method>
                 <property name="isPlaying" type="b" access="read"/>
                 <signal name="isPlayingChanged">
                     <arg name="isPlaying" type="b"/>
@@ -66,30 +57,6 @@ export class RendererWrapper {
     async setPause() {
         try {
             await this.proxy.setPauseAsync();
-        } catch (e) {
-            this._logger.warn(e);
-        }
-    }
-
-    async setProjectPath(projectPath) {
-        try {
-            await this.proxy.setProjectPathAsync(projectPath);
-        } catch (e) {
-            this._logger.warn(e);
-        }
-    }
-
-    async setMute(mute) {
-        try {
-            await this.proxy.setMuteAsync(mute);
-        } catch (e) {
-            this._logger.warn(e);
-        }
-    }
-
-    async setVolume(volume) {
-        try {
-            await this.proxy.setVolumeAsync(volume);
         } catch (e) {
             this._logger.warn(e);
         }

@@ -18,6 +18,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._scaleSignalHandlers = [];
             this._readyCallback = null;
             this._readyResolved = false;
+            this._sceneUserPropertiesJson = JSON.stringify(project?.scenePropertyPayload ?? {});
         }
 
         destroy() {
@@ -109,6 +110,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                     );
                     const paintable = new HanabiScene.Paintable({
                         'project-dir': this._project.path,
+                        'user-properties-json': this._sceneUserPropertiesJson,
                         muted: state.getMute(),
                         volume: state.getVolume(),
                         fps: state.getSceneFps(),
@@ -155,6 +157,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
 
                 const sceneWidget = setExpandFill(new HanabiScene.Widget({
                     'project-dir': this._project.path,
+                    'user-properties-json': this._sceneUserPropertiesJson,
                     muted: state.getMute(),
                     volume: state.getVolume(),
                     fps: state.getSceneFps(),
@@ -199,6 +202,12 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
         setSceneFps(fps) {
             this._scenePaintables.forEach(paintable => paintable.set_fps?.(fps));
             this._sceneWidgets.forEach(widget => widget.set_fps?.(fps));
+        }
+
+        setSceneUserProperties(payload) {
+            this._sceneUserPropertiesJson = JSON.stringify(payload ?? {});
+            this._scenePaintables.forEach(paintable => paintable.set_user_properties_json?.(this._sceneUserPropertiesJson));
+            this._sceneWidgets.forEach(widget => widget.set_user_properties_json?.(this._sceneUserPropertiesJson));
         }
 
         dispatchPointerEvent(event) {

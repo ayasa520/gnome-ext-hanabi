@@ -18,6 +18,9 @@ gboolean              hanabi_scene_paintable_is_supported(void);
 void        hanabi_scene_paintable_set_project_dir(HanabiScenePaintable* self, const char* project_dir);
 const char* hanabi_scene_paintable_get_project_dir(HanabiScenePaintable* self);
 
+void        hanabi_scene_paintable_set_user_properties_json(HanabiScenePaintable* self, const char* user_properties_json);
+const char* hanabi_scene_paintable_get_user_properties_json(HanabiScenePaintable* self);
+
 void     hanabi_scene_paintable_set_muted(HanabiScenePaintable* self, gboolean muted);
 gboolean hanabi_scene_paintable_get_muted(HanabiScenePaintable* self);
 

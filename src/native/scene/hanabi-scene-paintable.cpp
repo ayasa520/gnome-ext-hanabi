@@ -31,6 +31,7 @@ constexpr guint32     DEFAULT_DMABUF_FOURCC = DRM_FORMAT_ABGR8888;
 enum {
     PROP_0,
     PROP_PROJECT_DIR,
+    PROP_USER_PROPERTIES_JSON,
     PROP_MUTED,
     PROP_VOLUME,
     PROP_FILL_MODE,
@@ -45,7 +46,9 @@ struct SceneProject {
     std::string project_dir;
     std::string scene_path;
     std::string assets_path;
+    wallpaper::UserPropertyMap default_user_properties;
     wallpaper::UserPropertyMap user_properties;
+    std::unordered_map<std::string, std::string> user_property_types;
 };
 
 const char* bool_to_string(bool value) { return value ? "true" : "false"; }
@@ -87,6 +90,19 @@ bool property_prefers_string(JsonObject* property) {
         : "";
     return g_ascii_strcasecmp(type, "text") == 0 ||
         g_ascii_strcasecmp(type, "textinput") == 0 ||
+        g_ascii_strcasecmp(type, "combo") == 0 ||
+        g_ascii_strcasecmp(type, "file") == 0 ||
+        g_ascii_strcasecmp(type, "directory") == 0 ||
+        g_ascii_strcasecmp(type, "scenetexture") == 0;
+}
+
+bool property_prefers_string_type(const char* type) {
+    if (!type)
+        return false;
+
+    return g_ascii_strcasecmp(type, "text") == 0 ||
+        g_ascii_strcasecmp(type, "textinput") == 0 ||
+        g_ascii_strcasecmp(type, "combo") == 0 ||
         g_ascii_strcasecmp(type, "file") == 0 ||
         g_ascii_strcasecmp(type, "directory") == 0 ||
         g_ascii_strcasecmp(type, "scenetexture") == 0;
@@ -150,6 +166,88 @@ bool parse_property_default(JsonObject* property, wallpaper::UserProperty* out_p
     }
 
     out_property->value = wallpaper::ShaderValue(components);
+    return true;
+}
+
+bool parse_user_property_override_value(JsonNode* value,
+                                        const char* type,
+                                        wallpaper::UserPropertyValue* out_value) {
+    if (!value || !JSON_NODE_HOLDS_VALUE(value))
+        return false;
+
+    const GType value_type = json_node_get_value_type(value);
+    if (g_ascii_strcasecmp(type ? type : "", "bool") == 0) {
+        if (value_type == G_TYPE_BOOLEAN) {
+            *out_value = wallpaper::ShaderValue(json_node_get_boolean(value) ? 1.0f : 0.0f);
+            return true;
+        }
+
+        if (value_type == G_TYPE_DOUBLE || value_type == G_TYPE_INT64) {
+            *out_value = wallpaper::ShaderValue(std::abs(json_node_get_double(value)) >= 0.0001 ? 1.0f : 0.0f);
+            return true;
+        }
+
+        if (value_type == G_TYPE_STRING) {
+            const char* string_value = json_node_get_string(value);
+            const gboolean truthy = string_value &&
+                g_ascii_strcasecmp(string_value, "0") != 0 &&
+                g_ascii_strcasecmp(string_value, "false") != 0 &&
+                *string_value != '\0';
+            *out_value = wallpaper::ShaderValue(truthy ? 1.0f : 0.0f);
+            return true;
+        }
+        return false;
+    }
+
+    if (value_type == G_TYPE_BOOLEAN) {
+        *out_value = wallpaper::ShaderValue(json_node_get_boolean(value) ? 1.0f : 0.0f);
+        return true;
+    }
+
+    if (value_type == G_TYPE_DOUBLE || value_type == G_TYPE_INT64) {
+        if (property_prefers_string_type(type)) {
+            char buffer[G_ASCII_DTOSTR_BUF_SIZE] = {};
+            g_ascii_dtostr(buffer, sizeof(buffer), json_node_get_double(value));
+            *out_value = std::string(buffer);
+            return true;
+        }
+
+        *out_value = wallpaper::ShaderValue(static_cast<float>(json_node_get_double(value)));
+        return true;
+    }
+
+    if (value_type != G_TYPE_STRING)
+        return false;
+
+    const char* string_value = json_node_get_string(value);
+    if (!string_value)
+        return false;
+
+    if (property_prefers_string_type(type)) {
+        *out_value = std::string(string_value);
+        return true;
+    }
+
+    std::vector<float> components;
+    g_auto(GStrv) parts = g_strsplit_set(string_value, " ,", -1);
+    for (gchar** part = parts; part && *part; part++) {
+        if (**part == '\0')
+            continue;
+
+        char* endptr = nullptr;
+        double component = g_ascii_strtod(*part, &endptr);
+        if (endptr == *part)
+            continue;
+
+        components.push_back(static_cast<float>(component));
+    }
+
+    if (components.empty()) {
+        *out_value = std::string(string_value);
+        return true;
+    }
+
+    *out_value = wallpaper::ShaderValue(components);
     return true;
 }
 
@@ -257,8 +355,13 @@ bool load_scene_project(const char* project_dir, SceneProject& project) {
                         continue;
 
                     wallpaper::UserProperty parsed_property;
-                    if (parse_property_default(property, &parsed_property))
+                    if (parse_property_default(property, &parsed_property)) {
+                        project.default_user_properties[name] = parsed_property;
                         project.user_properties[name] = std::move(parsed_property);
+                        project.user_property_types[name] = json_object_has_member(property, "type")
+                            ? json_object_get_string_member(property, "type")
+                            : "";
+                    }
                 }
             }
         }
@@ -273,6 +376,61 @@ bool load_scene_project(const char* project_dir, SceneProject& project) {
               project.assets_path.c_str(),
               project.user_properties.size());
     return true;
+}
+
+void apply_user_property_overrides(SceneProject& project, const char* user_properties_json) {
+    project.user_properties = project.default_user_properties;
+
+    if (!user_properties_json || *user_properties_json == '\0')
+        return;
+
+    g_autoptr(JsonNode) root = json_from_string(user_properties_json, nullptr);
+    if (!root || !JSON_NODE_HOLDS_OBJECT(root)) {
+        g_warning("HanabiScene(paintable): invalid user property override json for %s",
+                  project.project_dir.c_str());
+        return;
+    }
+
+    JsonObject* overrides = json_node_get_object(root);
+    if (!overrides) {
+        g_warning("HanabiScene(paintable): override json is not an object for %s",
+                  project.project_dir.c_str());
+        return;
+    }
+
+    g_autoptr(GList) members = json_object_get_members(overrides);
+    for (GList* iter = members; iter; iter = iter->next) {
+        const char* name = static_cast<const char*>(iter->data);
+        auto property_iter = project.user_properties.find(name);
+        if (property_iter == project.user_properties.end())
+            continue;
+
+        JsonNode* member = json_object_get_member(overrides, name);
+        if (!member)
+            continue;
+
+        JsonNode* value = member;
+        const char* type = nullptr;
+        if (JSON_NODE_HOLDS_OBJECT(member)) {
+            JsonObject* member_object = json_node_get_object(member);
+            if (!member_object || !json_object_has_member(member_object, "value"))
+                continue;
+            value = json_object_get_member(member_object, "value");
+            type = json_object_has_member(member_object, "type")
+                ? json_object_get_string_member(member_object, "type")
+                : nullptr;
+        }
+
+        if (!type) {
+            auto type_iter = project.user_property_types.find(name);
+            if (type_iter != project.user_property_types.end())
+                type = type_iter->second.c_str();
+        }
+
+        wallpaper::UserPropertyValue parsed_value;
+        if (parse_user_property_override_value(value, type, &parsed_value))
+            property_iter->second.value = std::move(parsed_value);
+    }
 }
 
 wallpaper::FillMode to_wp_fill_mode(int fill_mode) {
@@ -293,6 +451,7 @@ struct _HanabiScenePaintable {
     GObject parent_instance;
 
     gchar* project_dir;
+    gchar* user_properties_json;
     gboolean muted;
     gdouble volume;
     gint fill_mode;
@@ -325,6 +484,16 @@ struct _HanabiScenePaintable {
 static GParamSpec* properties[N_PROPS] = {};
 
 static gboolean hanabi_scene_paintable_is_ready(HanabiScenePaintable* self);
+
+static void sync_scene_user_properties(HanabiScenePaintable* self) {
+    if (!self->scene)
+        return;
+
+    self->scene->setPropertyObject(
+        wallpaper::PROPERTY_USER_PROPERTIES,
+        std::make_shared<wallpaper::UserPropertyMap>(self->project.user_properties)
+    );
+}
 
 void clear_cached_textures(HanabiScenePaintable* self) {
     const gboolean was_ready = hanabi_scene_paintable_is_ready(self);
@@ -396,9 +565,7 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                         }
 
                                         if (self->scene) {
-                                            self->scene->setPropertyObject(
-                                                wallpaper::PROPERTY_USER_PROPERTIES,
-                                                std::make_shared<wallpaper::UserPropertyMap>(self->project.user_properties));
+                                            sync_scene_user_properties(self);
                                             self->scene->setPropertyString(
                                                 wallpaper::PROPERTY_ASSETS, self->project.assets_path);
                                             self->scene->setPropertyString(
@@ -617,6 +784,7 @@ static void hanabi_scene_paintable_finalize(GObject* object) {
     self->scene.~unique_ptr<wallpaper::SceneWallpaper>();
     self->project.~SceneProject();
     g_clear_pointer(&self->project_dir, g_free);
+    g_clear_pointer(&self->user_properties_json, g_free);
     G_OBJECT_CLASS(hanabi_scene_paintable_parent_class)->finalize(object);
 }
 
@@ -628,6 +796,9 @@ static void hanabi_scene_paintable_set_property(GObject* object,
     switch (prop_id) {
     case PROP_PROJECT_DIR:
         hanabi_scene_paintable_set_project_dir(self, g_value_get_string(value));
+        break;
+    case PROP_USER_PROPERTIES_JSON:
+        hanabi_scene_paintable_set_user_properties_json(self, g_value_get_string(value));
         break;
     case PROP_MUTED:
         hanabi_scene_paintable_set_muted(self, g_value_get_boolean(value));
@@ -667,6 +838,9 @@ static void hanabi_scene_paintable_get_property(GObject* object,
     case PROP_PROJECT_DIR:
         g_value_set_string(value, self->project_dir);
         break;
+    case PROP_USER_PROPERTIES_JSON:
+        g_value_set_string(value, self->user_properties_json);
+        break;
     case PROP_MUTED:
         g_value_set_boolean(value, self->muted);
         break;
@@ -703,6 +877,9 @@ static void hanabi_scene_paintable_class_init(HanabiScenePaintableClass* klass) 
     properties[PROP_PROJECT_DIR] =
         g_param_spec_string("project-dir", nullptr, nullptr, nullptr,
                             static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_USER_PROPERTIES_JSON] =
+        g_param_spec_string("user-properties-json", nullptr, nullptr, nullptr,
+                            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
     properties[PROP_MUTED] =
         g_param_spec_boolean("muted", nullptr, nullptr, FALSE,
                              static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
@@ -737,6 +914,7 @@ static void hanabi_scene_paintable_init(HanabiScenePaintable* self) {
     self->fps = 30;
     self->render_scale = 1.0;
     self->playing = TRUE;
+    self->user_properties_json = nullptr;
     self->last_logged_frame_id = -1;
 }
 
@@ -776,6 +954,7 @@ void hanabi_scene_paintable_set_project_dir(HanabiScenePaintable* self, const ch
                   project_dir);
         return;
     }
+    apply_user_property_overrides(project, self->user_properties_json);
 
     g_message("HanabiScene: project-dir update old=%s new=%s",
               self->project_dir ? self->project_dir : "(null)",
@@ -800,6 +979,36 @@ void hanabi_scene_paintable_set_project_dir(HanabiScenePaintable* self, const ch
 const char* hanabi_scene_paintable_get_project_dir(HanabiScenePaintable* self) {
     g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), nullptr);
     return self->project_dir;
+}
+
+void hanabi_scene_paintable_set_user_properties_json(HanabiScenePaintable* self,
+                                                     const char*           user_properties_json) {
+    g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
+
+    if (g_strcmp0(self->user_properties_json, user_properties_json) == 0)
+        return;
+
+    g_free(self->user_properties_json);
+    self->user_properties_json = g_strdup(user_properties_json);
+    apply_user_property_overrides(self->project, self->user_properties_json);
+
+    self->scene.reset();
+    self->scene_ready = false;
+    self->render_ready = false;
+    self->render_width = 0;
+    self->render_height = 0;
+    self->intrinsic_width = 0;
+    self->intrinsic_height = 0;
+    clear_cached_textures(self);
+
+    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_USER_PROPERTIES_JSON]);
+    gdk_paintable_invalidate_size(GDK_PAINTABLE(self));
+    gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+}
+
+const char* hanabi_scene_paintable_get_user_properties_json(HanabiScenePaintable* self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), nullptr);
+    return self->user_properties_json;
 }
 
 void hanabi_scene_paintable_set_muted(HanabiScenePaintable* self, gboolean muted) {

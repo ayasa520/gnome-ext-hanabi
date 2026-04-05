@@ -13,6 +13,9 @@ GtkWidget *hanabi_scene_widget_new(void);
 void hanabi_scene_widget_set_project_dir(HanabiSceneWidget *self, const char *project_dir);
 const char *hanabi_scene_widget_get_project_dir(HanabiSceneWidget *self);
 
+void hanabi_scene_widget_set_user_properties_json(HanabiSceneWidget *self, const char *user_properties_json);
+const char *hanabi_scene_widget_get_user_properties_json(HanabiSceneWidget *self);
+
 void hanabi_scene_widget_set_muted(HanabiSceneWidget *self, gboolean muted);
 gboolean hanabi_scene_widget_get_muted(HanabiSceneWidget *self);
 
