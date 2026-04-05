@@ -562,7 +562,7 @@ const HanabiRenderer = GObject.registerClass(
                 this._backend = nextBackend;
                 this._syncApplicationHoldForBackend(this._backend);
                 this._rebuildRendererWindows(this._backend);
-                this._applyActiveBackendSettings(this._backend);
+                this._applyActiveBackendSettings(this._backend, this._project);
                 this.setAutoWallpaper();
                 console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
                 return;
@@ -577,7 +577,7 @@ const HanabiRenderer = GObject.registerClass(
                 this._backend = nextBackend;
                 this._rebuildRendererWindows(this._backend);
                 this._syncApplicationHoldForBackend(this._backend);
-                this._applyActiveBackendSettings(this._backend);
+                this._applyActiveBackendSettings(this._backend, this._project);
                 this.setAutoWallpaper();
                 console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
                 return;
@@ -585,7 +585,7 @@ const HanabiRenderer = GObject.registerClass(
 
             const nextWidgets = this._hanabiWindows.map((_window, index) => nextBackend.createWidgetForMonitor(index));
             this._hanabiWindows.forEach((window, index) => window.stageWallpaperWidget(nextWidgets[index]));
-            this._applyPendingBackendSettings(nextBackend);
+            this._applyPendingBackendSettings(nextBackend, nextProject);
             this.setAutoWallpaper();
 
             const switchId = ++this._switchSerial;
@@ -655,7 +655,7 @@ const HanabiRenderer = GObject.registerClass(
             this._hanabiWindows.forEach(window => window.cancelWallpaperTransition());
             this._pendingSwitch.backend.destroy();
             this._pendingSwitch = null;
-            this._applyActiveBackendSettings(this._backend);
+            this._applyActiveBackendSettings(this._backend, this._project);
         }
 
         _completePendingSwitch(switchId) {
@@ -669,7 +669,7 @@ const HanabiRenderer = GObject.registerClass(
             this._project = project;
             this._backend = backend;
             previousBackend.prepareForTransitionOut?.();
-            this._applyActiveBackendSettings(this._backend);
+            this._applyActiveBackendSettings(this._backend, this._project);
 
             this._hanabiWindows.forEach((window, index) => {
                 window.commitWallpaperTransition();
@@ -681,12 +681,12 @@ const HanabiRenderer = GObject.registerClass(
             console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
         }
 
-        _applyActiveBackendSettings(backend) {
+        _applyActiveBackendSettings(backend, project = this._project) {
             if (!backend)
                 return;
 
             backend.applyContentFit(contentFit);
-            backend.setSceneUserProperties?.(this._project?.scenePropertyPayload ?? null);
+            backend.setSceneUserProperties?.(project?.scenePropertyPayload ?? null);
             backend.setVolume(volume);
             backend.setMute(mute);
             backend.setSceneFps(sceneFps);
@@ -696,12 +696,12 @@ const HanabiRenderer = GObject.registerClass(
                 backend.setPause();
         }
 
-        _applyPendingBackendSettings(backend) {
+        _applyPendingBackendSettings(backend, project) {
             if (!backend)
                 return;
 
             backend.applyContentFit(contentFit);
-            backend.setSceneUserProperties?.(this._pendingSwitch?.project?.scenePropertyPayload ?? null);
+            backend.setSceneUserProperties?.(project?.scenePropertyPayload ?? null);
             backend.setVolume(volume);
             backend.setMute(true);
             backend.setSceneFps(sceneFps);
