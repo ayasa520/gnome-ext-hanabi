@@ -208,6 +208,7 @@ let argvContentFitOverride = false;
 const wallpaperSwitchTransitionDurationMs = 1000;
 const wallpaperSwitchTransitionCleanupDelayMs = wallpaperSwitchTransitionDurationMs + 150;
 const wallpaperSwitchReadyTimeoutMs = 15000;
+const sceneUserPropertyReloadDebounceMs = 200;
 
 const {
     ProjectType,
@@ -331,6 +332,7 @@ const HanabiRenderer = GObject.registerClass(
             this._dbus = null;
             this._backendDestroySourceIds = new Set();
             this._pendingSwitch = null;
+            this._sceneUserPropertyReloadSourceId = 0;
             this._switchSerial = 0;
             this._nativeWindowHold = false;
             if (!standalone)
@@ -410,7 +412,7 @@ const HanabiRenderer = GObject.registerClass(
                     break;
                 case SceneUserPropertyStoreKey:
                     sceneUserPropertyStore = settings.get_string(key);
-                    this._handleSceneUserPropertyStoreChanged();
+                    this._scheduleSceneUserPropertyStoreReload();
                     break;
                 case 'debug-mode':
                     isDebugMode = settings.get_boolean(key);
@@ -548,6 +550,7 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _switchProject() {
+            this._cancelSceneUserPropertyStoreReload();
             this._switchToProject(loadConfiguredProject(projectPath));
         }
 
@@ -628,12 +631,36 @@ const HanabiRenderer = GObject.registerClass(
                 this._switchToProject(nextProject);
         }
 
+        _scheduleSceneUserPropertyStoreReload() {
+            if (this._sceneUserPropertyReloadSourceId)
+                GLib.source_remove(this._sceneUserPropertyReloadSourceId);
+
+            this._sceneUserPropertyReloadSourceId = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                sceneUserPropertyReloadDebounceMs,
+                () => {
+                    this._sceneUserPropertyReloadSourceId = 0;
+                    this._handleSceneUserPropertyStoreChanged();
+                    return GLib.SOURCE_REMOVE;
+                }
+            );
+        }
+
+        _cancelSceneUserPropertyStoreReload() {
+            if (!this._sceneUserPropertyReloadSourceId)
+                return;
+
+            GLib.source_remove(this._sceneUserPropertyReloadSourceId);
+            this._sceneUserPropertyReloadSourceId = 0;
+        }
+
         _resetBackend() {
             if (changeWallpaperTimerId) {
                 GLib.source_remove(changeWallpaperTimerId);
                 changeWallpaperTimerId = null;
             }
 
+            this._cancelSceneUserPropertyStoreReload();
             this._cancelPendingSwitch();
             this._destroyRendererWindows();
             this._backend?.destroy();
