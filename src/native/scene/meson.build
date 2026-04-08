@@ -19,7 +19,7 @@ scene_artifacts = custom_target(
   command: [
     sh_exe, '-eu', '-c',
     'echo "==> Configuring HanabiScene CMake project" && ' +
-    '"$1" -S "$2" -B "$3" && ' +
+    '"$1" -S "$2" -B "$3" -DCMAKE_BUILD_TYPE=RelWithDebInfo && ' +
     'echo "==> Building HanabiScene native bridge" && ' +
     '"$1" --build "$3" --verbose && ' +
     'echo "==> Collecting HanabiScene build artifacts" && ' +
