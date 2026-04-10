@@ -152,8 +152,12 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             overlay.add_overlay(pausePicture);
 
             const view = webView.get_wpe_view();
-            const toplevel = WPEPlatformHeadless.ToplevelHeadless.new(this._wpeDisplay);
-            view.set_toplevel(toplevel);
+            const toplevel =
+                view.get_toplevel?.() ??
+                this._wpeDisplay.create_toplevel?.(0) ??
+                null;
+            if (toplevel)
+                view.set_toplevel(toplevel);
             view.visible = true;
             view.map();
 
