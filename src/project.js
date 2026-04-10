@@ -8,6 +8,9 @@ if (!imports.searchPath.some(path => path === commonDir))
 const ProjectLoader = imports.projectLoader;
 
 export const ProjectType = ProjectLoader.ProjectType;
+export const ProjectBrowserFilterKey = ProjectLoader.ProjectBrowserFilterKey;
+export const ProjectContentRatings = ProjectLoader.ProjectContentRatings;
+export const ProjectGenrePresets = ProjectLoader.ProjectGenrePresets;
 export const ScenePropertyType = ProjectLoader.ScenePropertyType;
 export const SceneUserPropertyStoreKey = ProjectLoader.SceneUserPropertyStoreKey;
 export const areScenePropertyValuesEqual = ProjectLoader.areScenePropertyValuesEqual;
@@ -15,12 +18,17 @@ export const buildScenePropertyValueMap = ProjectLoader.buildScenePropertyValueM
 export const buildSceneUserPropertyPayload = ProjectLoader.buildSceneUserPropertyPayload;
 export const evaluateScenePropertyExpression = ProjectLoader.evaluateScenePropertyExpression;
 export const getProjectScenePropertyOverrides = ProjectLoader.getProjectScenePropertyOverrides;
+export const getProjectFilterTagOptions = ProjectLoader.getProjectFilterTagOptions;
+export const getProjectFilterFromSettings = ProjectLoader.getProjectFilterFromSettings;
 export const isScenePropertyVisible = ProjectLoader.isScenePropertyVisible;
 export const loadProject = ProjectLoader.loadProject;
 export const listProjects = ProjectLoader.listProjects;
+export const normalizeProjectTag = ProjectLoader.normalizeProjectTag;
 export const normalizeScenePropertyValue = ProjectLoader.normalizeScenePropertyValue;
 export const parseStoredScenePropertyOverrides = ProjectLoader.parseStoredScenePropertyOverrides;
+export const projectMatchesFilter = ProjectLoader.projectMatchesFilter;
 export const resolveProjectConfigId = ProjectLoader.resolveProjectConfigId;
 export const resolveScenePropertyValue = ProjectLoader.resolveScenePropertyValue;
 export const serializeStoredScenePropertyOverrides = ProjectLoader.serializeStoredScenePropertyOverrides;
+export const setProjectFilterInSettings = ProjectLoader.setProjectFilterInSettings;
 export const setProjectScenePropertyOverrides = ProjectLoader.setProjectScenePropertyOverrides;

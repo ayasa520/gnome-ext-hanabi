@@ -140,5 +140,11 @@
             <summary>Show Panel Menu</summary>
             <description>Show the panel menu for the extension</description>
         </key>
+
+        <key name="project-browser-filter-state" type="s">
+            <default>''</default>
+            <summary>Project Browser Filter State</summary>
+            <description>Structured filter state for wallpaper browser categories</description>
+        </key>
     </schema>
 </schemalist>

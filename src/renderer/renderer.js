@@ -211,9 +211,11 @@ const wallpaperSwitchReadyTimeoutMs = 15000;
 const sceneUserPropertyReloadDebounceMs = 200;
 
 const {
+    ProjectBrowserFilterKey,
     ProjectType,
     SceneUserPropertyStoreKey,
     buildSceneUserPropertyPayload,
+    getProjectFilterFromSettings,
     getProjectScenePropertyOverrides,
     loadProject,
     listProjects,
@@ -400,6 +402,9 @@ const HanabiRenderer = GObject.registerClass(
                     break;
                 case 'change-wallpaper-mode':
                     changeWallpaperMode = settings.get_int(key);
+                    break;
+                case ProjectBrowserFilterKey.STATE:
+                    this.setAutoWallpaper();
                     break;
                 case 'content-fit':
                     if (!haveContentFit)
@@ -1069,9 +1074,17 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         setAutoWallpaper() {
+            if (changeWallpaperTimerId) {
+                GLib.source_remove(changeWallpaperTimerId);
+                changeWallpaperTimerId = null;
+            }
+
             let currentIndex = 0;
-            let projects = listProjects(changeWallpaperDirectoryPath);
-            if (projects.length === 0)
+            let projects = listProjects(
+                changeWallpaperDirectoryPath,
+                getProjectFilterFromSettings(extSettings)
+            );
+            if (projects.length === 0 || !changeWallpaper)
                 return;
 
             let getRandomIndex = (actualIndex, projectsLength) => {
@@ -1104,15 +1117,8 @@ const HanabiRenderer = GObject.registerClass(
                 return true;
             };
 
-            if (changeWallpaperTimerId) {
-                GLib.source_remove(changeWallpaperTimerId);
-                changeWallpaperTimerId = null;
-            }
-
-            if (changeWallpaper) {
-                operation();
-                changeWallpaperTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, changeWallpaperInterval * 60, operation);
-            }
+            operation();
+            changeWallpaperTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, changeWallpaperInterval * 60, operation);
         }
 
         get isPlaying() {

@@ -25,7 +25,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as DBus from '../services/dbus.js';
-import {listProjects} from '../../project.js';
+import {getProjectFilterFromSettings, listProjects} from '../../project.js';
 
 export class HanabiPanelMenu {
     constructor(extension) {
@@ -183,7 +183,10 @@ export class HanabiPanelMenu {
      */
     _setNextWallpaper = () => {
         let changeWallpaperDirectoryPath = this._settings.get_string('change-wallpaper-directory-path');
-        let projects = listProjects(changeWallpaperDirectoryPath);
+        let projects = listProjects(
+            changeWallpaperDirectoryPath,
+            getProjectFilterFromSettings(this._settings)
+        );
         if (projects.length === 0)
             return;
 

@@ -21,6 +21,45 @@ var ScenePropertyType = {
 };
 
 var SceneUserPropertyStoreKey = 'scene-user-properties';
+var ProjectBrowserFilterKey = {
+    STATE: 'project-browser-filter-state',
+};
+var ProjectContentRatings = [
+    'Everyone',
+    'Questionable',
+    'Mature',
+];
+var ProjectGenrePresets = [
+    'Abstract',
+    'Animal',
+    'Anime',
+    'Cartoon',
+    'CGI',
+    'Cyberpunk',
+    'Fantasy',
+    'Game',
+    'Girls',
+    'Guys',
+    'Landscape',
+    'Medieval',
+    'Memes',
+    'MMD',
+    'Music',
+    'Nature',
+    'Pixel art',
+    'Relaxing',
+    'Retro',
+    'Sci-Fi',
+    'Sports',
+    'Technology',
+    'Television',
+    'Vehicle',
+    'Unspecified',
+];
+
+const projectGenrePresetIndex = new Map(
+    ProjectGenrePresets.map((tag, index) => [tag, index])
+);
 
 const scenePropertyStringTypes = new Set([
     ScenePropertyType.COLOR,
@@ -122,6 +161,178 @@ function normalizeProjectTags(project) {
         return [];
 
     return project.tags.filter(tag => typeof tag === 'string' && tag !== '');
+}
+
+function normalizeProjectTag(tag) {
+    return typeof tag === 'string' ? tag.trim() : '';
+}
+
+function normalizeProjectContentRating(contentRating) {
+    const normalized = typeof contentRating === 'string' ? contentRating.trim() : '';
+    return normalized || ProjectContentRatings[0];
+}
+
+function compareProjectGenres(left, right) {
+    const leftPresetIndex = projectGenrePresetIndex.has(left)
+        ? projectGenrePresetIndex.get(left)
+        : Number.MAX_SAFE_INTEGER;
+    const rightPresetIndex = projectGenrePresetIndex.has(right)
+        ? projectGenrePresetIndex.get(right)
+        : Number.MAX_SAFE_INTEGER;
+
+    if (leftPresetIndex !== rightPresetIndex)
+        return leftPresetIndex - rightPresetIndex;
+
+    return left.localeCompare(right);
+}
+
+function normalizeProjectGenreList(tags) {
+    const result = new Set(ProjectGenrePresets);
+    (tags ?? []).forEach(tag => {
+        const normalizedTag = normalizeProjectTag(tag);
+        if (normalizedTag)
+            result.add(normalizedTag);
+    });
+    return [...result].sort(compareProjectGenres);
+}
+
+function getProjectFilterTagOptions(projects = []) {
+    const tags = [];
+    projects.forEach(project => tags.push(...(project?.tags ?? [])));
+    return normalizeProjectGenreList(tags);
+}
+
+function buildProjectFilterState(filter, availableTags = []) {
+    const normalized = filter && typeof filter === 'object' ? filter : {};
+    const tags = normalizeProjectGenreList(availableTags);
+
+    const state = {
+        type: {
+            scene: true,
+            web: true,
+            video: true,
+        },
+        contentrating: {
+            Everyone: true,
+            Questionable: true,
+            Mature: false,
+        },
+        tags: {},
+    };
+
+    Object.keys(state.type).forEach(key => {
+        if (typeof normalized?.type?.[key] === 'boolean')
+            state.type[key] = normalized.type[key];
+    });
+
+    Object.keys(state.contentrating).forEach(key => {
+        if (typeof normalized?.contentrating?.[key] === 'boolean')
+            state.contentrating[key] = normalized.contentrating[key];
+    });
+
+    tags.forEach(tag => {
+        state.tags[tag] = typeof normalized?.tags?.[tag] === 'boolean'
+            ? normalized.tags[tag]
+            : true;
+    });
+
+    Object.keys(normalized?.tags ?? {}).forEach(tag => {
+        const normalizedTag = normalizeProjectTag(tag);
+        if (!normalizedTag || Object.prototype.hasOwnProperty.call(state.tags, normalizedTag))
+            return;
+
+        state.tags[normalizedTag] = typeof normalized.tags[tag] === 'boolean'
+            ? normalized.tags[tag]
+            : true;
+    });
+
+    return state;
+}
+
+function parseProjectFilterState(serialized, availableTags = []) {
+    if (!serialized)
+        return buildProjectFilterState(null, availableTags);
+
+    try {
+        const parsed = typeof serialized === 'string' ? JSON.parse(serialized) : serialized;
+        return buildProjectFilterState(parsed, availableTags);
+    } catch (_e) {
+        return buildProjectFilterState(null, availableTags);
+    }
+}
+
+function serializeProjectFilterState(filter, availableTags = []) {
+    const normalized = buildProjectFilterState(filter, [
+        ...availableTags,
+        ...Object.keys(filter?.tags ?? {}),
+    ]);
+    const serialized = {
+        type: {},
+        contentrating: {},
+        tags: {},
+    };
+
+    Object.keys(normalized.type).forEach(key => {
+        serialized.type[key] = normalized.type[key];
+    });
+    Object.keys(normalized.contentrating).forEach(key => {
+        serialized.contentrating[key] = normalized.contentrating[key];
+    });
+    Object.keys(normalized.tags)
+        .sort(compareProjectGenres)
+        .forEach(key => {
+            serialized.tags[key] = normalized.tags[key];
+        });
+
+    return JSON.stringify(serialized);
+}
+
+function setProjectFilterInSettings(settings, filter, availableTags = []) {
+    if (!settings)
+        return;
+
+    settings.set_string(
+        ProjectBrowserFilterKey.STATE,
+        serializeProjectFilterState(filter, availableTags)
+    );
+}
+
+function getProjectFilterFromSettings(settings, availableTags = []) {
+    if (!settings)
+        return buildProjectFilterState(null, availableTags);
+
+    return parseProjectFilterState(
+        settings.get_string(ProjectBrowserFilterKey.STATE),
+        availableTags
+    );
+}
+
+function getProjectFilterTagsForProject(project) {
+    if (Array.isArray(project?.tags) && project.tags.length > 0)
+        return project.tags;
+
+    return ['Unspecified'];
+}
+
+function projectMatchesFilter(project, filter) {
+    if (filter === null || filter === undefined)
+        return true;
+
+    const normalizedFilter = buildProjectFilterState(
+        filter,
+        getProjectFilterTagsForProject(project)
+    );
+
+    if (!normalizedFilter.type[project?.type])
+        return false;
+
+    const contentRating = normalizeProjectContentRating(project?.contentrating);
+    if (!normalizedFilter.contentrating[contentRating])
+        return false;
+
+    return getProjectFilterTagsForProject(project)
+        .map(normalizeProjectTag)
+        .every(tag => normalizedFilter.tags[tag] !== false);
 }
 
 function resolveProjectConfigId(project) {
@@ -703,6 +914,7 @@ function loadProject(projectDirPath) {
         title: resolveProjectTitle(projectDirPath, project),
         description: typeof project?.description === 'string' ? project.description : '',
         tags,
+        contentrating: normalizeProjectContentRating(project?.contentrating),
         workshopId: project?.workshopid ?? null,
         type,
         entry,
@@ -722,7 +934,7 @@ function loadProject(projectDirPath) {
     };
 }
 
-function listProjects(parentDirPath) {
+function listProjects(parentDirPath, filter = null) {
     const projects = [];
     if (!parentDirPath)
         return projects;
@@ -748,5 +960,7 @@ function listProjects(parentDirPath) {
             projects.push(project);
     }
 
-    return projects.sort((a, b) => a.path.localeCompare(b.path));
+    return projects
+        .sort((a, b) => a.path.localeCompare(b.path))
+        .filter(project => projectMatchesFilter(project, filter));
 }

@@ -10,16 +10,22 @@ import Soup from 'gi://Soup?version=3.0';
 import {gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import {
+    ProjectBrowserFilterKey,
+    ProjectContentRatings,
     ScenePropertyType,
     SceneUserPropertyStoreKey,
     areScenePropertyValuesEqual,
     buildScenePropertyValueMap,
+    getProjectFilterTagOptions,
+    getProjectFilterFromSettings,
     getProjectScenePropertyOverrides,
     isScenePropertyVisible,
     listProjects,
     loadProject,
     normalizeScenePropertyValue,
+    projectMatchesFilter,
     serializeStoredScenePropertyOverrides,
+    setProjectFilterInSettings,
     setProjectScenePropertyOverrides,
 } from '../project.js';
 import {connectTracked} from './rows.js';
@@ -546,6 +552,7 @@ function getStepDigits(step) {
 function createProjectBrowserDialog(window, settings) {
     const currentProjectKey = 'project-path';
     const libraryKey = 'change-wallpaper-directory-path';
+    const filterStateKey = ProjectBrowserFilterKey.STATE;
 
     const dialog = new Gtk.Dialog({
         title: _('Choose Wallpaper'),
@@ -586,6 +593,10 @@ function createProjectBrowserDialog(window, settings) {
     header.append(libraryLabel);
 
     const toolbar = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 8,
+    });
+    const searchRow = new Gtk.Box({
         orientation: Gtk.Orientation.HORIZONTAL,
         spacing: 12,
     });
@@ -593,7 +604,57 @@ function createProjectBrowserDialog(window, settings) {
         hexpand: true,
         placeholder_text: _('Search wallpapers'),
     });
-    toolbar.append(searchEntry);
+    const filterButton = new Gtk.MenuButton({
+        label: _('Filter'),
+        valign: Gtk.Align.CENTER,
+    });
+    const filterPopover = new Gtk.Popover({
+        position: Gtk.PositionType.BOTTOM,
+        has_arrow: true,
+    });
+    const filterPopoverScrolled = new Gtk.ScrolledWindow({
+        min_content_width: 280,
+        min_content_height: 360,
+        max_content_height: 420,
+        hscrollbar_policy: Gtk.PolicyType.NEVER,
+    });
+    const filterPopoverContent = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 12,
+        margin_top: 12,
+        margin_bottom: 12,
+        margin_start: 12,
+        margin_end: 12,
+    });
+    const filterPopoverHeader = new Gtk.Box({
+        orientation: Gtk.Orientation.HORIZONTAL,
+        spacing: 12,
+    });
+    const filterPopoverDescription = new Gtk.Label({
+        label: _('Show or hide wallpapers by category'),
+        xalign: 0,
+        wrap: true,
+        hexpand: true,
+        css_classes: ['dim-label'],
+    });
+    const filterResetButton = new Gtk.Button({
+        label: _('Reset'),
+        valign: Gtk.Align.START,
+    });
+    const filterSectionsBox = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 12,
+    });
+    filterPopoverHeader.append(filterPopoverDescription);
+    filterPopoverHeader.append(filterResetButton);
+    filterPopoverContent.append(filterPopoverHeader);
+    filterPopoverContent.append(filterSectionsBox);
+    filterPopoverScrolled.set_child(filterPopoverContent);
+    filterPopover.set_child(filterPopoverScrolled);
+    filterButton.set_popover(filterPopover);
+    searchRow.append(searchEntry);
+    searchRow.append(filterButton);
+    toolbar.append(searchRow);
     content.append(toolbar);
 
     const body = new Gtk.Box({
@@ -694,9 +755,110 @@ function createProjectBrowserDialog(window, settings) {
     let currentInspectorProject = null;
     let currentInspectorOverrides = {};
     let currentProjectsByPath = new Map();
+    let currentFilterTagOptions = getProjectFilterTagOptions([]);
     let inspectorSections = [];
     const sceneImageSession = new Soup.Session();
     const cards = [];
+    let syncingFilterControls = false;
+    const filterControls = {
+        type: new Map(),
+        contentrating: new Map(),
+        tags: new Map(),
+    };
+
+    const projectMatchesCurrentFilters = project => {
+        const query = currentQuery.trim().toLowerCase();
+        if (query && !buildProjectSearchText(project).includes(query))
+            return false;
+
+        return projectMatchesFilter(
+            project,
+            getProjectFilterFromSettings(settings, currentFilterTagOptions)
+        );
+    };
+
+    const clearChildren = box => {
+        while (true) {
+            const child = box.get_first_child();
+            if (!child)
+                break;
+            box.remove(child);
+        }
+    };
+
+    const createFilterSection = (title, sectionKey, items) => {
+        const section = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 6,
+        });
+        const heading = new Gtk.Label({
+            label: title,
+            xalign: 0,
+            css_classes: ['heading'],
+        });
+        const list = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 4,
+        });
+
+        items.forEach(item => {
+            const button = new Gtk.CheckButton({
+                label: item.label,
+                halign: Gtk.Align.START,
+            });
+            button.connect('toggled', checkbox => {
+                if (syncingFilterControls)
+                    return;
+
+                const filterState = getProjectFilterFromSettings(settings, currentFilterTagOptions);
+                filterState[sectionKey][item.key] = checkbox.active;
+                setProjectFilterInSettings(settings, filterState, currentFilterTagOptions);
+            });
+            filterControls[sectionKey].set(item.key, button);
+            list.append(button);
+        });
+
+        section.append(heading);
+        section.append(list);
+        return section;
+    };
+
+    const syncFilterControls = () => {
+        const filterState = getProjectFilterFromSettings(settings, currentFilterTagOptions);
+        syncingFilterControls = true;
+        Object.entries(filterControls).forEach(([sectionKey, controls]) => {
+            controls.forEach((button, key) => {
+                button.active = filterState[sectionKey][key] !== false;
+            });
+        });
+        syncingFilterControls = false;
+    };
+
+    const rebuildFilterControls = projects => {
+        currentFilterTagOptions = getProjectFilterTagOptions(projects);
+        Object.values(filterControls).forEach(controls => controls.clear());
+        clearChildren(filterSectionsBox);
+
+        filterSectionsBox.append(createFilterSection(_('Type'), 'type', [
+            {key: 'scene', label: _('Scene')},
+            {key: 'web', label: _('Web')},
+            {key: 'video', label: _('Video')},
+        ]));
+        filterSectionsBox.append(createFilterSection(_('Age'), 'contentrating', ProjectContentRatings.map(rating => ({
+            key: rating,
+            label: rating,
+        }))));
+        filterSectionsBox.append(createFilterSection(_('Genre'), 'tags', currentFilterTagOptions.map(tag => ({
+            key: tag,
+            label: tag,
+        }))));
+
+        syncFilterControls();
+    };
+
+    filterResetButton.connect('clicked', () => {
+        setProjectFilterInSettings(settings, null, currentFilterTagOptions);
+    });
 
     const resolveSceneImageFile = source => {
         if (!source || /^https?:\/\//i.test(source))
@@ -1266,18 +1428,18 @@ function createProjectBrowserDialog(window, settings) {
     };
 
     const updateEmptyState = () => {
-        const query = currentQuery.trim().toLowerCase();
-        const visibleChildren = cards.filter(({project}) => !query || buildProjectSearchText(project).includes(query)).length;
+        const visibleChildren = cards.filter(({project}) => projectMatchesCurrentFilters(project)).length;
         const hasVisibleCards = visibleChildren > 0;
         scrolled.visible = hasVisibleCards;
         placeholder.visible = !hasVisibleCards;
         if (!hasVisibleCards)
-            placeholder.label = cards.length > 0 ? _('No wallpapers match your search') : placeholder.label;
+            placeholder.label = cards.length > 0 ? _('No wallpapers match your search or filters') : placeholder.label;
     };
 
     const rebuild = () => {
         const projects = listProjects(settings.get_string(libraryKey));
         currentProjectsByPath = new Map(projects.map(project => [project.path, project]));
+        rebuildFilterControls(projects);
         while (true) {
             const child = flowBox.get_first_child();
             if (!child)
@@ -1325,8 +1487,7 @@ function createProjectBrowserDialog(window, settings) {
         if (!item)
             return false;
 
-        const query = currentQuery.trim().toLowerCase();
-        return !query || buildProjectSearchText(item.project).includes(query);
+        return projectMatchesCurrentFilters(item.project);
     });
 
     searchEntry.connect('search-changed', entry => {
@@ -1341,6 +1502,11 @@ function createProjectBrowserDialog(window, settings) {
     });
     connectTracked(window, settings, `changed::${libraryKey}`, () => {
         rebuild();
+    });
+    connectTracked(window, settings, `changed::${filterStateKey}`, () => {
+        syncFilterControls();
+        flowBox.invalidate_filter();
+        updateEmptyState();
     });
     showInspectorMessage(null, _('Select a wallpaper to configure its scene properties'));
     rebuild();
