@@ -20,7 +20,10 @@ var ScenePropertyType = {
     TEXT_INPUT: 'textinput',
 };
 
-var SceneUserPropertyStoreKey = 'scene-user-properties';
+var UserPropertyStoreKey = 'scene-user-properties';
+var SceneUserPropertyStoreKey = UserPropertyStoreKey;
+var WebUserPropertyStoreKey = UserPropertyStoreKey;
+var LegacyWebUserPropertyStoreKey = 'web-user-properties';
 var ProjectBrowserFilterKey = {
     STATE: 'project-browser-filter-state',
 };
@@ -420,6 +423,32 @@ function normalizeScenePropertyValue(type, value, fallbackValue = null) {
     }
 }
 
+function normalizeWebFilesystemPropertyValue(value) {
+    if (typeof value !== 'string')
+        return value;
+
+    let normalized = value.trim();
+    if (!normalized)
+        return '';
+
+    if (normalized.startsWith('file://')) {
+        try {
+            const path = Gio.File.new_for_uri(normalized).get_path();
+            if (typeof path === 'string' && path !== '')
+                normalized = path;
+        } catch (_e) {
+        }
+    }
+
+    if (/^[A-Za-z]:[\\/]/.test(normalized))
+        return normalized;
+
+    if (normalized.startsWith('/'))
+        return normalized.replace(/^\/+/, '');
+
+    return normalized;
+}
+
 function areScenePropertyValuesEqual(type, left, right) {
     const normalizedLeft = normalizeScenePropertyValue(type, left);
     const normalizedRight = normalizeScenePropertyValue(type, right);
@@ -438,8 +467,14 @@ function normalizeScenePropertyOptions(property) {
             : typeof option?.text === 'string'
                 ? option.text
             : `${option?.value ?? ''}`;
+        const rawValue = option?.value ?? text;
         const value = normalizeScenePropertyValue(ScenePropertyType.COMBO, option?.value ?? text, '');
-        return {text, value};
+        return {
+            text,
+            value,
+            rawValue: rawValue ?? text,
+            condition: typeof option?.condition === 'string' ? option.condition.trim() : '',
+        };
     });
 }
 
@@ -458,6 +493,7 @@ function normalizeSceneProperty(propertyName, property) {
         text: typeof property.text === 'string' ? property.text : propertyName,
         order: typeof property.order === 'number' && Number.isFinite(property.order) ? property.order : 0,
         condition: typeof property.condition === 'string' ? property.condition.trim() : '',
+        mode: typeof property.mode === 'string' ? property.mode.trim().toLowerCase() : '',
         min: typeof property.min === 'number' && Number.isFinite(property.min) ? property.min : null,
         max: typeof property.max === 'number' && Number.isFinite(property.max) ? property.max : null,
         step: typeof property.step === 'number' && Number.isFinite(property.step) ? property.step : null,
@@ -469,7 +505,8 @@ function normalizeSceneProperty(propertyName, property) {
 }
 
 function normalizeSceneProperties(project) {
-    if (resolveProjectType(project) !== ProjectType.SCENE)
+    const type = resolveProjectType(project);
+    if (type !== ProjectType.SCENE && type !== ProjectType.WEB)
         return [];
 
     const propertyEntries = project?.general?.properties;
@@ -540,7 +577,33 @@ function serializeStoredScenePropertyOverrides(overrides) {
     return Object.keys(sanitized).length > 0 ? JSON.stringify(sanitized) : '';
 }
 
+function mergeStoredScenePropertyOverrides(...serializedStores) {
+    const merged = {};
+    for (const serializedStore of serializedStores) {
+        const store = parseStoredScenePropertyOverrides(serializedStore);
+        for (const [configId, overrides] of Object.entries(store)) {
+            const sanitized = sanitizeStoredScenePropertyOverrides(overrides);
+            if (Object.keys(sanitized).length === 0)
+                continue;
+
+            merged[configId] = {
+                ...(merged[configId] ?? {}),
+                ...sanitized,
+            };
+        }
+    }
+    return merged;
+}
+
 function getProjectScenePropertyOverrides(serializedOrStore, project) {
+    return getProjectUserPropertyOverrides(serializedOrStore, project);
+}
+
+function getProjectWebPropertyOverrides(serializedOrStore, project) {
+    return getProjectUserPropertyOverrides(serializedOrStore, project);
+}
+
+function getProjectUserPropertyOverrides(serializedOrStore, project) {
     const configId = resolveProjectConfigId(project);
     if (!configId)
         return {};
@@ -550,6 +613,14 @@ function getProjectScenePropertyOverrides(serializedOrStore, project) {
 }
 
 function setProjectScenePropertyOverrides(serializedOrStore, project, overrides) {
+    return setProjectUserPropertyOverrides(serializedOrStore, project, overrides);
+}
+
+function setProjectWebPropertyOverrides(serializedOrStore, project, overrides) {
+    return setProjectUserPropertyOverrides(serializedOrStore, project, overrides);
+}
+
+function setProjectUserPropertyOverrides(serializedOrStore, project, overrides) {
     const configId = resolveProjectConfigId(project);
     const store = parseStoredScenePropertyOverrides(serializedOrStore);
     if (!configId)
@@ -874,6 +945,34 @@ function buildSceneUserPropertyPayload(project, overrides = {}) {
             type: property.type,
             value,
         };
+    }
+    return payload;
+}
+
+function buildWebUserPropertyPayload(project, overrides = {}) {
+    if (project?.type !== ProjectType.WEB)
+        return {};
+
+    const payload = {};
+    for (const property of project?.sceneProperties ?? []) {
+        if (!property.editable)
+            continue;
+
+        let value = resolveScenePropertyValue(property, overrides);
+        const entry = {value};
+        if ([ScenePropertyType.FILE, ScenePropertyType.DIRECTORY, ScenePropertyType.SCENE_TEXTURE].includes(property.type)) {
+            value = normalizeWebFilesystemPropertyValue(value);
+            entry.value = value;
+        }
+        if (property.type === ScenePropertyType.COMBO) {
+            const option = property.options.find(option => option.value === `${value}`);
+            if (option) {
+                value = option.rawValue;
+                entry.value = value;
+                entry.text = option.text;
+            }
+        }
+        payload[property.name] = entry;
     }
     return payload;
 }

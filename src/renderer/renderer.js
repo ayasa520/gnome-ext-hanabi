@@ -19,8 +19,10 @@
 
 imports.gi.versions.Gtk = '4.0';
 imports.gi.versions.GioUnix = '2.0';
+imports.gi.versions.Soup = '3.0';
 const {GObject, Gtk, Gio, GLib, Gdk, Gst, GIRepository} = imports.gi;
 const GioUnix = imports.gi.GioUnix;
+const Soup = imports.gi.Soup;
 const System = imports.system;
 
 const rendererDir = GLib.path_get_dirname(System.programInvocationName);
@@ -209,36 +211,502 @@ const wallpaperSwitchTransitionDurationMs = 1000;
 const wallpaperSwitchTransitionCleanupDelayMs = wallpaperSwitchTransitionDurationMs + 150;
 const wallpaperSwitchReadyTimeoutMs = 15000;
 const sceneUserPropertyReloadDebounceMs = 200;
+const webAudioBandsPerChannel = 64;
+const webAudioFrameLength = webAudioBandsPerChannel * 2;
+const webAudioUpdateIntervalNs = 33333333;
+const webAudioRestartDelayMs = 1000;
+const webAudioSilenceThresholdDb = -80;
+const localMediaHttpEndpointPath = '/hanabi-media';
+
+const guessLocalMediaMimeType = path => {
+    if (typeof path !== 'string' || path === '')
+        return 'application/octet-stream';
+
+    try {
+        const [contentType] = Gio.content_type_guess(path, null);
+        const mimeType = contentType
+            ? Gio.content_type_get_mime_type(contentType)
+            : null;
+        if (mimeType)
+            return mimeType;
+    } catch (_e) {
+    }
+
+    const extension = path.split('.').pop()?.toLowerCase?.() ?? '';
+    switch (extension) {
+    case 'aac':
+        return 'audio/aac';
+    case 'flac':
+        return 'audio/flac';
+    case 'm4a':
+        return 'audio/mp4';
+    case 'mp3':
+        return 'audio/mpeg';
+    case 'mp4':
+        return 'video/mp4';
+    case 'oga':
+    case 'ogg':
+        return 'audio/ogg';
+    case 'ogv':
+        return 'video/ogg';
+    case 'opus':
+        return 'audio/ogg';
+    case 'wav':
+        return 'audio/wav';
+    case 'webm':
+        return 'video/webm';
+    default:
+        return 'application/octet-stream';
+    }
+};
+
+const parseHttpRangeHeader = (value, totalLength) => {
+    if (typeof value !== 'string' || !value.startsWith('bytes=') || !Number.isFinite(totalLength) || totalLength <= 0)
+        return null;
+
+    const match = value.trim().match(/^bytes=(\d*)-(\d*)$/i);
+    if (!match)
+        return null;
+
+    const [, startText, endText] = match;
+    if (startText === '' && endText === '')
+        return null;
+
+    let start = 0;
+    let end = totalLength - 1;
+
+    if (startText === '') {
+        const suffixLength = Number.parseInt(endText, 10);
+        if (!Number.isFinite(suffixLength) || suffixLength <= 0)
+            return null;
+        start = Math.max(0, totalLength - suffixLength);
+    } else {
+        start = Number.parseInt(startText, 10);
+        if (!Number.isFinite(start) || start < 0 || start >= totalLength)
+            return null;
+
+        if (endText !== '') {
+            end = Number.parseInt(endText, 10);
+            if (!Number.isFinite(end) || end < start)
+                return null;
+            end = Math.min(end, totalLength - 1);
+        }
+    }
+
+    return {start, end};
+};
+
+class LocalMediaHttpServer {
+    constructor() {
+        this._server = null;
+        this._token = GLib.uuid_string_random();
+        this._urlPrefix = '';
+        this._start();
+    }
+
+    get urlPrefix() {
+        return this._urlPrefix;
+    }
+
+    getMediaUrl(path) {
+        if (!this._urlPrefix || typeof path !== 'string' || path === '')
+            return '';
+
+        return `${this._urlPrefix}${encodeURIComponent(path)}`;
+    }
+
+    _start() {
+        try {
+            this._server = new Soup.Server({
+                server_header: 'HanabiLocalMedia',
+            });
+            this._server.add_handler(localMediaHttpEndpointPath, (_server, message) => {
+                this._handleMessage(message);
+            });
+            this._server.listen_local(0, Soup.ServerListenOptions.IPV4_ONLY);
+
+            const uri = this._server.get_uris()?.[0] ?? null;
+            if (!uri) {
+                console.warn('Local media HTTP server started without an advertised URI');
+                return;
+            }
+
+            const baseUri = uri.to_string().replace(/\/$/, '');
+            this._urlPrefix = `${baseUri}${localMediaHttpEndpointPath}?token=${encodeURIComponent(this._token)}&path=`;
+            console.log(`Local media HTTP server listening at ${baseUri}${localMediaHttpEndpointPath}`);
+        } catch (e) {
+            this._server = null;
+            this._urlPrefix = '';
+            console.warn(`Failed to start local media HTTP server: ${e}`);
+        }
+    }
+
+    _handleMessage(message) {
+        const method = message.get_method?.() ?? 'GET';
+        if (method !== 'GET' && method !== 'HEAD') {
+            message.set_status(Soup.Status.NOT_IMPLEMENTED, null);
+            return;
+        }
+
+        const query = Soup.form_decode(message.get_uri()?.get_query?.() ?? '');
+        const token = query?.token ?? '';
+        const filePath = query?.path ?? '';
+        if (token !== this._token || typeof filePath !== 'string' || filePath === '') {
+            message.set_status(Soup.Status.NOT_FOUND, null);
+            return;
+        }
+
+        try {
+            const file = Gio.File.new_for_path(filePath);
+            const info = file.query_info(
+                'standard::content-type,standard::size,standard::type',
+                Gio.FileQueryInfoFlags.NONE,
+                null
+            );
+            if (info.get_file_type() !== Gio.FileType.REGULAR) {
+                message.set_status(Soup.Status.NOT_FOUND, null);
+                return;
+            }
+
+            const [bytes] = file.load_bytes(null);
+            const data = bytes.get_data();
+            const totalLength = data.length;
+            const mimeType = Gio.content_type_get_mime_type(info.get_content_type?.() ?? '')
+                ?? guessLocalMediaMimeType(filePath);
+            const responseHeaders = message.get_response_headers();
+            responseHeaders.replace('Accept-Ranges', 'bytes');
+            responseHeaders.set_content_type(mimeType, null);
+
+            const requestedRange = parseHttpRangeHeader(
+                message.get_request_headers()?.get_one?.('Range') ?? '',
+                totalLength
+            );
+
+            if (
+                (message.get_request_headers()?.get_one?.('Range') ?? '') &&
+                !requestedRange
+            ) {
+                message.set_status(416, 'Range Not Satisfiable');
+                responseHeaders.replace('Content-Range', `bytes */${totalLength}`);
+                message.set_response(
+                    'application/octet-stream',
+                    Soup.MemoryUse.STATIC,
+                    new Uint8Array(0)
+                );
+                return;
+            }
+
+            const start = requestedRange?.start ?? 0;
+            const end = requestedRange?.end ?? (totalLength - 1);
+            const body = method === 'HEAD'
+                ? new Uint8Array(0)
+                : data.slice(start, end + 1);
+
+            if (requestedRange) {
+                message.set_status(Soup.Status.PARTIAL_CONTENT, null);
+                responseHeaders.set_content_range(start, end, totalLength);
+                responseHeaders.set_content_length(end - start + 1);
+            } else {
+                message.set_status(Soup.Status.OK, null);
+                responseHeaders.set_content_length(totalLength);
+            }
+
+            message.set_response(
+                mimeType,
+                Soup.MemoryUse.COPY,
+                body
+            );
+        } catch (e) {
+            console.warn(`Failed to serve local media file ${filePath}: ${e}`);
+            message.set_status(Soup.Status.NOT_FOUND, null);
+        }
+    }
+}
 
 const {
     ProjectBrowserFilterKey,
     ProjectType,
-    SceneUserPropertyStoreKey,
+    UserPropertyStoreKey,
+    LegacyWebUserPropertyStoreKey,
     buildSceneUserPropertyPayload,
+    buildWebUserPropertyPayload,
     getProjectFilterFromSettings,
     getProjectScenePropertyOverrides,
+    getProjectWebPropertyOverrides,
     loadProject,
     listProjects,
+    mergeStoredScenePropertyOverrides,
+    serializeStoredScenePropertyOverrides,
 } = ProjectLoader;
 
-let sceneUserPropertyStore = extSettings
-    ? extSettings.get_string(SceneUserPropertyStoreKey)
+const mergeUserPropertyStoresFromSettings = settings => {
+    if (!settings)
+        return '';
+
+    return serializeStoredScenePropertyOverrides(
+        mergeStoredScenePropertyOverrides(
+            settings.get_string(UserPropertyStoreKey),
+            settings.get_string(LegacyWebUserPropertyStoreKey)
+        )
+    );
+};
+
+const migrateUserPropertyStoresInSettings = settings => {
+    if (!settings)
+        return '';
+
+    const mergedStore = mergeUserPropertyStoresFromSettings(settings);
+    if (settings.get_string(UserPropertyStoreKey) !== mergedStore)
+        settings.set_string(UserPropertyStoreKey, mergedStore);
+    if (settings.get_string(LegacyWebUserPropertyStoreKey) !== '')
+        settings.set_string(LegacyWebUserPropertyStoreKey, '');
+    return mergedStore;
+};
+
+let userPropertyStore = extSettings
+    ? migrateUserPropertyStoresInSettings(extSettings)
     : '';
 
-const applyProjectScenePropertyState = project => {
+const applyProjectUserPropertyState = project => {
     if (!project)
         return project;
 
-    project.scenePropertyOverrides = getProjectScenePropertyOverrides(sceneUserPropertyStore, project);
-    project.scenePropertyPayload = buildSceneUserPropertyPayload(project, project.scenePropertyOverrides);
+    if (project.type === ProjectType.SCENE) {
+        project.scenePropertyOverrides = getProjectScenePropertyOverrides(userPropertyStore, project);
+        project.scenePropertyPayload = buildSceneUserPropertyPayload(project, project.scenePropertyOverrides);
+    } else if (project.type === ProjectType.WEB) {
+        project.webPropertyOverrides = getProjectWebPropertyOverrides(userPropertyStore, project);
+        project.webPropertyPayload = buildWebUserPropertyPayload(project, project.webPropertyOverrides);
+    }
     return project;
 };
 
-const loadConfiguredProject = path => applyProjectScenePropertyState(loadProject(path));
-const serializeScenePropertyPayload = project =>
-    JSON.stringify(project?.scenePropertyPayload ?? {});
+const loadConfiguredProject = path => applyProjectUserPropertyState(loadProject(path));
+const serializeProjectPropertyPayload = project => {
+    if (project?.type === ProjectType.SCENE)
+        return JSON.stringify(project?.scenePropertyPayload ?? {});
+    if (project?.type === ProjectType.WEB)
+        return JSON.stringify(project?.webPropertyPayload ?? {});
+    return '{}';
+};
 
 const hasArg = arg => ARGV.includes(arg);
+
+const buildSilentWebAudioFrame = () => new Array(webAudioFrameLength).fill(0);
+
+const parseSpectrumMagnitudeDbValues = structureString => {
+    if (!structureString)
+        return [];
+
+    const magnitudeIndex = structureString.indexOf('magnitude=');
+    if (magnitudeIndex === -1)
+        return [];
+
+    const magnitudeText = structureString.slice(magnitudeIndex);
+    const values = [];
+    const pattern = /\(float\)\s*(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/gi;
+    let match;
+    while ((match = pattern.exec(magnitudeText)) && values.length < webAudioFrameLength)
+        values.push(Number.parseFloat(match[1]));
+
+    return values;
+};
+
+const normalizeSpectrumMagnitudeDb = magnitudeDb => {
+    if (!Number.isFinite(magnitudeDb))
+        return 0;
+
+    if (magnitudeDb <= webAudioSilenceThresholdDb)
+        return 0;
+
+    if (magnitudeDb >= 0)
+        return 1;
+
+    return Math.max(0, Math.min(1, Math.pow(10, magnitudeDb / 20)));
+};
+
+class WebAudioVisualizerCapture {
+    constructor(onFrame) {
+        this._onFrame = onFrame;
+        this._pipeline = null;
+        this._bus = null;
+        this._busSignalIds = [];
+        this._restartSourceId = 0;
+        this._shouldRun = false;
+        this._isAvailable = true;
+        this._lastFrame = buildSilentWebAudioFrame();
+    }
+
+    get currentFrame() {
+        return [...this._lastFrame];
+    }
+
+    start() {
+        this._shouldRun = true;
+        if (this._pipeline || !this._isAvailable)
+            return;
+
+        this._cancelRestart();
+        this._startPipeline();
+    }
+
+    stop({emitSilence = true} = {}) {
+        this._shouldRun = false;
+        this._cancelRestart();
+        this._teardownPipeline();
+
+        if (emitSilence)
+            this._emitFrame(buildSilentWebAudioFrame());
+    }
+
+    destroy() {
+        this.stop();
+        this._onFrame = null;
+    }
+
+    _startPipeline() {
+        if (!Gst.ElementFactory.find('pulsesrc')) {
+            console.warn('Web audio visualizer capture unavailable: GStreamer pulsesrc plugin is missing');
+            this._isAvailable = false;
+            this._emitFrame(buildSilentWebAudioFrame());
+            return;
+        }
+
+        if (!Gst.ElementFactory.find('spectrum')) {
+            console.warn('Web audio visualizer capture unavailable: GStreamer spectrum plugin is missing');
+            this._isAvailable = false;
+            this._emitFrame(buildSilentWebAudioFrame());
+            return;
+        }
+
+        try {
+            this._pipeline = Gst.parse_launch(
+                'pulsesrc device=@DEFAULT_MONITOR@ client-name=HanabiVisualizer do-timestamp=true ! ' +
+                'audioconvert ! audioresample ! ' +
+                `audio/x-raw,channels=2,rate=48000 ! ` +
+                `spectrum bands=${webAudioBandsPerChannel} multi-channel=true post-messages=true ` +
+                'message-magnitude=true message-phase=false ' +
+                `interval=${webAudioUpdateIntervalNs} threshold=${webAudioSilenceThresholdDb} ! ` +
+                'fakesink sync=false'
+            );
+        } catch (e) {
+            console.warn(`Failed to create web audio visualizer pipeline: ${e}`);
+            this._scheduleRestart();
+            return;
+        }
+
+        this._bus = this._pipeline.get_bus();
+        this._bus.add_signal_watch();
+        this._busSignalIds = [
+            this._bus.connect('message::element', (_bus, message) => {
+                this._handleElementMessage(message);
+            }),
+            this._bus.connect('message::error', (_bus, message) => {
+                let details = '';
+                try {
+                    const [error, debugInfo] = message.parse_error();
+                    details = error?.message ?? String(error ?? '');
+                    if (debugInfo)
+                        details = `${details} (${debugInfo})`;
+                } catch (e) {
+                    details = String(e);
+                }
+                console.warn(`Web audio visualizer pipeline error: ${details}`);
+                this._scheduleRestart();
+            }),
+            this._bus.connect('message::eos', () => {
+                console.warn('Web audio visualizer pipeline reached EOS unexpectedly');
+                this._scheduleRestart();
+            }),
+        ];
+
+        const stateChange = this._pipeline.set_state(Gst.State.PLAYING);
+        if (stateChange === Gst.StateChangeReturn.FAILURE) {
+            console.warn('Web audio visualizer pipeline failed to enter PLAYING state');
+            this._scheduleRestart();
+        }
+    }
+
+    _handleElementMessage(message) {
+        const structure = message.get_structure?.();
+        if (!structure || structure.get_name() !== 'spectrum')
+            return;
+
+        const magnitudesDb = parseSpectrumMagnitudeDbValues(structure.to_string());
+        if (magnitudesDb.length === 0)
+            return;
+
+        const normalized = buildSilentWebAudioFrame();
+        if (magnitudesDb.length >= webAudioFrameLength) {
+            for (let i = 0; i < webAudioFrameLength; i++)
+                normalized[i] = normalizeSpectrumMagnitudeDb(magnitudesDb[i]);
+        } else {
+            const copyLength = Math.min(webAudioBandsPerChannel, magnitudesDb.length);
+            for (let i = 0; i < copyLength; i++) {
+                const value = normalizeSpectrumMagnitudeDb(magnitudesDb[i]);
+                normalized[i] = value;
+                normalized[i + webAudioBandsPerChannel] = value;
+            }
+        }
+
+        this._emitFrame(normalized);
+    }
+
+    _emitFrame(frame) {
+        this._lastFrame = [...frame];
+        this._onFrame?.(this.currentFrame);
+    }
+
+    _scheduleRestart() {
+        this._teardownPipeline();
+        if (!this._shouldRun || this._restartSourceId)
+            return;
+
+        this._restartSourceId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            webAudioRestartDelayMs,
+            () => {
+                this._restartSourceId = 0;
+                if (this._shouldRun)
+                    this._startPipeline();
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    _cancelRestart() {
+        if (!this._restartSourceId)
+            return;
+
+        GLib.source_remove(this._restartSourceId);
+        this._restartSourceId = 0;
+    }
+
+    _teardownPipeline() {
+        if (this._bus) {
+            this._busSignalIds.forEach(signalId => {
+                try {
+                    this._bus.disconnect(signalId);
+                } catch (_e) {
+                }
+            });
+            this._busSignalIds = [];
+            try {
+                this._bus.remove_signal_watch();
+            } catch (_e) {
+            }
+            this._bus = null;
+        }
+
+        if (this._pipeline) {
+            try {
+                this._pipeline.set_state(Gst.State.NULL);
+            } catch (_e) {
+            }
+            this._pipeline = null;
+        }
+    }
+}
 
 if (hasArg('-S') || hasArg('--standalone')) {
     standalone = true;
@@ -337,6 +805,12 @@ const HanabiRenderer = GObject.registerClass(
             this._sceneUserPropertyReloadSourceId = 0;
             this._switchSerial = 0;
             this._nativeWindowHold = false;
+            this._webAudioBackends = new Set();
+            this._webAudioCapture = new WebAudioVisualizerCapture(frame => {
+                this._broadcastWebAudioFrame(frame);
+            });
+            this._currentWebAudioFrame = buildSilentWebAudioFrame();
+            this._localMediaHttpServer = new LocalMediaHttpServer();
             if (!standalone)
                 this._exportDbus();
             if (!standalone)
@@ -368,6 +842,10 @@ const HanabiRenderer = GObject.registerClass(
                 } else {
                     commandLine.set_exit_status(1);
                 }
+            });
+
+            this.connect('shutdown', () => {
+                this._localMediaHttpServer = null;
             });
 
             extSettings?.connect('changed', (settings, key) => {
@@ -415,9 +893,13 @@ const HanabiRenderer = GObject.registerClass(
                     this._backend?.applyContentFit(contentFit);
                     this._pendingSwitch?.backend?.applyContentFit(contentFit);
                     break;
-                case SceneUserPropertyStoreKey:
-                    sceneUserPropertyStore = settings.get_string(key);
-                    this._scheduleSceneUserPropertyStoreReload();
+                case UserPropertyStoreKey:
+                    userPropertyStore = settings.get_string(key);
+                    this._scheduleProjectUserPropertyStoreReload();
+                    break;
+                case LegacyWebUserPropertyStoreKey:
+                    userPropertyStore = migrateUserPropertyStoresInSettings(settings);
+                    this._scheduleProjectUserPropertyStoreReload();
                     break;
                 case 'debug-mode':
                     isDebugMode = settings.get_boolean(key);
@@ -555,7 +1037,7 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _switchProject() {
-            this._cancelSceneUserPropertyStoreReload();
+            this._cancelProjectUserPropertyStoreReload();
             this._switchToProject(loadConfiguredProject(projectPath));
         }
 
@@ -618,25 +1100,48 @@ const HanabiRenderer = GObject.registerClass(
             nextBackend.waitUntilReady(() => this._completePendingSwitch(switchId));
         }
 
-        _handleSceneUserPropertyStoreChanged() {
+        _handleProjectUserPropertyStoreChanged() {
             const nextProject = loadConfiguredProject(projectPath);
-            const nextPayloadJson = serializeScenePropertyPayload(nextProject);
-            const currentPayloadJson = serializeScenePropertyPayload(this._project);
-            const pendingPayloadJson = serializeScenePropertyPayload(this._pendingSwitch?.project);
+            const nextPayloadJson = serializeProjectPropertyPayload(nextProject);
+            const currentPayloadJson = serializeProjectPropertyPayload(this._project);
+            const pendingPayloadJson = serializeProjectPropertyPayload(this._pendingSwitch?.project);
 
-            if (nextProject?.type !== ProjectType.SCENE)
+            if (nextProject?.type !== ProjectType.SCENE && nextProject?.type !== ProjectType.WEB)
                 return;
+
+            if (nextProject.type === ProjectType.WEB) {
+                if (
+                    this._pendingSwitch?.project?.path === nextProject.path &&
+                    pendingPayloadJson !== nextPayloadJson
+                ) {
+                    this._pendingSwitch.project = nextProject;
+                    this._pendingSwitch.backend.setWebUserProperties?.(nextProject.webPropertyPayload ?? null);
+                    return;
+                }
+
+                if (
+                    !this._pendingSwitch &&
+                    this._project?.path === nextProject.path &&
+                    currentPayloadJson !== nextPayloadJson
+                ) {
+                    this._project = nextProject;
+                    this._backend?.setWebUserProperties?.(nextProject.webPropertyPayload ?? null);
+                    return;
+                }
+            }
 
             if (this._pendingSwitch && pendingPayloadJson !== nextPayloadJson) {
                 this._switchToProject(nextProject);
                 return;
             }
 
-            if (!this._pendingSwitch && currentPayloadJson !== nextPayloadJson)
+            if (!this._pendingSwitch && currentPayloadJson !== nextPayloadJson) {
                 this._switchToProject(nextProject);
+                return;
+            }
         }
 
-        _scheduleSceneUserPropertyStoreReload() {
+        _scheduleProjectUserPropertyStoreReload() {
             if (this._sceneUserPropertyReloadSourceId)
                 GLib.source_remove(this._sceneUserPropertyReloadSourceId);
 
@@ -645,13 +1150,13 @@ const HanabiRenderer = GObject.registerClass(
                 sceneUserPropertyReloadDebounceMs,
                 () => {
                     this._sceneUserPropertyReloadSourceId = 0;
-                    this._handleSceneUserPropertyStoreChanged();
+                    this._handleProjectUserPropertyStoreChanged();
                     return GLib.SOURCE_REMOVE;
                 }
             );
         }
 
-        _cancelSceneUserPropertyStoreReload() {
+        _cancelProjectUserPropertyStoreReload() {
             if (!this._sceneUserPropertyReloadSourceId)
                 return;
 
@@ -665,7 +1170,7 @@ const HanabiRenderer = GObject.registerClass(
                 changeWallpaperTimerId = null;
             }
 
-            this._cancelSceneUserPropertyStoreReload();
+            this._cancelProjectUserPropertyStoreReload();
             this._cancelPendingSwitch();
             this._destroyRendererWindows();
             this._backend?.destroy();
@@ -676,6 +1181,9 @@ const HanabiRenderer = GObject.registerClass(
 
             this._backendDestroySourceIds.forEach(sourceId => GLib.source_remove(sourceId));
             this._backendDestroySourceIds.clear();
+            this._webAudioCapture?.stop();
+            this._webAudioBackends.clear();
+            this._currentWebAudioFrame = buildSilentWebAudioFrame();
         }
 
         _cancelPendingSwitch() {
@@ -719,6 +1227,7 @@ const HanabiRenderer = GObject.registerClass(
 
             backend.applyContentFit(contentFit);
             backend.setSceneUserProperties?.(project?.scenePropertyPayload ?? null);
+            backend.setWebUserProperties?.(project?.webPropertyPayload ?? null);
             backend.setVolume(volume);
             backend.setMute(mute);
             backend.setSceneFps(sceneFps);
@@ -734,6 +1243,7 @@ const HanabiRenderer = GObject.registerClass(
 
             backend.applyContentFit(contentFit);
             backend.setSceneUserProperties?.(project?.scenePropertyPayload ?? null);
+            backend.setWebUserProperties?.(project?.webPropertyPayload ?? null);
             backend.setVolume(volume);
             backend.setMute(true);
             backend.setSceneFps(sceneFps);
@@ -1059,6 +1569,7 @@ const HanabiRenderer = GObject.registerClass(
 
         setPlay() {
             this._requestedPlaying = true;
+            this._updateWebAudioCaptureState();
             if (this._backend)
                 this._backend.setPlay();
             else
@@ -1067,10 +1578,52 @@ const HanabiRenderer = GObject.registerClass(
 
         setPause() {
             this._requestedPlaying = false;
+            this._updateWebAudioCaptureState();
             if (this._backend)
                 this._backend.setPause();
             else
                 this._setPlayingState(false);
+        }
+
+        registerWebAudioBackend(backend) {
+            if (!backend)
+                return;
+
+            this._webAudioBackends.add(backend);
+            backend.setAudioSamples?.(this._currentWebAudioFrame);
+            this._updateWebAudioCaptureState();
+        }
+
+        unregisterWebAudioBackend(backend) {
+            if (!backend)
+                return;
+
+            this._webAudioBackends.delete(backend);
+            this._updateWebAudioCaptureState();
+        }
+
+        getCurrentWebAudioFrame() {
+            return [...this._currentWebAudioFrame];
+        }
+
+        getLocalMediaHttpUrlPrefix() {
+            return this._localMediaHttpServer?.urlPrefix ?? '';
+        }
+
+        _broadcastWebAudioFrame(frame) {
+            this._currentWebAudioFrame = [...frame];
+            this._webAudioBackends.forEach(backend => {
+                backend.setAudioSamples?.(this._currentWebAudioFrame);
+            });
+        }
+
+        _updateWebAudioCaptureState() {
+            if (this._webAudioBackends.size > 0 && this._requestedPlaying) {
+                this._webAudioCapture?.start();
+                return;
+            }
+
+            this._webAudioCapture?.stop();
         }
 
         setAutoWallpaper() {

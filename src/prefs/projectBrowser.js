@@ -13,20 +13,24 @@ import {
     ProjectBrowserFilterKey,
     ProjectContentRatings,
     ScenePropertyType,
-    SceneUserPropertyStoreKey,
+    UserPropertyStoreKey,
+    LegacyWebUserPropertyStoreKey,
     areScenePropertyValuesEqual,
     buildScenePropertyValueMap,
     getProjectFilterTagOptions,
     getProjectFilterFromSettings,
     getProjectScenePropertyOverrides,
+    getProjectWebPropertyOverrides,
     isScenePropertyVisible,
     listProjects,
     loadProject,
+    mergeStoredScenePropertyOverrides,
     normalizeScenePropertyValue,
     projectMatchesFilter,
     serializeStoredScenePropertyOverrides,
     setProjectFilterInSettings,
     setProjectScenePropertyOverrides,
+    setProjectWebPropertyOverrides,
 } from '../project.js';
 import {connectTracked} from './rows.js';
 
@@ -116,6 +120,42 @@ function buildProjectSearchText(project) {
         project.description,
         ...(project.tags ?? []),
     ].join(' ').toLowerCase();
+}
+
+function mergeUserPropertyStoresFromSettings(settings) {
+    return serializeStoredScenePropertyOverrides(
+        mergeStoredScenePropertyOverrides(
+            settings.get_string(UserPropertyStoreKey),
+            settings.get_string(LegacyWebUserPropertyStoreKey)
+        )
+    );
+}
+
+function migrateUserPropertyStoresInSettings(settings) {
+    const mergedStore = mergeUserPropertyStoresFromSettings(settings);
+    if (settings.get_string(UserPropertyStoreKey) !== mergedStore)
+        settings.set_string(UserPropertyStoreKey, mergedStore);
+    if (settings.get_string(LegacyWebUserPropertyStoreKey) !== '')
+        settings.set_string(LegacyWebUserPropertyStoreKey, '');
+    return mergedStore;
+}
+
+function getProjectPropertyOverrides(settings, project) {
+    if (project?.type === 'web')
+        return getProjectWebPropertyOverrides(settings.get_string(UserPropertyStoreKey), project);
+    return getProjectScenePropertyOverrides(settings.get_string(UserPropertyStoreKey), project);
+}
+
+function setProjectPropertyOverrides(settings, project, overrides) {
+    const nextStore = project?.type === 'web'
+        ? setProjectWebPropertyOverrides(settings.get_string(UserPropertyStoreKey), project, overrides)
+        : setProjectScenePropertyOverrides(settings.get_string(UserPropertyStoreKey), project, overrides);
+
+    settings.set_string(
+        UserPropertyStoreKey,
+        serializeStoredScenePropertyOverrides(nextStore)
+    );
+    return getProjectPropertyOverrides(settings, project);
 }
 
 function createProjectPreview(project) {
@@ -550,6 +590,8 @@ function getStepDigits(step) {
 }
 
 function createProjectBrowserDialog(window, settings) {
+    migrateUserPropertyStoresInSettings(settings);
+
     const currentProjectKey = 'project-path';
     const libraryKey = 'change-wallpaper-directory-path';
     const filterStateKey = ProjectBrowserFilterKey.STATE;
@@ -1095,15 +1137,10 @@ function createProjectBrowserDialog(window, settings) {
         else
             currentInspectorOverrides[property.name] = nextValue;
 
-        const nextStore = setProjectScenePropertyOverrides(
-            settings.get_string(SceneUserPropertyStoreKey),
+        currentInspectorOverrides = setProjectPropertyOverrides(
+            settings,
             currentInspectorProject,
             currentInspectorOverrides
-        );
-        currentInspectorOverrides = getProjectScenePropertyOverrides(nextStore, currentInspectorProject);
-        settings.set_string(
-            SceneUserPropertyStoreKey,
-            serializeStoredScenePropertyOverrides(nextStore)
         );
         updateInspectorSensitivity();
     };
@@ -1337,18 +1374,10 @@ function createProjectBrowserDialog(window, settings) {
     function buildInspector(project) {
         clearInspectorContent();
         currentInspectorProject = project;
-        currentInspectorOverrides = getProjectScenePropertyOverrides(
-            settings.get_string(SceneUserPropertyStoreKey),
-            project
-        );
-
-        if (project.type !== 'scene') {
-            showInspectorMessage(project, _('Only scene wallpaper options are implemented right now'));
-            return;
-        }
+        currentInspectorOverrides = getProjectPropertyOverrides(settings, project);
 
         if ((project.sceneProperties?.length ?? 0) === 0) {
-            showInspectorMessage(project, _('This scene wallpaper has no configurable properties'));
+            showInspectorMessage(project, _('This wallpaper has no configurable properties'));
             return;
         }
 
@@ -1410,7 +1439,7 @@ function createProjectBrowserDialog(window, settings) {
         const currentPath = settings.get_string(currentProjectKey);
         const project = currentProjectsByPath.get(currentPath) ?? loadProject(currentPath);
         if (!project) {
-            showInspectorMessage(null, _('Select a wallpaper to configure its scene properties'));
+            showInspectorMessage(null, _('Select a wallpaper to configure its properties'));
             return;
         }
         buildInspector(project);
@@ -1508,13 +1537,14 @@ function createProjectBrowserDialog(window, settings) {
         flowBox.invalidate_filter();
         updateEmptyState();
     });
-    showInspectorMessage(null, _('Select a wallpaper to configure its scene properties'));
+    showInspectorMessage(null, _('Select a wallpaper to configure its properties'));
     rebuild();
     return dialog;
 }
 
 export function prefsRowProjectChooser(window, prefsGroup) {
     const settings = window._settings;
+    migrateUserPropertyStoresInSettings(settings);
     const currentProjectKey = 'project-path';
 
     const row = new Adw.ActionRow({

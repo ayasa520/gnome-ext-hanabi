@@ -9,8 +9,14 @@
 
         <key name="scene-user-properties" type="s">
             <default>''</default>
-            <summary>Scene User Properties</summary>
-            <description>Per-wallpaper overrides for scene user properties, stored as JSON</description>
+            <summary>User Properties</summary>
+            <description>Per-wallpaper overrides for scene and web user properties, stored as JSON</description>
+        </key>
+
+        <key name="web-user-properties" type="s">
+            <default>''</default>
+            <summary>Legacy Web User Properties</summary>
+            <description>Deprecated legacy store kept only to migrate older web user property overrides</description>
         </key>
 
         <key name="mute" type="b">

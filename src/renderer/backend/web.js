@@ -25,6 +25,18 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
     const wpeShmMemoryFormat = isLittleEndian
         ? Gdk.MemoryFormat.B8G8R8A8_PREMULTIPLIED
         : Gdk.MemoryFormat.A8R8G8B8_PREMULTIPLIED;
+    const normalizeWebFilesystemPath = path => {
+        if (typeof path !== 'string')
+            return path;
+
+        if (/^[A-Za-z]:[\\/]/.test(path))
+            return path;
+
+        if (path.startsWith('/'))
+            return path.replace(/^\/+/, '');
+
+        return path;
+    };
 
     return class WebBackend extends BackendController {
         constructor(renderer, project) {
@@ -32,24 +44,34 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webViews = new Map();
             this._webPausePictures = new Map();
             this._webViewReadyStates = new Map();
+            this._lastAppliedWebUserPropertyPayloads = new Map();
             this._readyCallback = null;
             this._readyResolved = false;
             this._wpeStates = new Map();
             this._wpeDisplay = this._createWPEDisplay();
+            this._localMediaHttpUrlPrefix = renderer.getLocalMediaHttpUrlPrefix?.() ?? '';
+            this._webUserPropertyPayload = project?.webPropertyPayload ?? {};
+            this._webDirectorySnapshots = new Map();
+            this._webAudioSamples = renderer.getCurrentWebAudioFrame?.() ?? new Array(128).fill(0);
             this.usesNativeWindows = false;
             this.displayName = 'WPEWebKit';
+            this._renderer.registerWebAudioBackend?.(this);
         }
 
         destroy() {
             this._readyCallback = null;
             this._readyResolved = true;
+            this._renderer.unregisterWebAudioBackend?.(this);
 
             this._destroyAllWPEWidgets();
 
             this._webViews.clear();
             this._webPausePictures.clear();
             this._webViewReadyStates.clear();
+            this._lastAppliedWebUserPropertyPayloads.clear();
             this._wpeStates.clear();
+            this._webDirectorySnapshots.clear();
+            this._webAudioSamples = new Array(128).fill(0);
             this._wpeDisplay = null;
         }
 
@@ -78,12 +100,28 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._setPlayback(false, true);
         }
 
+        setWebUserProperties(payload) {
+            this._webUserPropertyPayload = payload ?? {};
+            this._syncFetchAllDirectoryProperties();
+            this._pushWebPropertiesToReadyViews();
+        }
+
+        setAudioSamples(samples) {
+            this._webAudioSamples = Array.isArray(samples)
+                ? [...samples]
+                : new Array(128).fill(0);
+            this._pushAudioSamplesToReadyViews();
+        }
+
         setMute(_mute) {
             this._webViews.forEach(webView => {
                 if (webView.is_muted === _mute)
                     webView.is_muted = !_mute;
                 webView.is_muted = _mute;
             });
+        }
+
+        setSceneFps(_fps) {
         }
 
         dispatchPointerEvent(event) {
@@ -298,6 +336,188 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
 
                         wrapAudioContext('AudioContext');
                         wrapAudioContext('webkitAudioContext');
+
+                        const hanabiMediaHttpUrlPrefix = ${JSON.stringify(this._localMediaHttpUrlPrefix)};
+                        const rewriteMediaUrl = rawValue => {
+                            if (typeof rawValue !== 'string' || rawValue === '')
+                                return rawValue;
+
+                            if (rawValue.startsWith('blob:') || rawValue.startsWith('data:'))
+                                return rawValue;
+
+                            let resolvedUrl = null;
+                            try {
+                                resolvedUrl = new URL(rawValue, document.baseURI);
+                            } catch (_e) {
+                                return rawValue;
+                            }
+
+                            if (resolvedUrl.protocol !== 'file:')
+                                return rawValue;
+
+                            let decodedPath = resolvedUrl.pathname || '';
+                            try {
+                                decodedPath = decodeURIComponent(decodedPath);
+                            } catch (_e) {
+                            }
+
+                            return hanabiMediaHttpUrlPrefix
+                                ? hanabiMediaHttpUrlPrefix + encodeURIComponent(decodedPath)
+                                : rawValue;
+                        };
+                        const patchSrcProperty = proto => {
+                            if (!proto)
+                                return;
+
+                            const descriptor = Object.getOwnPropertyDescriptor(proto, 'src');
+                            if (!descriptor?.set || descriptor.set.__hanabiWrapped)
+                                return;
+
+                            const wrappedSetter = function(value) {
+                                return descriptor.set.call(this, rewriteMediaUrl(value));
+                            };
+                            wrappedSetter.__hanabiWrapped = true;
+
+                            Object.defineProperty(proto, 'src', {
+                                configurable: descriptor.configurable,
+                                enumerable: descriptor.enumerable,
+                                get: descriptor.get,
+                                set: wrappedSetter,
+                            });
+                        };
+                        const patchSetAttribute = proto => {
+                            if (!proto || proto.setAttribute?.__hanabiWrapped)
+                                return;
+
+                            const originalSetAttribute = proto.setAttribute;
+                            const wrappedSetAttribute = function(name, value) {
+                                if (String(name).toLowerCase() === 'src' && typeof value === 'string')
+                                    return originalSetAttribute.call(this, name, rewriteMediaUrl(value));
+                                return originalSetAttribute.call(this, name, value);
+                            };
+                            wrappedSetAttribute.__hanabiWrapped = true;
+                            proto.setAttribute = wrappedSetAttribute;
+                        };
+
+                        patchSrcProperty(window.HTMLMediaElement?.prototype);
+                        patchSrcProperty(window.HTMLSourceElement?.prototype);
+                        patchSetAttribute(window.HTMLMediaElement?.prototype);
+                        patchSetAttribute(window.HTMLSourceElement?.prototype);
+
+                        const bridgeState = {
+                            audioFrame: new Array(128).fill(0),
+                            generalProperties: {},
+                            paused: false,
+                            userProperties: {},
+                        };
+                        let wallpaperPropertyListenerValue = window.wallpaperPropertyListener;
+                        let wallpaperAudioListenerValue = null;
+
+                        const getPropertyListener = () => {
+                            const listener = wallpaperPropertyListenerValue;
+                            if (!listener || typeof listener !== 'object')
+                                return null;
+                            return listener;
+                        };
+
+                        const getAudioListener = () => {
+                            if (typeof wallpaperAudioListenerValue !== 'function')
+                                return null;
+                            return wallpaperAudioListenerValue;
+                        };
+
+                        const flushAudioFrame = () => {
+                            const listener = getAudioListener();
+                            if (!listener)
+                                return;
+                            try {
+                                listener(bridgeState.audioFrame);
+                            } catch (_e) {
+                            }
+                        };
+
+                        const flushUserProperties = () => {
+                            const listener = getPropertyListener();
+                            if (!listener)
+                                return;
+                            if (typeof listener.applyUserProperties === 'function')
+                                listener.applyUserProperties(bridgeState.userProperties);
+                        };
+
+                        const flushGeneralProperties = () => {
+                            const listener = getPropertyListener();
+                            if (!listener)
+                                return;
+                            if (typeof listener.applyGeneralProperties === 'function')
+                                listener.applyGeneralProperties(bridgeState.generalProperties);
+                        };
+
+                        const flushPausedState = () => {
+                            const listener = getPropertyListener();
+                            if (!listener)
+                                return;
+                            if (typeof listener.setPaused === 'function')
+                                listener.setPaused(bridgeState.paused);
+                        };
+
+                        Object.defineProperty(window, 'wallpaperPropertyListener', {
+                            configurable: true,
+                            enumerable: true,
+                            get() {
+                                return wallpaperPropertyListenerValue;
+                            },
+                            set(value) {
+                                wallpaperPropertyListenerValue = value;
+                                queueMicrotask(() => {
+                                    flushUserProperties();
+                                    flushGeneralProperties();
+                                    flushPausedState();
+                                });
+                            },
+                        });
+
+                        Object.defineProperty(window, 'wallpaperRegisterAudioListener', {
+                            configurable: true,
+                            enumerable: true,
+                            writable: true,
+                            value(callback) {
+                                wallpaperAudioListenerValue = typeof callback === 'function' ? callback : null;
+                                queueMicrotask(() => {
+                                    flushAudioFrame();
+                                });
+                            },
+                        });
+
+                        window.__hanabiApplyUserProperties = payload => {
+                            bridgeState.userProperties = payload && typeof payload === 'object' ? payload : {};
+                            flushUserProperties();
+                        };
+                        window.__hanabiApplyGeneralProperties = payload => {
+                            bridgeState.generalProperties = payload && typeof payload === 'object' ? payload : {};
+                            flushGeneralProperties();
+                        };
+                        window.__hanabiSetPaused = isPaused => {
+                            bridgeState.paused = Boolean(isPaused);
+                            flushPausedState();
+                        };
+                        window.__hanabiUserDirectoryFilesAddedOrChanged = (propertyName, changedFiles) => {
+                            const listener = getPropertyListener();
+                            if (!listener)
+                                return;
+                            if (typeof listener.userDirectoryFilesAddedOrChanged === 'function')
+                                listener.userDirectoryFilesAddedOrChanged(propertyName, changedFiles);
+                        };
+                        window.__hanabiUserDirectoryFilesRemoved = (propertyName, removedFiles) => {
+                            const listener = getPropertyListener();
+                            if (!listener)
+                                return;
+                            if (typeof listener.userDirectoryFilesRemoved === 'function')
+                                listener.userDirectoryFilesRemoved(propertyName, removedFiles);
+                        };
+                        window.__hanabiApplyAudioFrame = payload => {
+                            bridgeState.audioFrame = Array.isArray(payload) ? payload : new Array(128).fill(0);
+                            flushAudioFrame();
+                        };
                     })();
                     `,
                     api.UserContentInjectedFrames.ALL_FRAMES,
@@ -354,6 +574,11 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                     return;
 
                 this._webViewReadyStates.set(index, true);
+                this._pushWebPropertiesToView(index, webView, true);
+                this._pushGeneralPropertiesToView(webView);
+                this._pushPausedStateToView(webView);
+                this._pushFetchAllDirectoryPropertiesToView(webView);
+                this._pushAudioSamplesToView(webView);
                 this._resolveReadyIfNeeded();
 
                 if (this._renderer.isPlaying)
@@ -392,6 +617,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                     window.dispatchEvent(new CustomEvent('hanabi-playback-change', {
                         detail: {playing},
                     }));
+                    window.__hanabiSetPaused?.(!playing);
                 })();
             `;
 
@@ -425,6 +651,203 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             });
             if (updateState)
                 this._renderer._setPlayingState(isPlaying);
+        }
+
+        _buildGeneralPropertyPayload() {
+            return {};
+        }
+
+        _pushScriptToView(webView, script) {
+            webView.evaluate_javascript(
+                script,
+                -1,
+                null,
+                null,
+                null,
+                () => {}
+            );
+        }
+
+        _cloneWebUserPropertyPayload(payload) {
+            return JSON.parse(JSON.stringify(payload ?? {}));
+        }
+
+        _buildWebUserPropertyDelta(index) {
+            const nextPayload = this._webUserPropertyPayload ?? {};
+            const previousPayload = this._lastAppliedWebUserPropertyPayloads.get(index) ?? {};
+            const delta = {};
+            let hasChanges = false;
+
+            for (const [key, value] of Object.entries(nextPayload)) {
+                if (JSON.stringify(previousPayload[key]) === JSON.stringify(value))
+                    continue;
+
+                delta[key] = value;
+                hasChanges = true;
+            }
+
+            return hasChanges ? delta : null;
+        }
+
+        _pushWebPropertiesToView(index, webView, forceFull = false) {
+            if (!webView)
+                return;
+
+            const payload = forceFull
+                ? (this._webUserPropertyPayload ?? {})
+                : this._buildWebUserPropertyDelta(index);
+            if (!payload)
+                return;
+
+            this._lastAppliedWebUserPropertyPayloads.set(
+                index,
+                this._cloneWebUserPropertyPayload(this._webUserPropertyPayload)
+            );
+            const payloadJson = JSON.stringify(payload);
+            this._pushScriptToView(
+                webView,
+                `window.__hanabiApplyUserProperties?.(${payloadJson});`
+            );
+        }
+
+        _pushGeneralPropertiesToView(webView) {
+            if (!webView)
+                return;
+
+            const payloadJson = JSON.stringify(this._buildGeneralPropertyPayload());
+            this._pushScriptToView(
+                webView,
+                `window.__hanabiApplyGeneralProperties?.(${payloadJson});`
+            );
+        }
+
+        _pushPausedStateToView(webView) {
+            if (!webView)
+                return;
+
+            this._pushScriptToView(
+                webView,
+                `window.__hanabiSetPaused?.(${this._renderer.isPlaying ? 'false' : 'true'});`
+            );
+        }
+
+        _pushAudioSamplesToView(webView) {
+            if (!webView)
+                return;
+
+            const payloadJson = JSON.stringify(this._webAudioSamples ?? []);
+            this._pushScriptToView(
+                webView,
+                `window.__hanabiApplyAudioFrame?.(${payloadJson});`
+            );
+        }
+
+        _pushWebPropertiesToReadyViews() {
+            this._webViews.forEach((webView, index) => {
+                if (!this._webViewReadyStates.get(index))
+                    return;
+                this._pushWebPropertiesToView(index, webView);
+            });
+        }
+
+        _pushGeneralPropertiesToReadyViews() {
+            this._webViews.forEach((webView, index) => {
+                if (!this._webViewReadyStates.get(index))
+                    return;
+                this._pushGeneralPropertiesToView(webView);
+            });
+        }
+
+        _pushAudioSamplesToReadyViews() {
+            this._webViews.forEach((webView, index) => {
+                if (!this._webViewReadyStates.get(index))
+                    return;
+                this._pushAudioSamplesToView(webView);
+            });
+        }
+
+        _getFetchAllDirectoryProperties() {
+            return (this._project?.sceneProperties ?? []).filter(property =>
+                property?.type === 'directory' && property?.mode === 'fetchall'
+            );
+        }
+
+        _listFilesForDirectory(path) {
+            if (!path)
+                return [];
+
+            try {
+                const dir = Gio.File.new_for_path(path);
+                if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
+                    return [];
+
+                const enumerator = dir.enumerate_children(
+                    'standard::name,standard::type',
+                    Gio.FileQueryInfoFlags.NONE,
+                    null
+                );
+                const files = [];
+                let info;
+                while ((info = enumerator.next_file(null))) {
+                    if (info.get_file_type() !== Gio.FileType.REGULAR)
+                        continue;
+                    files.push(dir.get_child(info.get_name()).get_path());
+                }
+                return files.sort((left, right) => left.localeCompare(right));
+            } catch (_e) {
+                return [];
+            }
+        }
+
+        _pushFetchAllDirectoryChangeToView(webView, propertyName, changedFiles, removedFiles) {
+            if (!webView)
+                return;
+
+            const normalizedChangedFiles = changedFiles.map(normalizeWebFilesystemPath);
+            const normalizedRemovedFiles = removedFiles.map(normalizeWebFilesystemPath);
+
+            if (normalizedChangedFiles.length > 0) {
+                this._pushScriptToView(
+                    webView,
+                    `window.__hanabiUserDirectoryFilesAddedOrChanged?.(${JSON.stringify(propertyName)}, ${JSON.stringify(normalizedChangedFiles)});`
+                );
+            }
+
+            if (normalizedRemovedFiles.length > 0) {
+                this._pushScriptToView(
+                    webView,
+                    `window.__hanabiUserDirectoryFilesRemoved?.(${JSON.stringify(propertyName)}, ${JSON.stringify(normalizedRemovedFiles)});`
+                );
+            }
+        }
+
+        _pushFetchAllDirectoryPropertiesToView(webView) {
+            for (const property of this._getFetchAllDirectoryProperties()) {
+                const files = this._webDirectorySnapshots.get(property.name) ?? [];
+                this._pushFetchAllDirectoryChangeToView(webView, property.name, files, []);
+            }
+        }
+
+        _syncFetchAllDirectoryProperties() {
+            for (const property of this._getFetchAllDirectoryProperties()) {
+                const directoryPath = this._webUserPropertyPayload?.[property.name]?.value ?? '';
+                const nextFiles = this._listFilesForDirectory(directoryPath);
+                const previousFiles = this._webDirectorySnapshots.get(property.name) ?? [];
+                const previousSet = new Set(previousFiles);
+                const nextSet = new Set(nextFiles);
+                const changedFiles = nextFiles.filter(file => !previousSet.has(file));
+                const removedFiles = previousFiles.filter(file => !nextSet.has(file));
+
+                this._webDirectorySnapshots.set(property.name, nextFiles);
+                if (changedFiles.length === 0 && removedFiles.length === 0)
+                    continue;
+
+                this._webViews.forEach((webView, index) => {
+                    if (!this._webViewReadyStates.get(index))
+                        return;
+                    this._pushFetchAllDirectoryChangeToView(webView, property.name, changedFiles, removedFiles);
+                });
+            }
         }
 
         _freezeWPEView(index) {
@@ -845,6 +1268,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webViews.delete(index);
             this._webPausePictures.delete(index);
             this._webViewReadyStates.delete(index);
+            this._lastAppliedWebUserPropertyPayloads.delete(index);
         }
 
         _destroyAllWPEWidgets() {
