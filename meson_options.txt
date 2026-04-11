@@ -1,0 +1,6 @@
+option(
+  'gstcefsrc-web-backend',
+  type: 'boolean',
+  value: false,
+  description: 'Enable the experimental gstcefsrc-based web backend'
+)

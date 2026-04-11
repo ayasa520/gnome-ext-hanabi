@@ -100,6 +100,36 @@ export function prefsRowFitMode(window, prefsGroup) {
     });
 }
 
+export function prefsRowWebBackend(window, prefsGroup, backends) {
+    const settings = window._settings;
+    const title = _('Web Backend');
+    const subtitle = _('Choose the renderer used for web wallpapers');
+    const items = Gtk.StringList.new(backends.map(backend => backend.label));
+    const values = backends.map(backend => backend.value);
+    const currentValue = settings.get_string('web-backend');
+    const selectedIndex = Math.max(0, values.indexOf(currentValue));
+
+    const row = new Adw.ComboRow({
+        title,
+        subtitle,
+        model: items,
+        selected: selectedIndex,
+    });
+
+    row.set_tooltip_markup(_(`
+    <b>WPE WebKit</b>: The default backend for web wallpapers.
+    <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using GStreamer.
+    `));
+    prefsGroup.add(row);
+
+    if (values[selectedIndex] !== currentValue)
+        settings.set_string('web-backend', values[selectedIndex]);
+
+    row.connect('notify::selected', () => {
+        settings.set_string('web-backend', values[row.selected] ?? values[0]);
+    });
+}
+
 export function prefsRowPauseOnMaximizeOrFullscreen(window, prefsGroup) {
     const settings = window._settings;
     const title = _('Pause on Maximize or Fullscreen');

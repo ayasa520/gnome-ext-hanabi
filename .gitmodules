@@ -1,3 +1,6 @@
 [submodule "src/native/third_party/wallpaper-scene-renderer"]
 	path = src/native/third_party/wallpaper-scene-renderer
 	url = https://github.com/ayasa520/wallpaper-scene-renderer
+[submodule "src/native/third_party/gstcefsrc"]
+	path = src/native/third_party/gstcefsrc
+	url = https://github.com/ayasa520/gstcefsrc

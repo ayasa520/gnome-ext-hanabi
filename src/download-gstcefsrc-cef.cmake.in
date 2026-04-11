@@ -1,0 +1,22 @@
+set(GSTCEFSRC_SOURCE_DIR "@gstcefsrc_source_dir@")
+set(GSTCEFSRC_CEF_DOWNLOAD_DIR "${GSTCEFSRC_SOURCE_DIR}/third_party/cef")
+set(GSTCEFSRC_CEF_PLATFORM "@gstcefsrc_cef_platform@")
+set(GSTCEFSRC_CEF_VERSION "@gstcefsrc_cef_version@")
+set(GSTCEFSRC_CEF_ESCAPED_VERSION "@gstcefsrc_cef_escaped_version@")
+set(GSTCEFSRC_STAMP_PATH "@gstcefsrc_download_stamp_path@")
+
+file(MAKE_DIRECTORY "${GSTCEFSRC_CEF_DOWNLOAD_DIR}")
+
+message(STATUS "Preparing gstcefsrc CEF bundle download")
+message(STATUS "  platform: ${GSTCEFSRC_CEF_PLATFORM}")
+message(STATUS "  version: ${GSTCEFSRC_CEF_VERSION}")
+
+include("${GSTCEFSRC_SOURCE_DIR}/cmake/DownloadCEF.cmake")
+DownloadCEF(
+  "${GSTCEFSRC_CEF_PLATFORM}"
+  "${GSTCEFSRC_CEF_VERSION}"
+  "${GSTCEFSRC_CEF_ESCAPED_VERSION}"
+  "${GSTCEFSRC_CEF_DOWNLOAD_DIR}"
+)
+
+file(WRITE "${GSTCEFSRC_STAMP_PATH}" "ready\n")

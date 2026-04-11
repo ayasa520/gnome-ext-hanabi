@@ -19,6 +19,7 @@ const BackendCommon = imports.common;
 const BackendBase = imports.base;
 const BackendVideo = imports.video;
 const BackendWeb = imports.web;
+const BackendWebGstCef = imports.webGstCef;
 const BackendScene = imports.scene;
 
 var createBackendFactory = env => {
@@ -26,16 +27,23 @@ var createBackendFactory = env => {
     const baseClasses = BackendBase.createBaseBackendClasses(env, helpers);
     const VideoBackend = BackendVideo.createVideoBackendClass(env, helpers, baseClasses);
     const WebBackend = BackendWeb.createWebBackendClass(env, helpers, baseClasses);
+    const WebGstCefBackend = BackendWebGstCef.createWebGstCefBackendClass(env, helpers, baseClasses);
     const SceneBackend = BackendScene.createSceneBackendClass(env, helpers, baseClasses);
     const {InvalidProjectBackend} = baseClasses;
-    const {ProjectType} = env;
+    const {ProjectType, flags, state} = env;
 
     return (renderer, project) => {
         switch (project?.type) {
         case ProjectType.VIDEO:
             return new VideoBackend(renderer, project);
-        case ProjectType.WEB:
+        case ProjectType.WEB: {
+            if (
+                flags.enableGstCefSrcWebBackend &&
+                state.getWebBackend?.() === 'gstcefsrc'
+            )
+                return new WebGstCefBackend(renderer, project);
             return new WebBackend(renderer, project);
+        }
         case ProjectType.SCENE:
             return new SceneBackend(renderer, project);
         default:

@@ -119,6 +119,12 @@
             <description>Enable graphics offload for improved performance (requires GTK 4.14+)</description>
         </key>
 
+        <key name="web-backend" type="s">
+            <default>'wpewebkit'</default>
+            <summary>Web Backend</summary>
+            <description>Select the renderer used for web wallpaper projects</description>
+        </key>
+
         <key name="content-fit" type="i">
             <range min="0" max="3" />
             <default>1</default>

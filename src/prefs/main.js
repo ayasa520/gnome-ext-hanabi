@@ -1,6 +1,7 @@
 import Adw from 'gi://Adw';
 
 import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import * as BuildConfig from '../buildConfig.js';
 
 import {
     prefsRowBoolean,
@@ -9,6 +10,7 @@ import {
     prefsRowInt,
     prefsRowPauseOnBattery,
     prefsRowPauseOnMaximizeOrFullscreen,
+    prefsRowWebBackend,
 } from './rows.js';
 import {
     prefsRowLibraryPath,
@@ -34,6 +36,12 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
         prefsRowLibraryPath(window, generalGroup);
         prefsRowProjectChooser(window, generalGroup);
         prefsRowFitMode(window, generalGroup);
+        if (BuildConfig.enableGstCefSrcWebBackend) {
+            prefsRowWebBackend(window, generalGroup, [
+                {value: 'wpewebkit', label: _('WPE WebKit')},
+                {value: 'gstcefsrc', label: _('CEF (gstcefsrc)')},
+            ]);
+        }
         prefsRowInt(window, generalGroup, _('Scene FPS'), 'scene-fps', _('Set target FPS for scene wallpapers'), 5, 240, 5, 10);
         prefsRowBoolean(window, generalGroup, _('Mute Audio'), 'mute', '');
         prefsRowInt(window, generalGroup, _('Volume Level'), 'volume', '', 0, 100, 1, 10);

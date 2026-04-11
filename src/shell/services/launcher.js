@@ -168,11 +168,25 @@ export class LaunchSubprocess {
         if (!this.running || !this._stdinPipe || !this.cancellable)
             return false;
 
-        const payload = this._serializePointerEvent(event);
-        if (!payload)
+        const queuedEvent = this._serializePointerEvent(event);
+        if (!queuedEvent)
             return false;
 
-        this._stdinQueue.push(this._stdinEncoder.encode(payload));
+        if (queuedEvent.type === 'mousemove') {
+            for (let i = this._stdinQueue.length - 1; i >= 0; i--) {
+                const pendingEvent = this._stdinQueue[i];
+                if (pendingEvent?.type !== 'mousemove')
+                    continue;
+                if (pendingEvent.monitorIndex !== queuedEvent.monitorIndex)
+                    continue;
+
+                this._stdinQueue[i] = queuedEvent;
+                this._flushPointerQueue();
+                return true;
+            }
+        }
+
+        this._stdinQueue.push(queuedEvent);
         this._flushPointerQueue();
         return true;
     }
@@ -189,21 +203,33 @@ export class LaunchSubprocess {
 
         switch (event.type) {
         case 'mousemove':
-            return `m\t${monitorIndex}\t${x}\t${y}\n`;
+            return {
+                type: 'mousemove',
+                monitorIndex,
+                payload: this._stdinEncoder.encode(`m\t${monitorIndex}\t${x}\t${y}\n`),
+            };
         case 'mousedown':
         case 'mouseup': {
             const button = Number(event.button ?? 0);
             if (!Number.isFinite(button))
                 return null;
             const opcode = event.type === 'mousedown' ? 'd' : 'u';
-            return `${opcode}\t${monitorIndex}\t${x}\t${y}\t${button}\n`;
+            return {
+                type: event.type,
+                monitorIndex,
+                payload: this._stdinEncoder.encode(`${opcode}\t${monitorIndex}\t${x}\t${y}\t${button}\n`),
+            };
         }
         case 'wheel': {
             const deltaX = Number(event.deltaX ?? 0);
             const deltaY = Number(event.deltaY ?? 0);
             if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY))
                 return null;
-            return `w\t${monitorIndex}\t${x}\t${y}\t${deltaX}\t${deltaY}\n`;
+            return {
+                type: 'wheel',
+                monitorIndex,
+                payload: this._stdinEncoder.encode(`w\t${monitorIndex}\t${x}\t${y}\t${deltaX}\t${deltaY}\n`),
+            };
         }
         default:
             return null;
@@ -214,7 +240,13 @@ export class LaunchSubprocess {
         if (this._stdinWritePending || !this._stdinPipe || this._stdinQueue.length === 0)
             return;
 
-        const chunk = this._stdinQueue[0];
+        const chunk = this._stdinQueue[0]?.payload;
+        if (!chunk) {
+            this._stdinQueue.shift();
+            this._flushPointerQueue();
+            return;
+        }
+
         this._stdinWritePending = true;
         this._stdinPipe.write_all_async(
             chunk,

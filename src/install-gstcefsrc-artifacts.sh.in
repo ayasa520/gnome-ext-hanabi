@@ -1,0 +1,48 @@
+#!/bin/sh
+
+set -eu
+
+stamp_path="$1"
+stage_dir='@gstcefsrc_stage_dir@'
+destdir="${DESTDIR:-}"
+install_dir="${destdir}@gstcefsrc_install_dir@"
+
+if [ ! -f "$stamp_path" ]; then
+    echo "gstcefsrc build stamp not found: $stamp_path" >&2
+    exit 1
+fi
+
+if [ ! -d "$stage_dir" ]; then
+    echo "gstcefsrc stage directory not found: $stage_dir" >&2
+    exit 1
+fi
+
+copy_if_exists() {
+    src_path="$1"
+    dst_path="$2"
+    if [ -e "$src_path" ]; then
+        cp -a "$src_path" "$dst_path"
+    fi
+}
+
+rm -rf "$install_dir"
+mkdir -p "$install_dir"
+
+copy_if_exists "$stage_dir/libgstcef.so" "$install_dir/"
+copy_if_exists "$stage_dir/gstcefsubprocess" "$install_dir/"
+copy_if_exists "$stage_dir/chrome-sandbox" "$install_dir/"
+copy_if_exists "$stage_dir/libcef.so" "$install_dir/"
+copy_if_exists "$stage_dir/libEGL.so" "$install_dir/"
+copy_if_exists "$stage_dir/libGLESv2.so" "$install_dir/"
+copy_if_exists "$stage_dir/libvk_swiftshader.so" "$install_dir/"
+copy_if_exists "$stage_dir/libvulkan.so.1" "$install_dir/"
+copy_if_exists "$stage_dir/v8_context_snapshot.bin" "$install_dir/"
+copy_if_exists "$stage_dir/vk_swiftshader_icd.json" "$install_dir/"
+copy_if_exists "$stage_dir/chrome_100_percent.pak" "$install_dir/"
+copy_if_exists "$stage_dir/chrome_200_percent.pak" "$install_dir/"
+copy_if_exists "$stage_dir/resources.pak" "$install_dir/"
+copy_if_exists "$stage_dir/icudtl.dat" "$install_dir/"
+
+if [ -d "$stage_dir/locales" ]; then
+    cp -a "$stage_dir/locales" "$install_dir/"
+fi

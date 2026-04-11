@@ -88,6 +88,14 @@ If any of these are missing, Hanabi may still install but some project types wil
     ./run.sh install
     ```
 
+   To enable the experimental Chromium-based web backend option in preferences:
+
+   ```
+    ./run.sh install -Dgstcefsrc-web-backend=true
+    ```
+
+   This uses the `gstcefsrc` source kept under [src/native/third_party/gstcefsrc](./src/native/third_party/gstcefsrc) and lets its upstream CMake build download the required CEF bundle automatically.
+
 3. Restart GNOME Shell
 4. Enable the Hanabi extension
 5. Choose a wallpaper project directory in the extension preference window
@@ -99,7 +107,7 @@ Hanabi now selects a project directory containing `project.json`, instead of sel
 Currently supported project types:
 
 - `video`: video wallpaper projects
-- `web`: web wallpaper projects rendered with WPEWebKit
+- `web`: web wallpaper projects rendered with WPEWebKit by default, with optional experimental `gstcefsrc` support when built with `-Dgstcefsrc-web-backend=true`
 - `scene`: scene wallpaper projects rendered through Hanabi's native scene bridge
 
 ### Repository Layout

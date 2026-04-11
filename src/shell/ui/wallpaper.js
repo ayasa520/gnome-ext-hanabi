@@ -32,7 +32,6 @@ const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const logger = new Logger.Logger();
 // Ref: https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/layout.js
 const BACKGROUND_FADE_ANIMATION_TIME = 1000;
-const MOTION_MIN_DELTA_PX = 1;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
 // const CUSTOM_BACKGROUND_BOUNDS_PADDING = 2;
 
@@ -240,7 +239,7 @@ export const LiveWallpaper = GObject.registerClass(
                 if (this._lastMotionPos) {
                     const dx = Math.abs(x - this._lastMotionPos.x);
                     const dy = Math.abs(y - this._lastMotionPos.y);
-                    if (dx < MOTION_MIN_DELTA_PX && dy < MOTION_MIN_DELTA_PX)
+                    if (dx === 0 && dy === 0)
                         return;
                 }
                 this._lastMotionPos = {x, y};

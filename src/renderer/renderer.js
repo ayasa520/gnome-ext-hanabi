@@ -161,6 +161,11 @@ const useGstGL = isGstVersionAtLeast(1, 24);
 
 const rendererDbusName = 'io.github.jeffshee.HanabiRenderer';
 let applicationId = rendererDbusName;
+const WebBackendKind = {
+    WPE_WEBKIT: 'wpewebkit',
+    GST_CEF_SRC: 'gstcefsrc',
+};
+const gstCefSrcWebBackendEnabled = Boolean(NativeRuntimeConfig.enableGstCefSrcWebBackend);
 
 let extSettings = null;
 const extSchemaId = 'io.github.jeffshee.hanabi-extension';
@@ -190,6 +195,71 @@ const isEnableGraphicsOffload = extSettings
     : false;
 const haveGraphicsOffload = isGtkVersionAtLeast(4, 14) && isEnableGraphicsOffload;
 
+const normalizeWebBackend = value => {
+    switch (`${value ?? ''}`.trim().toLowerCase()) {
+    case WebBackendKind.GST_CEF_SRC:
+        return WebBackendKind.GST_CEF_SRC;
+    case WebBackendKind.WPE_WEBKIT:
+    default:
+        return WebBackendKind.WPE_WEBKIT;
+    }
+};
+
+const getEffectiveWebBackend = value => {
+    const normalized = normalizeWebBackend(value);
+    if (normalized === WebBackendKind.GST_CEF_SRC && gstCefSrcWebBackendEnabled)
+        return normalized;
+    return WebBackendKind.WPE_WEBKIT;
+};
+
+const prependEnvPath = (name, value) => {
+    if (!value)
+        return;
+
+    const current = GLib.getenv(name) ?? '';
+    const segments = current
+        .split(':')
+        .filter(segment => segment !== '');
+    if (segments.includes(value))
+        return;
+
+    GLib.setenv(name, [value, ...segments].join(':'), true);
+};
+
+const setEnvDefault = (name, value) => {
+    if (!value || GLib.getenv(name))
+        return;
+
+    GLib.setenv(name, value, true);
+};
+
+const configureGstCefSrcEnvironment = () => {
+    if (!gstCefSrcWebBackendEnabled)
+        return;
+
+    const artifactsDir = `${NativeRuntimeConfig.gstCefSrcArtifactsDir ?? ''}`;
+    if (!GLib.file_test(artifactsDir, GLib.FileTest.IS_DIR)) {
+        console.warn(`gstcefsrc backend enabled, but artifacts directory is unavailable: ${artifactsDir}`);
+        return;
+    }
+
+    prependEnvPath('GST_PLUGIN_PATH', artifactsDir);
+
+    const subprocessPath = `${NativeRuntimeConfig.gstCefSrcSubprocessPath ?? ''}`;
+    if (GLib.file_test(subprocessPath, GLib.FileTest.IS_REGULAR))
+        setEnvDefault('GST_CEF_SUBPROCESS_PATH', subprocessPath);
+    else
+        console.warn(`gstcefsrc subprocess binary is unavailable: ${subprocessPath}`);
+
+    setEnvDefault('GST_CEF_CACHE_LOCATION', `${NativeRuntimeConfig.gstCefSrcCacheDir ?? '/tmp/gstcef-cache'}`);
+    setEnvDefault('GST_CEF_SANDBOX', '0');
+    setEnvDefault('GST_CEF_GPU_ENABLED', 'set');
+    setEnvDefault(
+        'GST_CEF_CHROME_EXTRA_FLAGS',
+        `${NativeRuntimeConfig.gstCefSrcChromeExtraFlags ?? 'use-angle=default,ignore-gpu-blocklist,enable-gpu-rasterization,enable-logging=stderr'}`
+    );
+};
+
 let contentFit = null;
 let mute = extSettings ? extSettings.get_boolean('mute') : false;
 let nohide = false;
@@ -201,6 +271,9 @@ let changeWallpaper = extSettings ? extSettings.get_boolean('change-wallpaper') 
 let changeWallpaperDirectoryPath = extSettings ? extSettings.get_string('change-wallpaper-directory-path') : '';
 let changeWallpaperMode = extSettings ? extSettings.get_int('change-wallpaper-mode') : 0;
 let changeWallpaperInterval = extSettings ? extSettings.get_int('change-wallpaper-interval') : 15;
+let webBackend = extSettings
+    ? getEffectiveWebBackend(extSettings.get_string('web-backend'))
+    : WebBackendKind.WPE_WEBKIT;
 let windowDimension = {width: 1920, height: 1080};
 let windowed = false;
 let fullscreened = true;
@@ -749,6 +822,7 @@ const createBackend = RendererBackends.createBackendFactory({
     Gio,
     GLib,
     Gdk,
+    Soup,
     Gst,
     GstPlay,
     GstAudio,
@@ -771,12 +845,14 @@ const createBackend = RendererBackends.createBackendFactory({
         haveContentFit,
         useGstGL,
         haveGraphicsOffload,
+        enableGstCefSrcWebBackend: gstCefSrcWebBackendEnabled,
     },
     state: {
         getContentFit: () => contentFit,
         getMute: () => mute,
         getVolume: () => volume,
         getSceneFps: () => sceneFps,
+        getWebBackend: () => webBackend,
     },
 });
 
@@ -881,6 +957,16 @@ const HanabiRenderer = GObject.registerClass(
                 case 'change-wallpaper-mode':
                     changeWallpaperMode = settings.get_int(key);
                     break;
+                case 'web-backend': {
+                    const nextWebBackend = getEffectiveWebBackend(settings.get_string(key));
+                    if (nextWebBackend === webBackend)
+                        break;
+
+                    webBackend = nextWebBackend;
+                    if (this._project?.type === ProjectType.WEB || this._pendingSwitch?.project?.type === ProjectType.WEB)
+                        this._switchProject();
+                    break;
+                }
                 case ProjectBrowserFilterKey.STATE:
                     this.setAutoWallpaper();
                     break;
@@ -1824,6 +1910,7 @@ const HanabiRendererWindow = GObject.registerClass(
     }
 );
 
+configureGstCefSrcEnvironment();
 Gst.init(null);
 
 let renderer = new HanabiRenderer();

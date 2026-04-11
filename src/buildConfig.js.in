@@ -1,0 +1,1 @@
+export const enableGstCefSrcWebBackend = @enable_gstcefsrc_web_backend@;

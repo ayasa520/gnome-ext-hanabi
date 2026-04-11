@@ -1,2 +1,7 @@
 var nativeSceneLibDir = '@native_scene_libdir@';
 var nativeSceneTypelibDir = '@native_scene_typelib_dir@';
+var enableGstCefSrcWebBackend = @enable_gstcefsrc_web_backend@;
+var gstCefSrcArtifactsDir = @gstcefsrc_artifacts_dir@;
+var gstCefSrcSubprocessPath = @gstcefsrc_subprocess_path@;
+var gstCefSrcCacheDir = @gstcefsrc_cache_dir@;
+var gstCefSrcChromeExtraFlags = @gstcefsrc_chrome_extra_flags@;
