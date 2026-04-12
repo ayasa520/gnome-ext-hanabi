@@ -1129,14 +1129,13 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                     caps: videoCaps,
                 });
                 const videoQueue = this._createElement('queue', 'gstcefsrc-video-queue', {
-                    'max-size-buffers': 0,
+                    'max-size-buffers': 3,
                     'max-size-bytes': 0,
-                    'max-size-time': 1000000000,
+                    'max-size-time': 0,
                 });
-                const videoConvert = this._createElement('videoconvert', 'gstcefsrc-video-convert');
-                const videoScale = this._createElement('videoscale', 'gstcefsrc-video-scale');
-                const videoRate = this._createElement('videorate', 'gstcefsrc-video-rate');
-                const sink = this._createElement(sinkFactory, 'gstcefsrc-videosink');
+                const sink = this._createElement(sinkFactory, 'gstcefsrc-videosink', {
+                    sync: false,
+                });
                 const audioQueue = this._createElement('queue', 'gstcefsrc-audio-queue', {
                     'max-size-buffers': 0,
                     'max-size-bytes': 0,
@@ -1155,9 +1154,6 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                     cefDemux,
                     videoCapsFilter,
                     videoQueue,
-                    videoConvert,
-                    videoScale,
-                    videoRate,
                     sink,
                     audioQueue,
                     audioConvert,
@@ -1176,9 +1172,6 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 this._linkElementChain([
                     videoCapsFilter,
                     videoQueue,
-                    videoConvert,
-                    videoScale,
-                    videoRate,
                     sink,
                 ]);
                 this._linkElementChain([
