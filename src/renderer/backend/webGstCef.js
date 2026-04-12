@@ -17,6 +17,7 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
         haveGstAudio,
         useGstGL,
         haveContentFit,
+        haveGraphicsOffload,
     } = flags;
     const {setExpandFill, createConfiguredPicture} = helpers;
     const {BackendController} = baseClasses;
@@ -714,6 +715,9 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 widget = this._wrapWidgetForFreeze(index, widget);
 
             if (widget)
+                widget = this._wrapWidgetForGraphicsOffload(index, widget);
+
+            if (widget)
                 this._trackMonitorWidget(index, widget);
 
             return widget ?? this._createPlaceholderWidget('gstcefsrc backend could not create a render widget');
@@ -843,6 +847,19 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
             }));
             this._pictures.push(picture);
             return picture;
+        }
+
+        _wrapWidgetForGraphicsOffload(index, widget) {
+            if (!(haveGraphicsOffload && Gtk.GraphicsOffload))
+                return widget;
+
+            console.log(
+                `gstcefsrc route: wrapping monitor ${index} widget in GraphicsOffload ` +
+                `(haveGraphicsOffload=${haveGraphicsOffload})`
+            );
+            const offload = setExpandFill(Gtk.GraphicsOffload.new(widget));
+            offload.set_enabled(Gtk.GraphicsOffloadEnabled.ENABLED);
+            return offload;
         }
 
         _wrapWidgetForFreeze(index, widget) {
