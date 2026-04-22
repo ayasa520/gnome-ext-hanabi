@@ -19,8 +19,7 @@
 
 imports.gi.versions.Gtk = '4.0';
 imports.gi.versions.GioUnix = '2.0';
-imports.gi.versions.Soup = '3.0';
-const {GObject, Gtk, Gio, GLib, Gdk, Gst, GIRepository} = imports.gi;
+const {GObject, Gtk, Gio, GLib, Gdk, GdkPixbuf, Gst, GIRepository} = imports.gi;
 const GioUnix = imports.gi.GioUnix;
 const Soup = imports.gi.Soup;
 const System = imports.system;
@@ -91,6 +90,15 @@ try {
     console.warn('GstAudio, or the typelib is not installed.');
 }
 const haveGstAudio = GstAudio !== null;
+
+let GstApp = null;
+try {
+    GstApp = imports.gi.GstApp;
+} catch (e) {
+    console.error(e);
+    console.warn('GstApp, or the typelib is not installed.');
+}
+const haveGstApp = GstApp !== null;
 
 let WPEWebKit = null;
 try {
@@ -283,12 +291,31 @@ let argvContentFitOverride = false;
 const wallpaperSwitchTransitionDurationMs = 1000;
 const wallpaperSwitchTransitionCleanupDelayMs = wallpaperSwitchTransitionDurationMs + 150;
 const wallpaperSwitchReadyTimeoutMs = 15000;
+const formatRendererAspect = (width, height) => {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || height <= 0)
+        return 'n/a';
+
+    return (width / height).toFixed(6);
+};
 const sceneUserPropertyReloadDebounceMs = 200;
-const webAudioBandsPerChannel = 64;
-const webAudioFrameLength = webAudioBandsPerChannel * 2;
+// Keep the visualizer cadence aligned with the gstcefsrc backend's 60 Hz audio
+// push while retaining the reusable backend's per-channel FFT output layout.
 const webAudioUpdateIntervalNs = 16666667;
+const webAudioOutputBandsPerChannel = 64;
+const webAudioFrameLength = webAudioOutputBandsPerChannel * 2;
+const webAudioPollIntervalMs = Math.max(1, Math.round(webAudioUpdateIntervalNs / 1000000));
 const webAudioRestartDelayMs = 1000;
-const webAudioSilenceThresholdDb = -80;
+const webAudioSampleRate = 44100;
+const webAudioFftSize = 2048;
+const webAudioSlowProcessingLogThresholdUs = 8000;
+const webAudioFrameLogIntervalFrames = Math.max(1, Math.round(5000 / webAudioPollIntervalMs));
+const webAudioMinFrequencyHz = 30;
+const webAudioMaxFrequencyHz = 18000;
+const webAudioMinDb = -80;
+const webAudioMaxDb = 0;
+const webAudioSilenceRmsThreshold = 0.003;
+const webAudioSpectrumOutputGain = 4.0;
+const webAudioBandPeakBlend = 0.35;
 const localMediaHttpEndpointPath = '/hanabi-media';
 
 const guessLocalMediaMimeType = path => {
@@ -500,7 +527,6 @@ const {
     ProjectBrowserFilterKey,
     ProjectType,
     UserPropertyStoreKey,
-    LegacyWebUserPropertyStoreKey,
     buildSceneUserPropertyPayload,
     buildWebUserPropertyPayload,
     getProjectFilterFromSettings,
@@ -508,36 +534,12 @@ const {
     getProjectWebPropertyOverrides,
     loadProject,
     listProjects,
-    mergeStoredScenePropertyOverrides,
-    serializeStoredScenePropertyOverrides,
 } = ProjectLoader;
 
-const mergeUserPropertyStoresFromSettings = settings => {
-    if (!settings)
-        return '';
-
-    return serializeStoredScenePropertyOverrides(
-        mergeStoredScenePropertyOverrides(
-            settings.get_string(UserPropertyStoreKey),
-            settings.get_string(LegacyWebUserPropertyStoreKey)
-        )
-    );
-};
-
-const migrateUserPropertyStoresInSettings = settings => {
-    if (!settings)
-        return '';
-
-    const mergedStore = mergeUserPropertyStoresFromSettings(settings);
-    if (settings.get_string(UserPropertyStoreKey) !== mergedStore)
-        settings.set_string(UserPropertyStoreKey, mergedStore);
-    if (settings.get_string(LegacyWebUserPropertyStoreKey) !== '')
-        settings.set_string(LegacyWebUserPropertyStoreKey, '');
-    return mergedStore;
-};
-
+// The renderer keeps one shared user-property JSON string in memory because
+// both web and scene payload builders must react to the same GSettings source.
 let userPropertyStore = extSettings
-    ? migrateUserPropertyStoresInSettings(extSettings)
+    ? extSettings.get_string(UserPropertyStoreKey)
     : '';
 
 const applyProjectUserPropertyState = project => {
@@ -567,47 +569,343 @@ const hasArg = arg => ARGV.includes(arg);
 
 const buildSilentWebAudioFrame = () => new Array(webAudioFrameLength).fill(0);
 
-const parseSpectrumMagnitudeDbValues = structureString => {
-    if (!structureString)
-        return [];
+const buildLogBandEdgesHz = () => Array.from(
+    {length: webAudioOutputBandsPerChannel + 1},
+    (_unused, index) => {
+        const t = index / webAudioOutputBandsPerChannel;
+        return webAudioMinFrequencyHz * Math.pow(webAudioMaxFrequencyHz / webAudioMinFrequencyHz, t);
+    }
+);
 
-    const magnitudeIndex = structureString.indexOf('magnitude=');
-    if (magnitudeIndex === -1)
-        return [];
+const webAudioBandEdgesHz = buildLogBandEdgesHz();
+const webAudioBandCentersHz = webAudioBandEdgesHz.slice(0, -1).map((edge, index) => {
+    return Math.sqrt(edge * webAudioBandEdgesHz[index + 1]);
+});
+const webAudioFrequenciesHz = Array.from(
+    {length: Math.floor(webAudioFftSize / 2) + 1},
+    (_unused, index) => (index * webAudioSampleRate) / webAudioFftSize
+);
+const webAudioWindow = Float32Array.from(
+    {length: webAudioFftSize},
+    (_unused, index) => 0.5 * (1 - Math.cos((2 * Math.PI * index) / (webAudioFftSize - 1)))
+);
+const webAudioMagnitudeReference = Math.max(
+    1,
+    webAudioWindow.reduce((sum, sample) => sum + sample, 0) * 0.5
+);
+const webAudioBandBinRanges = webAudioBandEdgesHz.slice(0, -1).map((_edge, index) => {
+    const low = webAudioBandEdgesHz[index];
+    const high = webAudioBandEdgesHz[index + 1];
+    let begin = 0;
+    while (begin < webAudioFrequenciesHz.length && webAudioFrequenciesHz[begin] < low)
+        begin++;
+    let end = begin;
+    while (end < webAudioFrequenciesHz.length && webAudioFrequenciesHz[end] < high)
+        end++;
+    return {begin, end};
+});
 
-    const magnitudeText = structureString.slice(magnitudeIndex);
-    const values = [];
-    const pattern = /\(float\)\s*(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/gi;
-    let match;
-    while ((match = pattern.exec(magnitudeText)) && values.length < webAudioFrameLength)
-        values.push(Number.parseFloat(match[1]));
+const clipNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 
-    return values;
+const createSpectrumProcessorState = () => ({
+    smoothed: new Float32Array(webAudioOutputBandsPerChannel),
+    lastDb: new Float32Array(webAudioOutputBandsPerChannel).fill(webAudioMinDb),
+    bandDb: new Float32Array(webAudioOutputBandsPerChannel),
+    normalized: new Float32Array(webAudioOutputBandsPerChannel),
+    horizontallySmoothed: new Float32Array(webAudioOutputBandsPerChannel),
+    real: new Float64Array(webAudioFftSize),
+    imag: new Float64Array(webAudioFftSize),
+    magnitudes: new Float32Array(Math.floor(webAudioFftSize / 2) + 1),
+    normalizedMagnitudes: new Float32Array(Math.floor(webAudioFftSize / 2) + 1),
+    binDb: new Float32Array(Math.floor(webAudioFftSize / 2) + 1),
+});
+
+const appendMonoChunk = (buffer, chunk) => {
+    if (!(buffer instanceof Float32Array) || !(chunk instanceof Float32Array) || chunk.length === 0)
+        return buffer;
+
+    if (chunk.length >= buffer.length) {
+        buffer.set(chunk.subarray(chunk.length - buffer.length));
+        return buffer;
+    }
+
+    buffer.copyWithin(0, chunk.length);
+    buffer.set(chunk, buffer.length - chunk.length);
+    return buffer;
 };
 
-const normalizeSpectrumMagnitudeDb = magnitudeDb => {
-    if (!Number.isFinite(magnitudeDb))
-        return 0;
+const appendInterleavedStereoChunk = (leftBuffer, rightBuffer, interleaved, frameCount) => {
+    if (!(leftBuffer instanceof Float32Array) || !(rightBuffer instanceof Float32Array) ||
+        !(interleaved instanceof Float32Array) || frameCount <= 0)
+        return;
 
-    if (magnitudeDb <= webAudioSilenceThresholdDb)
-        return 0;
+    const capacity = Math.min(leftBuffer.length, rightBuffer.length);
+    if (frameCount >= capacity) {
+        const startFrame = frameCount - capacity;
+        for (let i = 0; i < capacity; i++) {
+            const sourceIndex = (startFrame + i) * 2;
+            const left = interleaved[sourceIndex] ?? 0;
+            leftBuffer[i] = left;
+            rightBuffer[i] = interleaved[sourceIndex + 1] ?? left;
+        }
+        return;
+    }
 
-    if (magnitudeDb >= 0)
-        return 1;
+    leftBuffer.copyWithin(0, frameCount);
+    rightBuffer.copyWithin(0, frameCount);
+    const writeOffset = capacity - frameCount;
+    for (let i = 0; i < frameCount; i++) {
+        const sourceIndex = i * 2;
+        const left = interleaved[sourceIndex] ?? 0;
+        leftBuffer[writeOffset + i] = left;
+        rightBuffer[writeOffset + i] = interleaved[sourceIndex + 1] ?? left;
+    }
+};
 
-    return Math.max(0, Math.min(1, Math.pow(10, magnitudeDb / 20)));
+const interpolateLinearly = (xs, ys, target) => {
+    if (!Array.isArray(xs) || !(ys instanceof Float32Array) || xs.length === 0 || ys.length === 0)
+        return webAudioMinDb;
+
+    if (target <= xs[0])
+        return ys[0];
+    const lastIndex = Math.min(xs.length, ys.length) - 1;
+    if (target >= xs[lastIndex])
+        return ys[lastIndex];
+
+    let lowerIndex = 0;
+    while (lowerIndex < lastIndex && xs[lowerIndex + 1] < target)
+        lowerIndex++;
+
+    const upperIndex = Math.min(lastIndex, lowerIndex + 1);
+    const lowerX = xs[lowerIndex];
+    const upperX = xs[upperIndex];
+    if (upperX <= lowerX)
+        return ys[lowerIndex];
+
+    const mix = (target - lowerX) / (upperX - lowerX);
+    return ys[lowerIndex] + (ys[upperIndex] - ys[lowerIndex]) * mix;
+};
+
+const resampleSpectrumValues = (values, resolution) => {
+    const targetSize = Math.max(0, Number(resolution) || 0);
+    const sourceSize = values?.length ?? 0;
+    const result = new Array(targetSize).fill(0);
+    if (targetSize === 0 || sourceSize === 0)
+        return result;
+
+    if (targetSize === sourceSize)
+        return Array.from(values);
+
+    for (let i = 0; i < targetSize; i++) {
+        const sourcePosition = ((i + 0.5) * sourceSize / targetSize) - 0.5;
+        const clampedPosition = clipNumber(sourcePosition, 0, sourceSize - 1);
+        const lowerIndex = Math.floor(clampedPosition);
+        const upperIndex = Math.min(sourceSize - 1, lowerIndex + 1);
+        const mix = clampedPosition - lowerIndex;
+        const lowerValue = Number(values[lowerIndex] ?? 0);
+        const upperValue = Number(values[upperIndex] ?? 0);
+        result[i] = lowerValue + (upperValue - lowerValue) * mix;
+    }
+    return result;
+};
+
+const shouldLogWebAudioFrame = frameCount =>
+    frameCount <= 8 || frameCount % webAudioFrameLogIntervalFrames === 0;
+
+const normalizeAbsoluteSpectrumMagnitude = magnitude =>
+    clipNumber(((Number(magnitude) || 0) / webAudioMagnitudeReference) * webAudioSpectrumOutputGain, 0, 1);
+
+const magnitudeToDb = magnitude => {
+    if (!Number.isFinite(magnitude) || magnitude <= 0)
+        return webAudioMinDb;
+    return clipNumber(20 * Math.log10(magnitude + 1e-12), webAudioMinDb, webAudioMaxDb);
+};
+
+const computeSceneLow16Pair = values => {
+    const bins16 = resampleSpectrumValues(values, 16);
+    return [Number(bins16[0] ?? 0), Number(bins16[1] ?? 0)];
+};
+
+const computeSceneLow16Average = (leftPair, rightPair) =>
+    (Number(leftPair[0] ?? 0) + Number(leftPair[1] ?? 0) +
+        Number(rightPair[0] ?? 0) + Number(rightPair[1] ?? 0)) * 0.25;
+
+const formatSpectrumPair = values =>
+    `[${Number(values[0] ?? 0).toFixed(4)}, ${Number(values[1] ?? 0).toFixed(4)}]`;
+
+const computeRfftMagnitudes = (pcm, state) => {
+    const real = state.real;
+    const imag = state.imag;
+    const magnitudes = state.magnitudes;
+
+    real.fill(0);
+    imag.fill(0);
+
+    for (let i = 0; i < webAudioFftSize; i++)
+        real[i] = (pcm[i] ?? 0) * webAudioWindow[i];
+
+    for (let i = 1, j = 0; i < webAudioFftSize; i++) {
+        let bit = webAudioFftSize >> 1;
+        while (j & bit) {
+            j ^= bit;
+            bit >>= 1;
+        }
+        j ^= bit;
+        if (i < j) {
+            const realValue = real[i];
+            real[i] = real[j];
+            real[j] = realValue;
+            const imagValue = imag[i];
+            imag[i] = imag[j];
+            imag[j] = imagValue;
+        }
+    }
+
+    for (let size = 2; size <= webAudioFftSize; size <<= 1) {
+        const halfSize = size >> 1;
+        const theta = (-2 * Math.PI) / size;
+        const phaseRealStep = Math.cos(theta);
+        const phaseImagStep = Math.sin(theta);
+        for (let offset = 0; offset < webAudioFftSize; offset += size) {
+            let phaseReal = 1;
+            let phaseImag = 0;
+            for (let i = 0; i < halfSize; i++) {
+                const evenIndex = offset + i;
+                const oddIndex = evenIndex + halfSize;
+                const oddReal = real[oddIndex] * phaseReal - imag[oddIndex] * phaseImag;
+                const oddImag = real[oddIndex] * phaseImag + imag[oddIndex] * phaseReal;
+                real[oddIndex] = real[evenIndex] - oddReal;
+                imag[oddIndex] = imag[evenIndex] - oddImag;
+                real[evenIndex] += oddReal;
+                imag[evenIndex] += oddImag;
+                const nextPhaseReal = phaseReal * phaseRealStep - phaseImag * phaseImagStep;
+                const nextPhaseImag = phaseReal * phaseImagStep + phaseImag * phaseRealStep;
+                phaseReal = nextPhaseReal;
+                phaseImag = nextPhaseImag;
+            }
+        }
+    }
+
+    for (let index = 0; index < magnitudes.length; index++)
+        magnitudes[index] = Math.hypot(real[index], imag[index]);
+    return magnitudes;
+};
+
+const applyHorizontalSmoothing = (values, target) => {
+    for (let i = 0; i < values.length; i++) {
+        const left = values[Math.max(0, i - 1)] ?? 0;
+        const center = values[i] ?? 0;
+        const right = values[Math.min(values.length - 1, i + 1)] ?? 0;
+        target[i] = left * 0.08 + center * 0.84 + right * 0.08;
+    }
+    return target;
+};
+
+const processSpectrumFrame = (pcm, state) => {
+    if (!(pcm instanceof Float32Array) || !(state?.smoothed instanceof Float32Array))
+        return {
+            values: new Float32Array(webAudioOutputBandsPerChannel),
+            dbValues: new Float32Array(webAudioOutputBandsPerChannel).fill(webAudioMinDb),
+            rms: 0,
+            framePeak: 0,
+        };
+
+    const rms = Math.sqrt(pcm.reduce((sum, sample) => sum + sample * sample, 0) / Math.max(1, pcm.length) + 1e-12);
+    if (rms < webAudioSilenceRmsThreshold) {
+        for (let i = 0; i < webAudioOutputBandsPerChannel; i++)
+            state.smoothed[i] *= 0.82;
+        state.lastDb.fill(webAudioMinDb);
+        return {
+            values: state.smoothed,
+            dbValues: state.lastDb,
+            rms,
+            framePeak: 0,
+        };
+    }
+
+    const magnitudes = computeRfftMagnitudes(pcm, state);
+    const normalizedMagnitudes = state.normalizedMagnitudes;
+    let framePeak = 0;
+    const binDb = state.binDb;
+    for (let i = 0; i < magnitudes.length; i++) {
+        const normalizedMagnitude = normalizeAbsoluteSpectrumMagnitude(magnitudes[i]);
+        normalizedMagnitudes[i] = normalizedMagnitude;
+        framePeak = Math.max(framePeak, normalizedMagnitude);
+        binDb[i] = magnitudeToDb(normalizedMagnitude);
+    }
+
+    const bandDb = state.bandDb;
+    const normalized = state.normalized;
+    for (let i = 0; i < webAudioOutputBandsPerChannel; i++) {
+        const centerMagnitude = interpolateLinearly(
+            webAudioFrequenciesHz,
+            normalizedMagnitudes,
+            webAudioBandCentersHz[i]
+        );
+
+        let powerSum = 0;
+        let sampleCount = 0;
+        let peakMagnitude = 0;
+        const {begin, end} = webAudioBandBinRanges[i];
+        for (let bin = begin; bin < end; bin++) {
+            const magnitude = normalizedMagnitudes[bin] ?? 0;
+            powerSum += magnitude * magnitude;
+            peakMagnitude = Math.max(peakMagnitude, magnitude);
+            sampleCount++;
+        }
+
+        let bandMagnitude = centerMagnitude;
+        if (sampleCount > 0) {
+            const rmsMagnitude = Math.sqrt(powerSum / sampleCount + 1e-12);
+            const blendedPeakMagnitude =
+                peakMagnitude * webAudioBandPeakBlend + rmsMagnitude * (1 - webAudioBandPeakBlend);
+            bandMagnitude = Math.max(centerMagnitude, blendedPeakMagnitude);
+        }
+
+        bandMagnitude = clipNumber(bandMagnitude, 0, 1);
+        normalized[i] = bandMagnitude;
+        bandDb[i] = magnitudeToDb(bandMagnitude);
+    }
+
+    state.lastDb.set(bandDb);
+    const horizontallySmoothed = applyHorizontalSmoothing(normalized, state.horizontallySmoothed);
+    for (let i = 0; i < webAudioOutputBandsPerChannel; i++) {
+        const target = horizontallySmoothed[i];
+        const current = state.smoothed[i];
+        state.smoothed[i] = target > current
+            ? current * 0.25 + target * 0.75
+            : current * 0.75 + target * 0.25;
+    }
+
+    return {
+        values: state.smoothed,
+        dbValues: state.lastDb,
+        rms,
+        framePeak,
+    };
 };
 
 class WebAudioVisualizerCapture {
     constructor(onFrame) {
         this._onFrame = onFrame;
         this._pipeline = null;
+        this._appsink = null;
         this._bus = null;
         this._busSignalIds = [];
+        this._pollSourceId = 0;
+        this._processingSourceId = 0;
         this._restartSourceId = 0;
         this._shouldRun = false;
         this._isAvailable = true;
         this._lastFrame = buildSilentWebAudioFrame();
+        this._workingFrame = buildSilentWebAudioFrame();
+        this._pendingInterleavedChunk = null;
+        this._pendingInterleavedFrameCount = 0;
+        this._leftSampleBuffer = new Float32Array(webAudioFftSize * 2);
+        this._rightSampleBuffer = new Float32Array(webAudioFftSize * 2);
+        this._leftProcessorState = createSpectrumProcessorState();
+        this._rightProcessorState = createSpectrumProcessorState();
+        this._emittedFrameCount = 0;
     }
 
     get currentFrame() {
@@ -623,7 +921,7 @@ class WebAudioVisualizerCapture {
         this._startPipeline();
     }
 
-    stop({emitSilence = true} = {}) {
+    stop({emitSilence = true, reason = 'unspecified'} = {}) {
         this._shouldRun = false;
         this._cancelRestart();
         this._teardownPipeline();
@@ -637,6 +935,16 @@ class WebAudioVisualizerCapture {
         this._onFrame = null;
     }
 
+    _resetSpectrumState() {
+        this._leftSampleBuffer.fill(0);
+        this._rightSampleBuffer.fill(0);
+        this._leftProcessorState = createSpectrumProcessorState();
+        this._rightProcessorState = createSpectrumProcessorState();
+        this._emittedFrameCount = 0;
+        this._pendingInterleavedChunk = null;
+        this._pendingInterleavedFrameCount = 0;
+    }
+
     _startPipeline() {
         if (!Gst.ElementFactory.find('pulsesrc')) {
             console.warn('Web audio visualizer capture unavailable: GStreamer pulsesrc plugin is missing');
@@ -645,8 +953,8 @@ class WebAudioVisualizerCapture {
             return;
         }
 
-        if (!Gst.ElementFactory.find('spectrum')) {
-            console.warn('Web audio visualizer capture unavailable: GStreamer spectrum plugin is missing');
+        if (!haveGstApp || !Gst.ElementFactory.find('appsink')) {
+            console.warn('Web audio visualizer capture unavailable: GStreamer appsink plugin is missing');
             this._isAvailable = false;
             this._emitFrame(buildSilentWebAudioFrame());
             return;
@@ -656,11 +964,8 @@ class WebAudioVisualizerCapture {
             this._pipeline = Gst.parse_launch(
                 'pulsesrc device=@DEFAULT_MONITOR@ client-name=HanabiVisualizer do-timestamp=true ! ' +
                 'audioconvert ! audioresample ! ' +
-                `audio/x-raw,channels=2,rate=48000 ! ` +
-                `spectrum bands=${webAudioBandsPerChannel} multi-channel=true post-messages=true ` +
-                'message-magnitude=true message-phase=false ' +
-                `interval=${webAudioUpdateIntervalNs} threshold=${webAudioSilenceThresholdDb} ! ` +
-                'fakesink sync=false'
+                `audio/x-raw,format=F32LE,channels=2,rate=${webAudioSampleRate} ! ` +
+                'appsink name=audio_sink emit-signals=false max-buffers=1 drop=true sync=false'
             );
         } catch (e) {
             console.warn(`Failed to create web audio visualizer pipeline: ${e}`);
@@ -668,12 +973,18 @@ class WebAudioVisualizerCapture {
             return;
         }
 
+        this._appsink = this._pipeline.get_by_name('audio_sink');
+        if (!this._appsink) {
+            console.warn('Web audio visualizer capture pipeline did not expose appsink');
+            this._scheduleRestart();
+            return;
+        }
+
+        this._resetSpectrumState();
+
         this._bus = this._pipeline.get_bus();
         this._bus.add_signal_watch();
         this._busSignalIds = [
-            this._bus.connect('message::element', (_bus, message) => {
-                this._handleElementMessage(message);
-            }),
             this._bus.connect('message::error', (_bus, message) => {
                 let details = '';
                 try {
@@ -697,37 +1008,121 @@ class WebAudioVisualizerCapture {
         if (stateChange === Gst.StateChangeReturn.FAILURE) {
             console.warn('Web audio visualizer pipeline failed to enter PLAYING state');
             this._scheduleRestart();
+        } else {
+            this._pollSourceId = GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                webAudioPollIntervalMs,
+                () => {
+                    try {
+                        this._pullLatestAudioSample();
+                    } catch (e) {
+                        console.warn(`Web audio visualizer polling failed: ${e}`);
+                    }
+                    return GLib.SOURCE_CONTINUE;
+                }
+            );
         }
     }
 
-    _handleElementMessage(message) {
-        const structure = message.get_structure?.();
-        if (!structure || structure.get_name() !== 'spectrum')
+    _pullLatestAudioSample() {
+        if (!this._appsink)
             return;
 
-        const magnitudesDb = parseSpectrumMagnitudeDbValues(structure.to_string());
-        if (magnitudesDb.length === 0)
+        const sample = this._appsink.emit('try-pull-sample', 0);
+        if (!sample)
             return;
 
-        const normalized = buildSilentWebAudioFrame();
-        if (magnitudesDb.length >= webAudioFrameLength) {
-            for (let i = 0; i < webAudioFrameLength; i++)
-                normalized[i] = normalizeSpectrumMagnitudeDb(magnitudesDb[i]);
-        } else {
-            const copyLength = Math.min(webAudioBandsPerChannel, magnitudesDb.length);
-            for (let i = 0; i < copyLength; i++) {
-                const value = normalizeSpectrumMagnitudeDb(magnitudesDb[i]);
-                normalized[i] = value;
-                normalized[i + webAudioBandsPerChannel] = value;
+        const buffer = sample.get_buffer?.();
+        if (!buffer)
+            return;
+
+        const [mapped, mapInfo] = buffer.map(Gst.MapFlags.READ);
+        if (!mapped || !mapInfo?.data || mapInfo.size < Float32Array.BYTES_PER_ELEMENT) {
+            if (mapped)
+                buffer.unmap(mapInfo);
+            return;
+        }
+
+        const interleaved = new Float32Array(
+            mapInfo.data.buffer,
+            mapInfo.data.byteOffset,
+            Math.floor(mapInfo.size / Float32Array.BYTES_PER_ELEMENT)
+        );
+        const frameCount = Math.floor(interleaved.length / 2);
+        const interleavedCopy = new Float32Array(frameCount * 2);
+        interleavedCopy.set(interleaved.subarray(0, frameCount * 2));
+        buffer.unmap(mapInfo);
+
+        this._pendingInterleavedChunk = interleavedCopy;
+        this._pendingInterleavedFrameCount = frameCount;
+        this._schedulePendingAudioProcessing();
+    }
+
+    _schedulePendingAudioProcessing() {
+        if (this._processingSourceId)
+            return;
+
+        this._processingSourceId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._processingSourceId = 0;
+            try {
+                this._processPendingAudioChunk();
+            } catch (e) {
+                console.warn(`Web audio visualizer processing failed: ${e}`);
             }
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _processPendingAudioChunk() {
+        const interleaved = this._pendingInterleavedChunk;
+        const frameCount = this._pendingInterleavedFrameCount;
+        this._pendingInterleavedChunk = null;
+        this._pendingInterleavedFrameCount = 0;
+        if (!(interleaved instanceof Float32Array) || frameCount <= 0)
+            return;
+
+        const startedAtUs = GLib.get_monotonic_time();
+        appendInterleavedStereoChunk(this._leftSampleBuffer, this._rightSampleBuffer, interleaved, frameCount);
+
+        const leftProcessed = processSpectrumFrame(this._leftSampleBuffer.subarray(this._leftSampleBuffer.length - webAudioFftSize), this._leftProcessorState);
+        const rightProcessed = processSpectrumFrame(this._rightSampleBuffer.subarray(this._rightSampleBuffer.length - webAudioFftSize), this._rightProcessorState);
+        const normalized = this._workingFrame;
+        for (let i = 0; i < webAudioOutputBandsPerChannel; i++) {
+            normalized[i] = leftProcessed.values[i];
+            normalized[i + webAudioOutputBandsPerChannel] = rightProcessed.values[i];
+        }
+
+        this._emittedFrameCount++;
+        if (shouldLogWebAudioFrame(this._emittedFrameCount)) {
+            const leftSceneLow16 = computeSceneLow16Pair(leftProcessed.values);
+            const rightSceneLow16 = computeSceneLow16Pair(rightProcessed.values);
+            const sceneLow16Average = computeSceneLow16Average(leftSceneLow16, rightSceneLow16);
+            const frameMax = normalized.reduce((max, value) => Math.max(max, Number(value) || 0), 0);
+            console.log(
+                `Web audio visualizer frame: rms(left/right)=${leftProcessed.rms.toFixed(4)}/${rightProcessed.rms.toFixed(4)} peak(left/right)=${leftProcessed.framePeak.toFixed(4)}/${rightProcessed.framePeak.toFixed(4)}`
+            );
+            console.log(
+                `HanabiScene audio samples: max=${frameMax.toFixed(4)} scene16-avg2ch=${sceneLow16Average.toFixed(4)} scene16-low(left/right)=${formatSpectrumPair(leftSceneLow16)}/${formatSpectrumPair(rightSceneLow16)} bands=${normalized.length}`
+            );
         }
 
         this._emitFrame(normalized);
+
+        const elapsedUs = GLib.get_monotonic_time() - startedAtUs;
+        if (elapsedUs >= webAudioSlowProcessingLogThresholdUs) {
+            console.warn(
+                `Web audio visualizer processing slow: ${(elapsedUs / 1000).toFixed(2)}ms frameCount=${frameCount} pollIntervalMs=${webAudioPollIntervalMs}`
+            );
+        }
+
+        if (this._pendingInterleavedChunk)
+            this._schedulePendingAudioProcessing();
     }
 
     _emitFrame(frame) {
-        this._lastFrame = [...frame];
-        this._onFrame?.(this.currentFrame);
+        const emittedFrame = [...frame];
+        this._lastFrame = emittedFrame;
+        this._onFrame?.(emittedFrame);
     }
 
     _scheduleRestart() {
@@ -756,6 +1151,19 @@ class WebAudioVisualizerCapture {
     }
 
     _teardownPipeline() {
+        if (this._pollSourceId) {
+            GLib.source_remove(this._pollSourceId);
+            this._pollSourceId = 0;
+        }
+
+        if (this._processingSourceId) {
+            GLib.source_remove(this._processingSourceId);
+            this._processingSourceId = 0;
+        }
+
+        this._pendingInterleavedChunk = null;
+        this._pendingInterleavedFrameCount = 0;
+
         if (this._bus) {
             this._busSignalIds.forEach(signalId => {
                 try {
@@ -772,11 +1180,15 @@ class WebAudioVisualizerCapture {
         }
 
         if (this._pipeline) {
-            try {
-                this._pipeline.set_state(Gst.State.NULL);
-            } catch (_e) {
-            }
+            const pipeline = this._pipeline;
             this._pipeline = null;
+            this._appsink = null;
+            try {
+                pipeline.set_state(Gst.State.NULL);
+                pipeline.get_state(Gst.SECOND);
+            } catch (e) {
+                console.warn(`Web audio visualizer pipeline stop wait failed: ${e}`);
+            }
         }
     }
 }
@@ -822,7 +1234,10 @@ const createBackend = RendererBackends.createBackendFactory({
     Gio,
     GLib,
     Gdk,
+    // gstcefsrc uses Soup for its local asset bridge, while the scene backend
+    // still needs GdkPixbuf for thumbnail decoding and serialization.
     Soup,
+    GdkPixbuf,
     Gst,
     GstPlay,
     GstAudio,
@@ -856,6 +1271,135 @@ const createBackend = RendererBackends.createBackendFactory({
     },
 });
 
+let deferredGarbageCollectionSourceId = 0;
+let rendererCssProvider = null;
+const detachedWallpaperWidgetReleases = new WeakSet();
+
+const disposeDetachedObject = object => {
+    if (!object)
+        return;
+
+    try {
+        object.run_dispose?.();
+    } catch (_e) {
+    }
+};
+
+const detachWallpaperChildWidget = (widget, childWidget) => {
+    if (!widget || !childWidget)
+        return;
+
+    let parent = null;
+    try {
+        parent = childWidget.get_parent?.() ?? null;
+    } catch (_e) {
+        return;
+    }
+
+    if (parent !== widget)
+        return;
+
+    try {
+        if ((widget.get_child?.() ?? null) === childWidget) {
+            widget.set_child?.(null);
+            return;
+        }
+    } catch (_e) {
+    }
+
+    try {
+        widget.remove_overlay?.(childWidget);
+    } catch (_e) {
+    }
+
+    try {
+        if ((childWidget.get_parent?.() ?? null) === widget)
+            widget.remove?.(childWidget);
+    } catch (_e) {
+    }
+};
+
+const releaseDetachedWallpaperWidget = widget => {
+    if (!widget)
+        return;
+
+    if (detachedWallpaperWidgetReleases.has(widget))
+        return;
+    detachedWallpaperWidgetReleases.add(widget);
+
+    const children = [];
+    let child = widget.get_first_child?.() ?? null;
+    while (child) {
+        children.push(child);
+        child = child.get_next_sibling?.() ?? null;
+    }
+
+    try {
+        widget.pause?.();
+    } catch (_e) {
+    }
+
+    try {
+        widget.set_paintable?.(null);
+    } catch (_e) {
+    }
+
+    try {
+        if ('paintable' in widget)
+            widget.paintable = null;
+    } catch (_e) {
+    }
+
+    children.forEach(childWidget => detachWallpaperChildWidget(widget, childWidget));
+    children.forEach(releaseDetachedWallpaperWidget);
+
+    disposeDetachedObject(widget);
+};
+
+const runGarbageCollection = () => {
+    try {
+        System.gc();
+    } catch (e) {
+        console.warn(`Failed to trigger GJS GC: ${e}`);
+    }
+
+    if (deferredGarbageCollectionSourceId)
+        return;
+
+    deferredGarbageCollectionSourceId = GLib.idle_add(
+        GLib.PRIORITY_DEFAULT_IDLE,
+        () => {
+            deferredGarbageCollectionSourceId = 0;
+            try {
+                System.gc();
+            } catch (e) {
+                console.warn(`Failed to trigger deferred GJS GC: ${e}`);
+            }
+            return GLib.SOURCE_REMOVE;
+        }
+    );
+};
+
+const ensureRendererCssProvider = () => {
+    if (rendererCssProvider)
+        return rendererCssProvider;
+
+    rendererCssProvider = new Gtk.CssProvider();
+    rendererCssProvider.load_from_file(
+        Gio.File.new_for_path(
+            GLib.build_filenamev([extensionDir, 'renderer', 'stylesheet.css'])
+        )
+    );
+
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(),
+        rendererCssProvider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
+
+    return rendererCssProvider;
+};
+
 
 const HanabiRenderer = GObject.registerClass(
     {
@@ -881,7 +1425,7 @@ const HanabiRenderer = GObject.registerClass(
             this._sceneUserPropertyReloadSourceId = 0;
             this._switchSerial = 0;
             this._nativeWindowHold = false;
-            this._webAudioBackends = new Set();
+            this._audioSampleBackends = new Set();
             this._webAudioCapture = new WebAudioVisualizerCapture(frame => {
                 this._broadcastWebAudioFrame(frame);
             });
@@ -921,6 +1465,10 @@ const HanabiRenderer = GObject.registerClass(
             });
 
             this.connect('shutdown', () => {
+                this._resetBackend();
+                this._unexportDbus();
+                this._webAudioCapture?.destroy();
+                this._webAudioCapture = null;
                 this._localMediaHttpServer = null;
             });
 
@@ -980,11 +1528,10 @@ const HanabiRenderer = GObject.registerClass(
                     this._pendingSwitch?.backend?.applyContentFit(contentFit);
                     break;
                 case UserPropertyStoreKey:
+                    // A single neutral key is authoritative for both backends;
+                    // any change can affect the active project's generated web
+                    // or scene payload, so reload the current project state.
                     userPropertyStore = settings.get_string(key);
-                    this._scheduleProjectUserPropertyStoreReload();
-                    break;
-                case LegacyWebUserPropertyStoreKey:
-                    userPropertyStore = migrateUserPropertyStoresInSettings(settings);
                     this._scheduleProjectUserPropertyStoreReload();
                     break;
                 case 'debug-mode':
@@ -1130,10 +1677,10 @@ const HanabiRenderer = GObject.registerClass(
         _switchToProject(nextProject) {
             this._cancelPendingSwitch();
 
-            const nextBackend = this._createBackend(nextProject);
             const previousBackend = this._backend;
 
             if (!previousBackend) {
+                const nextBackend = this._createBackend(nextProject);
                 this._project = nextProject;
                 this._backend = nextBackend;
                 this._syncApplicationHoldForBackend(this._backend);
@@ -1143,6 +1690,11 @@ const HanabiRenderer = GObject.registerClass(
                 console.log(`using ${this._backend.displayName} for ${this._getProjectLabel()}`);
                 return;
             }
+
+            if (this._reuseActiveBackendForProject(nextProject))
+                return;
+
+            const nextBackend = this._createBackend(nextProject);
 
             if (this._backendUsesNativeWindows(previousBackend) || this._backendUsesNativeWindows(nextBackend)) {
                 if (this._backendUsesNativeWindows(nextBackend))
@@ -1184,6 +1736,30 @@ const HanabiRenderer = GObject.registerClass(
                 readyTimeoutId,
             };
             nextBackend.waitUntilReady(() => this._completePendingSwitch(switchId));
+        }
+
+        _reuseActiveBackendForProject(nextProject) {
+            if (!this._backend?.canReuseForProject?.(nextProject))
+                return false;
+
+            if (!this._backend.switchProject?.(nextProject))
+                return false;
+
+            // Scene backends follow the KDE plugin's persistent item model: the
+            // Gtk window and native render target stay mounted while the current
+            // backend updates its SceneWallpaper source.  That means the normal
+            // crossfade path, which builds a second backend and second target, is
+            // skipped for scene-to-scene switches.
+            this._project = nextProject;
+            this._syncApplicationHoldForBackend(this._backend);
+            this._applyActiveBackendSettings(this._backend, this._project);
+            this.setAutoWallpaper();
+            this._hanabiWindows.forEach((window, index) => {
+                if (nohide)
+                    window.set_title(this._getWindowTitle(index));
+            });
+            console.log(`reusing ${this._backend.displayName} for ${this._getProjectLabel()}`);
+            return true;
         }
 
         _handleProjectUserPropertyStoreChanged() {
@@ -1258,6 +1834,9 @@ const HanabiRenderer = GObject.registerClass(
 
             this._cancelProjectUserPropertyStoreReload();
             this._cancelPendingSwitch();
+            this._webAudioCapture?.stop({emitSilence: false, reason: 'renderer-reset'});
+            this._audioSampleBackends.clear();
+            this._currentWebAudioFrame = buildSilentWebAudioFrame();
             this._destroyRendererWindows();
             this._backend?.destroy();
             this._backend = null;
@@ -1267,9 +1846,7 @@ const HanabiRenderer = GObject.registerClass(
 
             this._backendDestroySourceIds.forEach(sourceId => GLib.source_remove(sourceId));
             this._backendDestroySourceIds.clear();
-            this._webAudioCapture?.stop();
-            this._webAudioBackends.clear();
-            this._currentWebAudioFrame = buildSilentWebAudioFrame();
+            runGarbageCollection();
         }
 
         _cancelPendingSwitch() {
@@ -1282,6 +1859,7 @@ const HanabiRenderer = GObject.registerClass(
             this._pendingSwitch.backend.destroy();
             this._pendingSwitch = null;
             this._applyActiveBackendSettings(this._backend, this._project);
+            runGarbageCollection();
         }
 
         _completePendingSwitch(switchId) {
@@ -1339,10 +1917,11 @@ const HanabiRenderer = GObject.registerClass(
         _scheduleBackendDestroy(backend) {
             const sourceId = GLib.timeout_add(
                 GLib.PRIORITY_DEFAULT,
-                wallpaperSwitchTransitionCleanupDelayMs,
+                wallpaperSwitchTransitionCleanupDelayMs + 50,
                 () => {
                     this._backendDestroySourceIds.delete(sourceId);
                     backend.destroy();
+                    runGarbageCollection();
                     return GLib.SOURCE_REMOVE;
                 }
             );
@@ -1671,21 +2250,29 @@ const HanabiRenderer = GObject.registerClass(
                 this._setPlayingState(false);
         }
 
-        registerWebAudioBackend(backend) {
+        registerAudioSamplesBackend(backend) {
             if (!backend)
                 return;
 
-            this._webAudioBackends.add(backend);
+            this._audioSampleBackends.add(backend);
             backend.setAudioSamples?.(this._currentWebAudioFrame);
             this._updateWebAudioCaptureState();
         }
 
-        unregisterWebAudioBackend(backend) {
+        unregisterAudioSamplesBackend(backend) {
             if (!backend)
                 return;
 
-            this._webAudioBackends.delete(backend);
+            this._audioSampleBackends.delete(backend);
             this._updateWebAudioCaptureState();
+        }
+
+        registerWebAudioBackend(backend) {
+            this.registerAudioSamplesBackend(backend);
+        }
+
+        unregisterWebAudioBackend(backend) {
+            this.unregisterAudioSamplesBackend(backend);
         }
 
         getCurrentWebAudioFrame() {
@@ -1697,19 +2284,22 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _broadcastWebAudioFrame(frame) {
-            this._currentWebAudioFrame = [...frame];
-            this._webAudioBackends.forEach(backend => {
+            this._currentWebAudioFrame = Array.isArray(frame) ? frame : [...frame];
+            this._audioSampleBackends.forEach(backend => {
                 backend.setAudioSamples?.(this._currentWebAudioFrame);
             });
         }
 
         _updateWebAudioCaptureState() {
-            if (this._webAudioBackends.size > 0 && this._requestedPlaying) {
+            if (this._audioSampleBackends.size > 0 && this._requestedPlaying) {
                 this._webAudioCapture?.start();
                 return;
             }
 
-            this._webAudioCapture?.stop();
+            const reason = this._audioSampleBackends.size === 0
+                ? 'no-audio-backends'
+                : 'playback-paused';
+            this._webAudioCapture?.stop({reason});
         }
 
         setAutoWallpaper() {
@@ -1770,71 +2360,125 @@ const HanabiRendererWindow = GObject.registerClass(
     {
         GTypeName: 'HanabiRendererWindow',
     },
-    class HanabiRendererWindow extends Gtk.ApplicationWindow {
-        constructor(application, title, widget, gdkMonitor) {
-            super({
-                application,
-                decorated: !!nohide,
+	    class HanabiRendererWindow extends Gtk.ApplicationWindow {
+	        constructor(application, title, widget, gdkMonitor) {
+	            super({
+	                application,
+	                decorated: !!nohide,
                 default_height: windowDimension.height,
                 default_width: windowDimension.width,
-                title,
-            });
-            this._gdkMonitor = gdkMonitor;
-            this._wallpaperOverlay = new Gtk.Overlay({
-                hexpand: true,
-                vexpand: true,
-                halign: Gtk.Align.FILL,
+	                title,
+	            });
+	            this._gdkMonitor = gdkMonitor;
+	            this._windowTitleForLog = title;
+	            this._wallpaperOverlay = new Gtk.Overlay({
+	                hexpand: true,
+	                vexpand: true,
+	                halign: Gtk.Align.FILL,
                 valign: Gtk.Align.FILL,
             });
             this._transitionRevealer = null;
             this._transitionCleanupId = 0;
             this._transitionCommitted = false;
 
-            // Load CSS with custom style
-            let cssProvider = new Gtk.CssProvider();
-            cssProvider.load_from_file(
-                Gio.File.new_for_path(
-                    GLib.build_filenamev([extensionDir, 'renderer', 'stylesheet.css'])
-                )
-            );
+	            // Load CSS with custom style
+	            ensureRendererCssProvider();
 
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                cssProvider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            );
-
-            super.set_child(this._wallpaperOverlay);
-            this.setWallpaperWidget(widget);
-            if (!windowed) {
-                // In extension mode (nohide=false), fullscreen may transiently mark the
-                // renderer as the active fullscreen window during login and hide/cover
-                // panel or dock before shell-side management catches up.
+	            super.set_child(this._wallpaperOverlay);
+	            this._logWindowGeometry('construct-before-child', widget);
+	            this.setWallpaperWidget(widget);
+	            if (!windowed) {
+	                // In extension mode (nohide=false), fullscreen may transiently mark the
+	                // renderer as the active fullscreen window during login and hide/cover
+	                // panel or dock before shell-side management catches up.
                 if (fullscreened && nohide) {
                     this.fullscreen_on_monitor(this._gdkMonitor);
                 } else {
                     let geometry = this._gdkMonitor.get_geometry();
-                    let [width, height] = [geometry.width, geometry.height];
-                    this.set_size_request(width, height);
-                }
-            }
-        }
+	                    let [width, height] = [geometry.width, geometry.height];
+	                    this.set_size_request(width, height);
+	                }
+	            }
+	            this._logWindowGeometry('construct-after-layout');
+	            this._queueWindowGeometryLog('construct-idle');
+	            this.connect('map', () => {
+	                this._logWindowGeometry('window-map');
+	                this._queueWindowGeometryLog('window-map-idle');
+	            });
+	        }
 
-        setWallpaperWidget(widget) {
-            this._prepareWallpaperWidget(widget);
-            this._discardWallpaperTransition();
-            this._wallpaperOverlay.set_child(widget);
-        }
+	        _describeMonitorForLog() {
+	            const geometry = this._gdkMonitor?.get_geometry?.() ?? null;
+	            if (!geometry)
+	                return 'monitor=n/a monitor-aspect=n/a monitor-scale=n/a';
 
-        stageWallpaperWidget(widget) {
+	            return `monitor=${geometry.x},${geometry.y} ${geometry.width}x${geometry.height} ` +
+	                `monitor-aspect=${formatRendererAspect(geometry.width, geometry.height)} ` +
+	                `monitor-scale=${this._gdkMonitor.get_scale_factor?.() ?? 'n/a'}`;
+	        }
+
+	        _describeWidgetForLog(label, widget) {
+	            if (!widget)
+	                return `${label}=n/a`;
+
+	            const width = widget.get_width?.() ?? 'n/a';
+	            const height = widget.get_height?.() ?? 'n/a';
+	            const scale = widget.get_scale_factor?.() ?? 'n/a';
+	            return `${label}=${width}x${height} ${label}-aspect=${formatRendererAspect(width, height)} ${label}-scale=${scale}`;
+	        }
+
+	        _logWindowGeometry(phase, candidateWidget = null) {
+	            const child = this._wallpaperOverlay?.get_child?.() ?? candidateWidget;
+	            // This diagnostic sits after the backend texture has been handed to GTK.
+	            // If the whole scene looks horizontally compressed while native render
+	            // targets report the expected aspect, the window/overlay/child sizes here
+	            // show whether GTK is stretching the final presentation widget.
+	            console.log(
+	                `HanabiRenderer geometry: phase=${phase} title='${this._windowTitleForLog}' ` +
+	                `windowed=${windowed} fullscreened=${fullscreened} nohide=${nohide} ` +
+	                `default=${windowDimension.width}x${windowDimension.height} ` +
+	                `window=${this.get_width?.() ?? 'n/a'}x${this.get_height?.() ?? 'n/a'} ` +
+	                `window-aspect=${formatRendererAspect(this.get_width?.() ?? NaN, this.get_height?.() ?? NaN)} ` +
+	                `${this._describeMonitorForLog()} ` +
+	                `${this._describeWidgetForLog('overlay', this._wallpaperOverlay)} ` +
+	                `${this._describeWidgetForLog('child', child)}`
+	            );
+	        }
+
+	        _queueWindowGeometryLog(phase) {
+	            // GTK computes the first non-zero allocations asynchronously.  The idle
+	            // pass captures the dimensions after layout has settled for the current
+	            // frame, which is where a presentation-only aspect error becomes visible.
+	            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+	                if (this._wallpaperOverlay)
+	                    this._logWindowGeometry(phase);
+
+	                return GLib.SOURCE_REMOVE;
+	            });
+	        }
+
+	        setWallpaperWidget(widget) {
+	            this._prepareWallpaperWidget(widget);
+	            const previousWidget = this._wallpaperOverlay.get_child();
+	            this._discardWallpaperTransition();
+	            this._wallpaperOverlay.set_child(widget);
+	            this._logWindowGeometry('set-wallpaper-widget', widget);
+	            this._queueWindowGeometryLog('set-wallpaper-widget-idle');
+	            if (previousWidget && previousWidget !== widget)
+	                releaseDetachedWallpaperWidget(previousWidget);
+	        }
+
+	        stageWallpaperWidget(widget) {
             this._prepareWallpaperWidget(widget);
 
             const previousWidget = this._wallpaperOverlay.get_child();
-            this.cancelWallpaperTransition();
-            this._wallpaperOverlay.set_child(widget);
+	            this.cancelWallpaperTransition();
+	            this._wallpaperOverlay.set_child(widget);
+	            this._logWindowGeometry('stage-wallpaper-widget', widget);
+	            this._queueWindowGeometryLog('stage-wallpaper-widget-idle');
 
-            if (!previousWidget)
-                return;
+	            if (!previousWidget)
+	                return;
 
             const revealer = new Gtk.Revealer({
                 hexpand: true,
@@ -1868,7 +2512,8 @@ const HanabiRendererWindow = GObject.registerClass(
                 GLib.PRIORITY_DEFAULT,
                 wallpaperSwitchTransitionCleanupDelayMs,
                 () => {
-                    this._discardWallpaperTransition();
+                    const discardedWidget = this._discardWallpaperTransition();
+                    releaseDetachedWallpaperWidget(discardedWidget);
                     return GLib.SOURCE_REMOVE;
                 }
             );
@@ -1879,9 +2524,37 @@ const HanabiRendererWindow = GObject.registerClass(
                 return;
 
             const previousWidget = this._transitionCommitted ? null : this._transitionRevealer.get_child();
-            this._discardWallpaperTransition();
+            const discardedWidget = this._transitionCommitted ? null : this._wallpaperOverlay.get_child();
+            const detachedTransitionWidget = this._discardWallpaperTransition();
             if (previousWidget)
                 this._wallpaperOverlay.set_child(previousWidget);
+            if (discardedWidget && discardedWidget !== previousWidget)
+                releaseDetachedWallpaperWidget(discardedWidget);
+            if (detachedTransitionWidget && detachedTransitionWidget !== previousWidget)
+                releaseDetachedWallpaperWidget(detachedTransitionWidget);
+        }
+
+        destroyWindow() {
+            this.cancelWallpaperTransition();
+
+            const currentWidget = this._wallpaperOverlay?.get_child?.() ?? null;
+            if (currentWidget) {
+                try {
+                    this._wallpaperOverlay.set_child(null);
+                } catch (_e) {
+                }
+                releaseDetachedWallpaperWidget(currentWidget);
+            }
+
+            const detachedTransitionWidget = this._discardWallpaperTransition();
+            releaseDetachedWallpaperWidget(detachedTransitionWidget);
+
+            try {
+                super.set_child(null);
+            } catch (_e) {
+            }
+
+            this.destroy();
         }
 
         _prepareWallpaperWidget(widget) {
@@ -1894,18 +2567,21 @@ const HanabiRendererWindow = GObject.registerClass(
         }
 
         _discardWallpaperTransition() {
+            let detachedWidget = null;
             if (this._transitionCleanupId) {
                 GLib.source_remove(this._transitionCleanupId);
                 this._transitionCleanupId = 0;
             }
 
             if (this._transitionRevealer) {
+                detachedWidget = this._transitionRevealer.get_child();
                 this._transitionRevealer.set_child(null);
                 this._wallpaperOverlay.remove_overlay(this._transitionRevealer);
                 this._transitionRevealer = null;
             }
 
             this._transitionCommitted = false;
+            return detachedWidget;
         }
     }
 );

@@ -14,7 +14,6 @@ import {
     ProjectContentRatings,
     ScenePropertyType,
     UserPropertyStoreKey,
-    LegacyWebUserPropertyStoreKey,
     areScenePropertyValuesEqual,
     buildScenePropertyValueMap,
     getProjectFilterTagOptions,
@@ -24,7 +23,7 @@ import {
     isScenePropertyVisible,
     listProjects,
     loadProject,
-    mergeStoredScenePropertyOverrides,
+    normalizeLibraryRootPath,
     normalizeScenePropertyValue,
     projectMatchesFilter,
     serializeStoredScenePropertyOverrides,
@@ -35,8 +34,20 @@ import {
 import {connectTracked} from './rows.js';
 
 const haveContentFit = Gtk.get_minor_version() >= 8;
-const PROJECT_CARD_WIDTH = 180;
-const PROJECT_FLOWBOX_COLUMN_SPACING = 12;
+// The Browse grid uses compact square thumbnails so more wallpapers remain
+// visible at once, while zero child spacing removes the gutter between adjacent
+// preview cards instead of leaving GTK's default gallery-style breathing room.
+const PROJECT_CARD_WIDTH = 160;
+const PROJECT_FLOWBOX_ITEM_SPACING = 0;
+// GTK reports mouse buttons as numeric event values; naming the two buttons we
+// care about keeps card activation and thumbnail context-menu handling from
+// accidentally sharing the same all-buttons gesture.
+const PROJECT_CARD_PRIMARY_BUTTON = 1;
+const PROJECT_CARD_SECONDARY_BUTTON = 3;
+// Thumbnail work is deliberately capped so opening Browse only creates cheap
+// placeholder widgets on the main thread, while disk reads and pixbuf decoding
+// are allowed to complete in a small background stream instead of stampeding.
+const PROJECT_THUMBNAIL_CONCURRENCY = 3;
 const SCENE_PROPERTY_PANEL_WIDTH = 360;
 const INSPECTOR_ROW_HORIZONTAL_MARGIN = 24;
 const INSPECTOR_ROW_CONTROL_SPACING = 12;
@@ -58,12 +69,12 @@ export function formatProjectSubtitle(path) {
 }
 
 export function formatLibrarySubtitle(path) {
-    return path || _('None');
+    return normalizeLibraryRootPath(path) || _('None');
 }
 
 export function prefsRowLibraryPath(window, prefsGroup) {
     const settings = window._settings;
-    const title = _('Wallpaper Library');
+    const title = _('Steam Library');
     const key = 'change-wallpaper-directory-path';
 
     let path = settings.get_string(key);
@@ -75,7 +86,7 @@ export function prefsRowLibraryPath(window, prefsGroup) {
 
     function createDialog() {
         let fileChooser = new Gtk.FileChooserDialog({
-            title: _('Select Wallpaper Library'),
+            title: _('Select Steam Library'),
             action: Gtk.FileChooserAction.SELECT_FOLDER,
         });
         fileChooser.set_modal(true);
@@ -85,7 +96,7 @@ export function prefsRowLibraryPath(window, prefsGroup) {
 
         fileChooser.connect('response', (dialog, responseId) => {
             if (responseId === Gtk.ResponseType.ACCEPT) {
-                let _path = dialog.get_file().get_path();
+                let _path = normalizeLibraryRootPath(dialog.get_file().get_path());
                 settings.set_string(key, _path);
                 row.subtitle = formatLibrarySubtitle(_path);
             }
@@ -108,7 +119,13 @@ export function prefsRowLibraryPath(window, prefsGroup) {
     });
 
     connectTracked(window, settings, `changed::${key}`, () => {
-        row.subtitle = formatLibrarySubtitle(settings.get_string(key));
+        const path = settings.get_string(key);
+        const normalized = normalizeLibraryRootPath(path);
+        if (normalized !== path) {
+            settings.set_string(key, normalized);
+            return;
+        }
+        row.subtitle = formatLibrarySubtitle(normalized);
     });
 }
 
@@ -122,35 +139,28 @@ function buildProjectSearchText(project) {
     ].join(' ').toLowerCase();
 }
 
-function mergeUserPropertyStoresFromSettings(settings) {
-    return serializeStoredScenePropertyOverrides(
-        mergeStoredScenePropertyOverrides(
-            settings.get_string(UserPropertyStoreKey),
-            settings.get_string(LegacyWebUserPropertyStoreKey)
-        )
-    );
-}
-
-function migrateUserPropertyStoresInSettings(settings) {
-    const mergedStore = mergeUserPropertyStoresFromSettings(settings);
-    if (settings.get_string(UserPropertyStoreKey) !== mergedStore)
-        settings.set_string(UserPropertyStoreKey, mergedStore);
-    if (settings.get_string(LegacyWebUserPropertyStoreKey) !== '')
-        settings.set_string(LegacyWebUserPropertyStoreKey, '');
-    return mergedStore;
+function getUserPropertyStoreFromSettings(settings) {
+    // The preferences UI reads the same neutral key that the renderer watches,
+    // keeping web and scene overrides synchronized without any backend-specific
+    // compatibility store or migration branch.
+    return settings.get_string(UserPropertyStoreKey);
 }
 
 function getProjectPropertyOverrides(settings, project) {
+    const userPropertyStore = getUserPropertyStoreFromSettings(settings);
     if (project?.type === 'web')
-        return getProjectWebPropertyOverrides(settings.get_string(UserPropertyStoreKey), project);
-    return getProjectScenePropertyOverrides(settings.get_string(UserPropertyStoreKey), project);
+        return getProjectWebPropertyOverrides(userPropertyStore, project);
+    return getProjectScenePropertyOverrides(userPropertyStore, project);
 }
 
 function setProjectPropertyOverrides(settings, project, overrides) {
+    const userPropertyStore = getUserPropertyStoreFromSettings(settings);
     const nextStore = project?.type === 'web'
-        ? setProjectWebPropertyOverrides(settings.get_string(UserPropertyStoreKey), project, overrides)
-        : setProjectScenePropertyOverrides(settings.get_string(UserPropertyStoreKey), project, overrides);
+        ? setProjectWebPropertyOverrides(userPropertyStore, project, overrides)
+        : setProjectScenePropertyOverrides(userPropertyStore, project, overrides);
 
+    // Persist the complete shared JSON store after backend-specific value
+    // normalization so both web and scene project payloads resolve from one key.
     settings.set_string(
         UserPropertyStoreKey,
         serializeStoredScenePropertyOverrides(nextStore)
@@ -158,129 +168,379 @@ function setProjectPropertyOverrides(settings, project, overrides) {
     return getProjectPropertyOverrides(settings, project);
 }
 
-function createProjectPreview(project) {
-    if (!project.previewPath) {
-        const placeholder = new Gtk.Box({
-            hexpand: false,
-            vexpand: false,
-            css_classes: ['card'],
+function isPreviewLoadCancelled(error) {
+    // GIO reports user-driven dialog teardown and per-widget destruction as a
+    // normal cancellation error; filtering it keeps diagnostics focused on real
+    // decode or filesystem failures that still need investigation.
+    return error?.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED) ?? false;
+}
+
+function readProjectPreviewStreamAsync(path, cancellable) {
+    const file = Gio.File.new_for_path(path);
+    return new Promise((resolve, reject) => {
+        file.read_async(GLib.PRIORITY_LOW, cancellable, (source, result) => {
+            try {
+                resolve(source.read_finish(result));
+            } catch (e) {
+                reject(e);
+            }
         });
-        placeholder.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
-        return placeholder;
-    }
+    });
+}
 
-    if (project.previewPath.toLowerCase().endsWith('.gif'))
-        return createAnimatedProjectPreview(project.previewPath);
+function closePreviewStreamQuietlyAsync(stream) {
+    if (!stream)
+        return Promise.resolve();
 
+    return new Promise(resolve => {
+        // The thumbnail queue owns short-lived file streams, so close errors are
+        // logged only by the load operation itself; failing to close an already
+        // cancelled stream should not turn a harmless Browse close into noise.
+        stream.close_async(GLib.PRIORITY_LOW, null, (source, result) => {
+            try {
+                source.close_finish(result);
+            } catch (_e) {
+            }
+            resolve();
+        });
+    });
+}
+
+async function loadProjectPreviewPixbufAsync(path, cancellable) {
+    let stream = null;
     try {
-        const pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-            project.previewPath,
-            PROJECT_CARD_WIDTH,
-            PROJECT_CARD_WIDTH,
-            true
-        );
-        const texture = Gdk.Texture.new_for_pixbuf(pixbuf);
-        const picture = new Gtk.Picture({
-            paintable: texture,
-            hexpand: false,
-            vexpand: false,
-            can_shrink: true,
+        stream = await readProjectPreviewStreamAsync(path, cancellable);
+        return await new Promise((resolve, reject) => {
+            // GdkPixbuf performs the expensive image decode asynchronously here,
+            // which is the critical part that used to block the Browse dialog
+            // while every project card was being created.
+            GdkPixbuf.Pixbuf.new_from_stream_at_scale_async(
+                stream,
+                PROJECT_CARD_WIDTH,
+                PROJECT_CARD_WIDTH,
+                true,
+                cancellable,
+                (_source, result) => {
+                    try {
+                        resolve(GdkPixbuf.Pixbuf.new_from_stream_finish(result));
+                    } catch (e) {
+                        reject(e);
+                    }
+                }
+            );
         });
-        picture.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
-        if (haveContentFit)
-            picture.set_content_fit(Gtk.ContentFit.COVER);
-        return picture;
-    } catch (_e) {
-        const picture = Gtk.Picture.new_for_file(Gio.File.new_for_path(project.previewPath));
-        picture.set({
-            hexpand: false,
-            vexpand: false,
-            can_shrink: true,
-        });
-        picture.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
-        if (haveContentFit)
-            picture.set_content_fit(Gtk.ContentFit.COVER);
-        return picture;
+    } finally {
+        await closePreviewStreamQuietlyAsync(stream);
     }
 }
 
-function createAnimatedProjectPreview(path) {
-    const image = new Gtk.Picture({
+async function loadProjectPreviewAnimationAsync(path, cancellable) {
+    let stream = null;
+    try {
+        stream = await readProjectPreviewStreamAsync(path, cancellable);
+        return await new Promise((resolve, reject) => {
+            // GIF previews still keep their animation support, but the animation
+            // container is opened asynchronously so large workshop libraries do
+            // not freeze preferences while the first frame is decoded.
+            GdkPixbuf.PixbufAnimation.new_from_stream_async(
+                stream,
+                cancellable,
+                (_source, result) => {
+                    try {
+                        resolve(GdkPixbuf.PixbufAnimation.new_from_stream_finish(result));
+                    } catch (e) {
+                        reject(e);
+                    }
+                }
+            );
+        });
+    } finally {
+        await closePreviewStreamQuietlyAsync(stream);
+    }
+}
+
+function createProjectPreviewLoadQueue() {
+    const queue = [];
+    const activeJobs = new Set();
+    let activeCount = 0;
+    let idleId = 0;
+    let destroyed = false;
+
+    const cancelJob = job => {
+        job.cancelled = true;
+        job.cancellable.cancel();
+    };
+
+    const schedule = () => {
+        if (destroyed || idleId)
+            return;
+
+        // Loading begins from an idle handler so the dialog has a chance to map
+        // and paint its initial placeholder grid before thumbnail work consumes
+        // background IO slots.
+        idleId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            idleId = 0;
+            pump();
+            return GLib.SOURCE_REMOVE;
+        });
+    };
+
+    const finishJob = job => {
+        activeJobs.delete(job);
+        activeCount = Math.max(0, activeCount - 1);
+        schedule();
+    };
+
+    function pump() {
+        while (!destroyed && activeCount < PROJECT_THUMBNAIL_CONCURRENCY && queue.length > 0) {
+            const job = queue.shift();
+            if (job.cancelled)
+                continue;
+
+            activeCount++;
+            activeJobs.add(job);
+            Promise.resolve()
+                .then(() => job.run(job.cancellable))
+                .catch(error => {
+                    if (!job.cancelled && !isPreviewLoadCancelled(error))
+                        console.warn(`Hanabi preferences: thumbnail queue job failed: ${error}`);
+                })
+                .finally(() => finishJob(job));
+        }
+    }
+
+    return {
+        enqueue(run) {
+            const job = {
+                run,
+                cancellable: new Gio.Cancellable(),
+                cancelled: false,
+            };
+            queue.push(job);
+            schedule();
+            return () => cancelJob(job);
+        },
+        destroy() {
+            destroyed = true;
+            if (idleId) {
+                GLib.source_remove(idleId);
+                idleId = 0;
+            }
+            queue.splice(0).forEach(cancelJob);
+            activeJobs.forEach(cancelJob);
+        },
+    };
+}
+
+function createProjectPreviewFrame() {
+    const frame = new Gtk.Overlay({
+        hexpand: false,
+        vexpand: false,
+    });
+    frame.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
+
+    const placeholder = new Gtk.Box({
+        hexpand: false,
+        vexpand: false,
+        css_classes: ['card'],
+    });
+    placeholder.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
+    frame.set_child(placeholder);
+
+    const picture = new Gtk.Picture({
         hexpand: false,
         vexpand: false,
         can_shrink: true,
+        visible: false,
     });
-    image.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
+    picture.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
     if (haveContentFit)
-        image.set_content_fit(Gtk.ContentFit.COVER);
+        picture.set_content_fit(Gtk.ContentFit.COVER);
+    frame.add_overlay(picture);
 
-    try {
-        const animation = GdkPixbuf.PixbufAnimation.new_from_file(path);
-        const iter = animation.get_iter(null);
-        const frameTextures = new Map();
-        let timerId = 0;
-        let destroyed = false;
+    const spinner = new Gtk.Spinner({
+        spinning: false,
+        halign: Gtk.Align.CENTER,
+        valign: Gtk.Align.CENTER,
+        visible: false,
+    });
+    frame.add_overlay(spinner);
 
-        const updateFrame = () => {
-            if (destroyed)
-                return GLib.SOURCE_REMOVE;
-
-            const pixbuf = iter.get_pixbuf();
-            if (pixbuf) {
-                let texture = frameTextures.get(pixbuf);
-                if (!texture) {
-                    const scaled = pixbuf.scale_simple(
-                        PROJECT_CARD_WIDTH,
-                        PROJECT_CARD_WIDTH,
-                        GdkPixbuf.InterpType.BILINEAR
-                    ) ?? pixbuf;
-                    texture = Gdk.Texture.new_for_pixbuf(scaled);
-                    frameTextures.set(pixbuf, texture);
-                }
-                image.set_paintable(texture);
-            }
-
-            const delay = Math.max(iter.get_delay_time(), 16);
-            timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
-                if (destroyed) {
-                    timerId = 0;
-                    return GLib.SOURCE_REMOVE;
-                }
-
-                timerId = 0;
-                iter.advance(null);
-                return updateFrame();
-            });
-            return GLib.SOURCE_REMOVE;
-        };
-
-        updateFrame();
-        image.connect('destroy', () => {
-            destroyed = true;
-            if (timerId) {
-                GLib.source_remove(timerId);
-                timerId = 0;
-            }
-            frameTextures.clear();
-            image.set_paintable(null);
-        });
-    } catch (_e) {
-        const picture = Gtk.Picture.new_for_file(Gio.File.new_for_path(path));
-        picture.set({
-            hexpand: false,
-            vexpand: false,
-            can_shrink: true,
-        });
-        picture.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
-        if (haveContentFit)
-            picture.set_content_fit(Gtk.ContentFit.COVER);
-        return picture;
-    }
-
-    return image;
+    return {frame, picture, spinner};
 }
 
-function createProjectCard(project, onActivate) {
+function attachAnimatedProjectPreview(picture, animation, isCancelled) {
+    const iter = animation.get_iter(null);
+    const frameTextures = new Map();
+    let timerId = 0;
+
+    const updateFrame = () => {
+        if (isCancelled())
+            return GLib.SOURCE_REMOVE;
+
+        const pixbuf = iter.get_pixbuf();
+        if (pixbuf) {
+            let texture = frameTextures.get(pixbuf);
+            if (!texture) {
+                // Each GIF frame is scaled once and cached as a texture; this
+                // keeps animation playback cheap after the asynchronous open has
+                // delivered the first decoded frame to the preview widget.
+                const scaled = pixbuf.scale_simple(
+                    PROJECT_CARD_WIDTH,
+                    PROJECT_CARD_WIDTH,
+                    GdkPixbuf.InterpType.BILINEAR
+                ) ?? pixbuf;
+                texture = Gdk.Texture.new_for_pixbuf(scaled);
+                frameTextures.set(pixbuf, texture);
+            }
+            picture.set_paintable(texture);
+        }
+
+        const delay = iter.get_delay_time();
+        if (delay < 0)
+            return GLib.SOURCE_REMOVE;
+
+        timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.max(delay, 16), () => {
+            timerId = 0;
+            if (isCancelled())
+                return GLib.SOURCE_REMOVE;
+
+            iter.advance(null);
+            return updateFrame();
+        });
+        return GLib.SOURCE_REMOVE;
+    };
+
+    updateFrame();
+    return () => {
+        if (timerId) {
+            GLib.source_remove(timerId);
+            timerId = 0;
+        }
+        frameTextures.clear();
+        picture.set_paintable(null);
+    };
+}
+
+function createProjectPreview(project, previewQueue) {
+    const {frame, picture, spinner} = createProjectPreviewFrame();
+    if (!project.previewPath || !previewQueue)
+        return frame;
+
+    let destroyed = false;
+    let cancelLoad = null;
+    let stopAnimation = null;
+    const path = project.previewPath;
+    const isGif = path.toLowerCase().endsWith('.gif');
+
+    const finishLoading = () => {
+        spinner.spinning = false;
+        spinner.visible = false;
+    };
+
+    const failLoading = error => {
+        if (destroyed)
+            return;
+
+        finishLoading();
+        if (!isPreviewLoadCancelled(error))
+            console.warn(`Hanabi preferences: failed to load wallpaper thumbnail "${path}": ${error}`);
+    };
+
+    spinner.visible = true;
+    spinner.spinning = true;
+    cancelLoad = previewQueue.enqueue(async cancellable => {
+        try {
+            if (isGif) {
+                const animation = await loadProjectPreviewAnimationAsync(path, cancellable);
+                if (destroyed || cancellable.is_cancelled())
+                    return;
+
+                stopAnimation = attachAnimatedProjectPreview(picture, animation, () => destroyed || cancellable.is_cancelled());
+                picture.visible = true;
+                finishLoading();
+                return;
+            }
+
+            const pixbuf = await loadProjectPreviewPixbufAsync(path, cancellable);
+            if (destroyed || cancellable.is_cancelled())
+                return;
+
+            picture.set_paintable(Gdk.Texture.new_for_pixbuf(pixbuf));
+            picture.visible = true;
+            finishLoading();
+        } catch (error) {
+            failLoading(error);
+        }
+    });
+
+    frame.connect('destroy', () => {
+        destroyed = true;
+        cancelLoad?.();
+        stopAnimation?.();
+        finishLoading();
+    });
+
+    return frame;
+}
+
+function openProjectDirectory(project) {
+    const path = project?.path;
+    if (!path) {
+        console.warn('Hanabi preferences: cannot open wallpaper folder because the project path is empty');
+        return;
+    }
+
+    // Launch the project directory URI through GIO instead of shelling out so
+    // the desktop chooses the user's configured file manager and reports real
+    // launch failures back through the async finish callback.
+    const uri = Gio.File.new_for_path(path).get_uri();
+    try {
+        Gio.AppInfo.launch_default_for_uri_async(uri, null, null, (_source, result) => {
+            try {
+                Gio.AppInfo.launch_default_for_uri_finish(result);
+            } catch (error) {
+                console.warn(`Hanabi preferences: failed to open wallpaper folder "${path}": ${error}`);
+            }
+        });
+    } catch (error) {
+        console.warn(`Hanabi preferences: failed to open wallpaper folder "${path}": ${error}`);
+    }
+}
+
+function attachProjectPreviewContextMenu(preview, project) {
+    const actions = new Gio.SimpleActionGroup();
+    const openFolderAction = new Gio.SimpleAction({name: 'open-folder'});
+    openFolderAction.connect('activate', () => openProjectDirectory(project));
+    actions.add_action(openFolderAction);
+    preview.insert_action_group('thumbnail', actions);
+
+    const menu = new Gio.Menu();
+    menu.append(_('Open Wallpaper Folder'), 'thumbnail.open-folder');
+
+    // The popover is parented to the thumbnail widget so the menu is only
+    // available from right-clicking the preview image, not the title/subtitle
+    // labels below the card.
+    const popover = Gtk.PopoverMenu.new_from_model(menu);
+    popover.set_parent(preview);
+    preview.connect('destroy', () => popover.unparent());
+
+    const contextGesture = new Gtk.GestureClick({button: PROJECT_CARD_SECONDARY_BUTTON});
+    contextGesture.connect('pressed', (_gesture, _nPress, x, y) => {
+        // Pointing the popover at the click position makes the context menu feel
+        // anchored to the exact thumbnail spot the user right-clicked.
+        popover.set_pointing_to(new Gdk.Rectangle({
+            x: Math.round(x),
+            y: Math.round(y),
+            width: 1,
+            height: 1,
+        }));
+        popover.popup();
+    });
+    preview.add_controller(contextGesture);
+}
+
+function createProjectCard(project, onActivate, previewQueue) {
     const titleText = typeof project.title === 'string' && project.title !== ''
         ? project.title
         : (project.basename || _('Untitled'));
@@ -295,12 +555,13 @@ function createProjectCard(project, onActivate) {
         tooltip_text: project.path,
     });
 
-    const preview = createProjectPreview(project);
+    const preview = createProjectPreview(project, previewQueue);
     preview.set({
         hexpand: false,
         vexpand: false,
     });
     preview.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
+    attachProjectPreviewContextMenu(preview, project);
 
     const subtitleParts = [project.type || _('Unknown')];
     if (project.tags?.length)
@@ -328,7 +589,9 @@ function createProjectCard(project, onActivate) {
     root.append(title);
     root.append(subtitle);
 
-    const gesture = new Gtk.GestureClick({button: 0});
+    // Keep selection on the primary button only, leaving the secondary button
+    // free for thumbnail context-menu actions without also activating the card.
+    const gesture = new Gtk.GestureClick({button: PROJECT_CARD_PRIMARY_BUTTON});
     gesture.connect('released', () => onActivate(project));
     root.add_controller(gesture);
 
@@ -590,8 +853,6 @@ function getStepDigits(step) {
 }
 
 function createProjectBrowserDialog(window, settings) {
-    migrateUserPropertyStoresInSettings(settings);
-
     const currentProjectKey = 'project-path';
     const libraryKey = 'change-wallpaper-directory-path';
     const filterStateKey = ProjectBrowserFilterKey.STATE;
@@ -722,17 +983,20 @@ function createProjectBrowserDialog(window, settings) {
     });
     const flowBox = new Gtk.FlowBox({
         selection_mode: Gtk.SelectionMode.NONE,
-        column_spacing: PROJECT_FLOWBOX_COLUMN_SPACING,
-        row_spacing: 12,
+        column_spacing: PROJECT_FLOWBOX_ITEM_SPACING,
+        row_spacing: PROJECT_FLOWBOX_ITEM_SPACING,
         min_children_per_line: 1,
         max_children_per_line: 6,
         hexpand: true,
         valign: Gtk.Align.START,
         homogeneous: false,
-        margin_top: 4,
-        margin_bottom: 4,
-        margin_start: 4,
-        margin_end: 4,
+        // Keep the outer edge gap matched to the internal gap so the compact
+        // wallpaper grid has no leftover border padding around the first or
+        // last preview card.
+        margin_top: PROJECT_FLOWBOX_ITEM_SPACING,
+        margin_bottom: PROJECT_FLOWBOX_ITEM_SPACING,
+        margin_start: PROJECT_FLOWBOX_ITEM_SPACING,
+        margin_end: PROJECT_FLOWBOX_ITEM_SPACING,
     });
     flowBox.set_homogeneous(false);
     flowBox.set_selection_mode(Gtk.SelectionMode.NONE);
@@ -801,12 +1065,18 @@ function createProjectBrowserDialog(window, settings) {
     let inspectorSections = [];
     const sceneImageSession = new Soup.Session();
     const cards = [];
+    // The Browse dialog owns one thumbnail queue. Destroying the dialog cancels
+    // pending preview IO and prevents late async callbacks from touching widgets
+    // that GTK has already removed from the preferences window.
+    const previewQueue = createProjectPreviewLoadQueue();
     let syncingFilterControls = false;
     const filterControls = {
         type: new Map(),
         contentrating: new Map(),
         tags: new Map(),
     };
+
+    dialog.connect('destroy', () => previewQueue.destroy());
 
     const projectMatchesCurrentFilters = project => {
         const query = currentQuery.trim().toLowerCase();
@@ -1085,8 +1355,8 @@ function createProjectBrowserDialog(window, settings) {
     const updateLabels = () => {
         selectedLabel.label = `${_('Current')}: ${formatProjectSubtitle(settings.get_string(currentProjectKey))}`;
         selectedLabel.tooltip_text = settings.get_string(currentProjectKey);
-        libraryLabel.label = `${_('Library')}: ${formatLibrarySubtitle(settings.get_string(libraryKey))}`;
-        libraryLabel.tooltip_text = settings.get_string(libraryKey);
+        libraryLabel.label = `${_('Steam Library')}: ${formatLibrarySubtitle(settings.get_string(libraryKey))}`;
+        libraryLabel.tooltip_text = formatLibrarySubtitle(settings.get_string(libraryKey));
     };
 
     const clearInspectorContent = () => {
@@ -1482,8 +1752,8 @@ function createProjectBrowserDialog(window, settings) {
         placeholder.visible = !hasProjects;
         if (!hasProjects) {
             placeholder.label = settings.get_string(libraryKey)
-                ? _('No wallpaper projects were found in this directory')
-                : _('Choose a wallpaper library first');
+                ? _('No wallpaper projects were found in this Steam library')
+                : _('Choose a Steam library first');
             updateLabels();
             refreshInspector();
             return;
@@ -1494,7 +1764,7 @@ function createProjectBrowserDialog(window, settings) {
                 settings.set_string(currentProjectKey, selectedProject.path);
                 syncSelectionState();
                 buildInspector(selectedProject);
-            });
+            }, previewQueue);
             const flowChild = new Gtk.FlowBoxChild({
                 halign: Gtk.Align.START,
                 hexpand: false,
@@ -1544,7 +1814,6 @@ function createProjectBrowserDialog(window, settings) {
 
 export function prefsRowProjectChooser(window, prefsGroup) {
     const settings = window._settings;
-    migrateUserPropertyStoresInSettings(settings);
     const currentProjectKey = 'project-path';
 
     const row = new Adw.ActionRow({

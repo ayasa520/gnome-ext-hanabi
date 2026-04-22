@@ -37,6 +37,35 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
 
         return path;
     };
+    const detachWebPresentationTarget = target => {
+        if (!target)
+            return;
+
+        try {
+            target.set_child?.(null);
+        } catch (_e) {
+        }
+
+        try {
+            target.set_paintable?.(null);
+        } catch (_e) {
+        }
+
+        try {
+            if ('paintable' in target)
+                target.paintable = null;
+        } catch (_e) {
+        }
+    };
+    const disposeWebObject = object => {
+        if (!object)
+            return;
+
+        try {
+            object.run_dispose?.();
+        } catch (_e) {
+        }
+    };
 
     return class WebBackend extends BackendController {
         constructor(renderer, project) {
@@ -55,13 +84,13 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webAudioSamples = renderer.getCurrentWebAudioFrame?.() ?? new Array(128).fill(0);
             this.usesNativeWindows = false;
             this.displayName = 'WPEWebKit';
-            this._renderer.registerWebAudioBackend?.(this);
+            this._renderer.registerAudioSamplesBackend?.(this);
         }
 
         destroy() {
             this._readyCallback = null;
             this._readyResolved = true;
-            this._renderer.unregisterWebAudioBackend?.(this);
+            this._renderer.unregisterAudioSamplesBackend?.(this);
 
             this._destroyAllWPEWidgets();
 
@@ -73,6 +102,8 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webDirectorySnapshots.clear();
             this._webAudioSamples = new Array(128).fill(0);
             this._wpeDisplay = null;
+            this._renderer = null;
+            this._project = null;
         }
 
         createWidgetForMonitor(index) {
@@ -108,7 +139,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
 
         setAudioSamples(samples) {
             this._webAudioSamples = Array.isArray(samples)
-                ? [...samples]
+                ? samples
                 : new Array(128).fill(0);
             this._pushAudioSamplesToReadyViews();
         }
@@ -222,6 +253,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 loggedBufferKinds: new Set(),
                 signalHandlers: [],
                 metricsSourceId: 0,
+                presentationTarget: null,
             };
 
             this._configureWebView(WPEWebKit, webView, index, wpeState.signalHandlers);
@@ -280,9 +312,11 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 );
                 const offload = setExpandFill(Gtk.GraphicsOffload.new(overlay));
                 offload.set_enabled(Gtk.GraphicsOffloadEnabled.ENABLED);
+                wpeState.presentationTarget = offload;
                 return offload;
             }
 
+            wpeState.presentationTarget = overlay;
             return overlay;
         }
 
@@ -1249,11 +1283,13 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 wpeState.livePaintable?.clear();
             } catch (_e) {
             }
+            detachWebPresentationTarget(wpeState.presentationTarget);
             wpeState.livePicture.paintable = null;
             wpeState.pausePicture.paintable = null;
             wpeState.pausePicture.visible = false;
             wpeState.lastTexture = null;
             wpeState.livePaintable = null;
+            wpeState.presentationTarget = null;
             try {
                 if (wpeState.overlay.get_child())
                     wpeState.overlay.set_child(null);
@@ -1263,6 +1299,12 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                 wpeState.overlay.remove_overlay(wpeState.pausePicture);
             } catch (_e) {
             }
+            disposeWebObject(wpeState.presentationTarget);
+            disposeWebObject(wpeState.overlay);
+            disposeWebObject(wpeState.livePicture);
+            disposeWebObject(wpeState.pausePicture);
+            disposeWebObject(wpeState.livePaintable);
+            disposeWebObject(webView);
 
             this._wpeStates.delete(index);
             this._webViews.delete(index);

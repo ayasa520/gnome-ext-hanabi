@@ -7,16 +7,13 @@
             <description>Path to the wallpaper project directory</description>
         </key>
 
-        <key name="scene-user-properties" type="s">
+        <!-- Web and scene wallpapers share the same Wallpaper Engine property model.
+             This neutral key intentionally replaces the older backend-specific stores,
+             so new overrides cannot diverge by renderer backend. -->
+        <key name="user-properties" type="s">
             <default>''</default>
             <summary>User Properties</summary>
-            <description>Per-wallpaper overrides for scene and web user properties, stored as JSON</description>
-        </key>
-
-        <key name="web-user-properties" type="s">
-            <default>''</default>
-            <summary>Legacy Web User Properties</summary>
-            <description>Deprecated legacy store kept only to migrate older web user property overrides</description>
+            <description>Per-wallpaper overrides for web and scene user properties, stored as JSON</description>
         </key>
 
         <key name="mute" type="b">
@@ -39,8 +36,8 @@
 
         <key name="change-wallpaper-directory-path" type="s">
             <default>''</default>
-            <summary>Wallpaper Projects Directory</summary>
-            <description>Path to a directory containing wallpaper projects</description>
+            <summary>Steam Library Path</summary>
+            <description>Path to the Steam library that contains steamapps/common/wallpaper_engine</description>
         </key>
 
         <key name="change-wallpaper-interval" type="i">

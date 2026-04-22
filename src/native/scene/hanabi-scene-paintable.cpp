@@ -24,6 +24,7 @@
 using hanabi::scene::SceneProject;
 using hanabi::scene::configure_scene_wallpaper;
 using hanabi::scene::ensure_scene_wallpaper;
+using hanabi::scene::sync_scene_user_properties;
 using hanabi::scene::to_wallpaper_fill_mode;
 
 namespace {
@@ -46,6 +47,17 @@ enum {
 };
 
 const char* bool_to_string(bool value) { return value ? "true" : "false"; }
+
+// Geometry logs compare several independently produced aspect ratios. Keeping the helper tolerant of
+// zero-sized allocations prevents diagnostic logging from masking the original render path problem.
+double safe_aspect_ratio(double width, double height) {
+    return height > 0.0 ? width / height : 0.0;
+}
+
+struct PaintableTextureEntry {
+    GdkTexture* texture { nullptr };
+    uint64_t generation { 0 };
+};
 
 std::vector<uint64_t> collect_dmabuf_modifiers(GdkDisplay* display, guint32 fourcc) {
 #if GTK_CHECK_VERSION(4, 14, 0)
@@ -85,6 +97,8 @@ struct _HanabiScenePaintable {
 
     gchar* project_dir;
     gchar* user_properties_json;
+    gchar* media_state_json;
+    GVariant* audio_samples;
     gboolean muted;
     gdouble volume;
     gint fill_mode;
@@ -101,16 +115,19 @@ struct _HanabiScenePaintable {
     gdouble render_scale;
 
     GdkTexture* current_texture;
+    uint64_t current_texture_generation;
     GdkDisplay* display;
     gboolean logged_display_acquired;
     gboolean logged_waiting_for_frame;
     gboolean logged_no_texture;
     int32_t last_logged_frame_id;
     gboolean last_logged_frame_from_cache;
+    gboolean logged_snapshot_geometry;
 
     std::unique_ptr<wallpaper::SceneWallpaper> scene;
     SceneProject project;
-    std::unordered_map<int32_t, GdkTexture*> textures;
+    std::unordered_map<int32_t, PaintableTextureEntry> textures;
+    uint64_t project_generation { 1 };
     uint64_t imported_texture_count { 0 };
 };
 
@@ -123,18 +140,35 @@ void clear_cached_textures(HanabiScenePaintable* self) {
     if (!self->textures.empty())
         g_message("HanabiScene: clearing %zu cached dma-buf textures", self->textures.size());
 
-    for (auto& [_, texture] : self->textures)
-        g_clear_object(&texture);
+    for (auto& [_, entry] : self->textures)
+        g_clear_object(&entry.texture);
 
     self->textures.clear();
     self->current_texture = nullptr;
+    self->current_texture_generation = 0;
     self->imported_texture_count = 0;
     self->logged_waiting_for_frame = FALSE;
     self->logged_no_texture = FALSE;
     self->last_logged_frame_id = -1;
     self->last_logged_frame_from_cache = FALSE;
+    self->logged_snapshot_geometry = FALSE;
     if (was_ready)
         g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_READY]);
+}
+
+void prune_stale_cached_textures(HanabiScenePaintable* self) {
+    for (auto iter = self->textures.begin(); iter != self->textures.end();) {
+        if (iter->second.generation == self->project_generation) {
+            ++iter;
+            continue;
+        }
+
+        // A project switch keeps the old texture visible until a new frame arrives,
+        // but once the current generation has produced a frame any cached frame from
+        // an older source is dead weight and can also collide with fresh frame ids.
+        g_clear_object(&iter->second.texture);
+        iter = self->textures.erase(iter);
+    }
 }
 
 G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
@@ -182,6 +216,16 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                                                       self->muted,
                                                                       self->fill_mode,
                                                                       self->fps);
+                                            hanabi::scene::sync_scene_media_state(
+                                                *self->scene,
+                                                hanabi::scene::build_scene_media_state_from_json(
+                                                    self->media_state_json,
+                                                    "paintable"));
+                                            hanabi::scene::sync_scene_audio_samples(
+                                                *self->scene,
+                                                hanabi::scene::build_scene_audio_samples_from_variant(
+                                                    self->audio_samples,
+                                                    "paintable"));
                                             self->scene_ready = true;
                                             g_message(
                                                 "HanabiScene: scene configured source=%s assets=%s muted=%s volume=%.3f fill-mode=%d fps=%d",
@@ -224,6 +268,7 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                         info.export_drm_modifiers = dmabuf_modifiers;
                                         info.width = static_cast<uint16_t>(target_width);
                                         info.height = static_cast<uint16_t>(target_height);
+                                        info.render_scale = render_scale;
                                         info.redraw_callback = [self]() {
                                             g_main_context_invoke(
                                                 nullptr,
@@ -257,8 +302,10 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                                 hanabi_scene_paintable_is_ready(self);
                                             self->logged_waiting_for_frame = FALSE;
                                             const auto cached = self->textures.find(handle->id());
-                                            if (cached != self->textures.end()) {
-                                                self->current_texture = cached->second;
+                                            if (cached != self->textures.end() &&
+                                                cached->second.generation == self->project_generation) {
+                                                self->current_texture = cached->second.texture;
+                                                self->current_texture_generation = cached->second.generation;
                                                 self->last_logged_frame_id = handle->id();
                                                 self->last_logged_frame_from_cache = TRUE;
                                             } else if (hanabi_scene_dmabuf_frame_can_build_texture(*handle) &&
@@ -276,21 +323,43 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                                         next_width != self->intrinsic_width ||
                                                         next_height != self->intrinsic_height;
 
-                                                    self->textures.emplace(handle->id(), next_texture);
+                                                    // The reusable SceneWallpaper can restart frame ids for
+                                                    // each source. Replace any stale entry only after the new
+                                                    // dma-buf has imported successfully so a failed import keeps
+                                                    // the old transition texture alive for the user.
+                                                    if (cached != self->textures.end()) {
+                                                        g_clear_object(&cached->second.texture);
+                                                        self->textures.erase(cached);
+                                                    }
+                                                    self->textures.emplace(
+                                                        handle->id(),
+                                                        PaintableTextureEntry {
+                                                            .texture = next_texture,
+                                                            .generation = self->project_generation,
+                                                        });
                                                     self->current_texture = next_texture;
+                                                    self->current_texture_generation = self->project_generation;
                                                     self->imported_texture_count++;
                                                     self->intrinsic_width = next_width;
                                                     self->intrinsic_height = next_height;
                                                     g_message(
-                                                        "HanabiScene: imported dma-buf frame id=%d size=%dx%d total-imported=%" G_GUINT64_FORMAT,
+                                                        "HanabiScene: imported dma-buf frame id=%d size=%dx%d total-imported=%" G_GUINT64_FORMAT " cached-textures=%zu",
                                                         handle->id(),
                                                         next_width,
                                                         next_height,
-                                                        self->imported_texture_count);
+                                                        self->imported_texture_count,
+                                                        self->textures.size());
                                                     self->last_logged_frame_id = handle->id();
                                                     self->last_logged_frame_from_cache = FALSE;
-                                                    if (size_changed)
+                                                    if (size_changed) {
+                                                        // A new imported texture extent changes the final GTK
+                                                        // scaling relationship, so let the next snapshot print
+                                                        // the full geometry again instead of hiding the evidence
+                                                        // behind the previous one-shot diagnostic.
+                                                        self->logged_snapshot_geometry = FALSE;
                                                         gdk_paintable_invalidate_size(paintable);
+                                                    }
+                                                    prune_stale_cached_textures(self);
                                                 } else if (error) {
                                                     g_warning(
                                                         "HanabiScene: failed to build dma-buf texture: %s",
@@ -337,6 +406,41 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                                        0.0f,
                                                        static_cast<float>(width),
                                                        static_cast<float>(height));
+                                    if (!self->logged_snapshot_geometry) {
+                                        const int texture_width =
+                                            gdk_texture_get_width(self->current_texture);
+                                        const int texture_height =
+                                            gdk_texture_get_height(self->current_texture);
+                                        // This log records the presentation hop after Vulkan has already
+                                        // produced a dma-buf. If the renderer-side projection is correct but
+                                        // this requested GTK snapshot rectangle has a different aspect from
+                                        // the imported texture, the visible compression is happening while GTK
+                                        // scales the texture into widget coordinates rather than inside the
+                                        // Wallpaper Engine scene graph or its genericimage3 composite pass.
+                                        g_message(
+                                            "HanabiScene: snapshot geometry request=%.3fx%.3f request-aspect=%.6f render-scale=%.3f target=%dx%d target-aspect=%.6f render=%dx%d texture=%dx%d texture-aspect=%.6f intrinsic=%dx%d intrinsic-aspect=%.6f bounds=%.3fx%.3f fill-mode=%d frame-id=%d frame-cache=%s",
+                                            width,
+                                            height,
+                                            safe_aspect_ratio(width, height),
+                                            render_scale,
+                                            target_width,
+                                            target_height,
+                                            safe_aspect_ratio(target_width, target_height),
+                                            self->render_width,
+                                            self->render_height,
+                                            texture_width,
+                                            texture_height,
+                                            safe_aspect_ratio(texture_width, texture_height),
+                                            self->intrinsic_width,
+                                            self->intrinsic_height,
+                                            safe_aspect_ratio(self->intrinsic_width, self->intrinsic_height),
+                                            static_cast<double>(bounds.size.width),
+                                            static_cast<double>(bounds.size.height),
+                                            self->fill_mode,
+                                            self->last_logged_frame_id,
+                                            bool_to_string(self->last_logged_frame_from_cache));
+                                        self->logged_snapshot_geometry = TRUE;
+                                    }
                                     gtk_snapshot_append_texture(
                                         GTK_SNAPSHOT(snapshot), self->current_texture, &bounds);
                                 };
@@ -373,6 +477,11 @@ static gboolean hanabi_scene_paintable_is_ready(HanabiScenePaintable* self) {
 
 static void hanabi_scene_paintable_dispose(GObject* object) {
     auto* self = HANABI_SCENE_PAINTABLE(object);
+    g_message("HanabiScene: paintable dispose project=%s scene=%s textures=%zu imported=%" G_GUINT64_FORMAT,
+              self->project_dir ? self->project_dir : "(null)",
+              self->scene ? "true" : "false",
+              self->textures.size(),
+              self->imported_texture_count);
     self->scene.reset();
     self->scene_ready = false;
     self->render_ready = false;
@@ -383,11 +492,18 @@ static void hanabi_scene_paintable_dispose(GObject* object) {
 
 static void hanabi_scene_paintable_finalize(GObject* object) {
     auto* self = HANABI_SCENE_PAINTABLE(object);
-    self->textures.~unordered_map<int32_t, GdkTexture*>();
+    g_message("HanabiScene: paintable finalize project=%s scene=%s textures=%zu imported=%" G_GUINT64_FORMAT,
+              self->project_dir ? self->project_dir : "(null)",
+              self->scene ? "true" : "false",
+              self->textures.size(),
+              self->imported_texture_count);
+    self->textures.~unordered_map<int32_t, PaintableTextureEntry>();
     self->scene.~unique_ptr<wallpaper::SceneWallpaper>();
     self->project.~SceneProject();
     g_clear_pointer(&self->project_dir, g_free);
     g_clear_pointer(&self->user_properties_json, g_free);
+    g_clear_pointer(&self->media_state_json, g_free);
+    g_clear_pointer(&self->audio_samples, g_variant_unref);
     G_OBJECT_CLASS(hanabi_scene_paintable_parent_class)->finalize(object);
 }
 
@@ -509,7 +625,7 @@ static void hanabi_scene_paintable_class_init(HanabiScenePaintableClass* klass) 
 }
 
 static void hanabi_scene_paintable_init(HanabiScenePaintable* self) {
-    new (&self->textures) std::unordered_map<int32_t, GdkTexture*>();
+    new (&self->textures) std::unordered_map<int32_t, PaintableTextureEntry>();
     new (&self->scene) std::unique_ptr<wallpaper::SceneWallpaper>();
     new (&self->project) SceneProject();
     self->volume = 1.0;
@@ -518,7 +634,12 @@ static void hanabi_scene_paintable_init(HanabiScenePaintable* self) {
     self->render_scale = 1.0;
     self->playing = TRUE;
     self->user_properties_json = nullptr;
+    self->media_state_json = nullptr;
+    self->audio_samples = nullptr;
+    self->current_texture_generation = 0;
+    self->project_generation = 1;
     self->last_logged_frame_id = -1;
+    self->logged_snapshot_geometry = FALSE;
 }
 
 HanabiScenePaintable* hanabi_scene_paintable_new(void) {
@@ -545,38 +666,110 @@ gboolean hanabi_scene_paintable_is_supported(void) {
 #endif
 }
 
+static gboolean configure_paintable_scene_for_current_project(HanabiScenePaintable* self,
+                                                              const char* reason) {
+    if (self->project.scene_path.empty())
+        return FALSE;
+
+    if (!ensure_scene_wallpaper(self->scene, CACHE_DIR_NAME, "paintable", self->project))
+        return FALSE;
+
+    // This mirrors the KDE backend's persistent SceneObject: the native target
+    // owns one SceneWallpaper for its lifetime, and a wallpaper switch only sends
+    // new project state into that object. The current texture is deliberately left
+    // untouched here so GTK can keep presenting the previous frame until the reused
+    // renderer imports a frame for the new generation.
+    configure_scene_wallpaper(*self->scene,
+                              self->project,
+                              self->volume,
+                              self->muted,
+                              self->fill_mode,
+                              self->fps);
+    hanabi::scene::sync_scene_media_state(
+        *self->scene,
+        hanabi::scene::build_scene_media_state_from_json(self->media_state_json, "paintable"));
+    hanabi::scene::sync_scene_audio_samples(
+        *self->scene,
+        hanabi::scene::build_scene_audio_samples_from_variant(self->audio_samples, "paintable"));
+    self->scene_ready = true;
+    if (self->playing)
+        self->scene->play();
+    else
+        self->scene->pause();
+
+    g_message("HanabiScene: paintable reused SceneWallpaper reason=%s generation=%" G_GUINT64_FORMAT " source=%s assets=%s render-ready=%s cached-textures=%zu",
+              reason ? reason : "unknown",
+              self->project_generation,
+              self->project.scene_path.c_str(),
+              self->project.assets_path.c_str(),
+              bool_to_string(self->render_ready),
+              self->textures.size());
+    return TRUE;
+}
+
+gboolean hanabi_scene_paintable_reload_project(HanabiScenePaintable* self,
+                                               const char* project_dir,
+                                               const char* user_properties_json) {
+    g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), FALSE);
+
+    SceneProject project;
+    if (!hanabi::scene::load_scene_project_with_overrides(
+            project_dir, user_properties_json, project, "paintable")) {
+        g_warning("HanabiScene: rejecting paintable project reload because project load failed: %s",
+                  project_dir ? project_dir : "(null)");
+        return FALSE;
+    }
+
+    const bool project_changed =
+        self->project.scene_path != project.scene_path ||
+        self->project.assets_path != project.assets_path ||
+        g_strcmp0(self->project_dir, project_dir) != 0;
+    const bool user_properties_changed =
+        g_strcmp0(self->user_properties_json, user_properties_json) != 0;
+
+    g_message("HanabiScene: paintable project reload old=%s new=%s project-changed=%s user-properties-changed=%s",
+              self->project_dir ? self->project_dir : "(null)",
+              project_dir ? project_dir : "(null)",
+              bool_to_string(project_changed),
+              bool_to_string(user_properties_changed));
+
+    g_free(self->project_dir);
+    self->project_dir = g_strdup(project_dir);
+    g_free(self->user_properties_json);
+    self->user_properties_json = g_strdup(user_properties_json);
+    self->project = std::move(project);
+
+    if (project_changed) {
+        // Frame ids can restart after the same SceneWallpaper loads another source.
+        // Advancing the generation lets the import path ignore old cached textures
+        // while still keeping the currently displayed texture as a transition frame.
+        self->project_generation++;
+        self->logged_snapshot_geometry = FALSE;
+    }
+
+    if (self->scene) {
+        if (project_changed)
+            configure_paintable_scene_for_current_project(self, "project-reload");
+        else
+            sync_scene_user_properties(*self->scene, self->project);
+    }
+
+    if (project_changed)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_PROJECT_DIR]);
+    if (user_properties_changed)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_USER_PROPERTIES_JSON]);
+
+    gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+    return TRUE;
+}
+
 void hanabi_scene_paintable_set_project_dir(HanabiScenePaintable* self, const char* project_dir) {
     g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
 
     if (g_strcmp0(self->project_dir, project_dir) == 0)
         return;
 
-    SceneProject project;
-    if (!hanabi::scene::load_scene_project_with_overrides(
-            project_dir, self->user_properties_json, project, "paintable")) {
-        g_warning("HanabiScene: rejecting project-dir update because project load failed: %s",
-                  project_dir ? project_dir : "(null)");
-        return;
-    }
-
-    g_message("HanabiScene: project-dir update old=%s new=%s",
-              self->project_dir ? self->project_dir : "(null)",
-              project_dir ? project_dir : "(null)");
-
-    g_free(self->project_dir);
-    self->project_dir = g_strdup(project_dir);
-    self->project = std::move(project);
-    self->scene.reset();
-    self->scene_ready = false;
-    self->render_ready = false;
-    self->render_width = 0;
-    self->render_height = 0;
-    self->intrinsic_width = 0;
-    self->intrinsic_height = 0;
-    clear_cached_textures(self);
-    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_PROJECT_DIR]);
-    gdk_paintable_invalidate_size(GDK_PAINTABLE(self));
-    gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+    hanabi_scene_paintable_reload_project(self, project_dir, self->user_properties_json);
 }
 
 const char* hanabi_scene_paintable_get_project_dir(HanabiScenePaintable* self) {
@@ -594,24 +787,56 @@ void hanabi_scene_paintable_set_user_properties_json(HanabiScenePaintable* self,
     g_free(self->user_properties_json);
     self->user_properties_json = g_strdup(user_properties_json);
     hanabi::scene::apply_user_property_overrides(self->project, self->user_properties_json, "paintable");
-
-    self->scene.reset();
-    self->scene_ready = false;
-    self->render_ready = false;
-    self->render_width = 0;
-    self->render_height = 0;
-    self->intrinsic_width = 0;
-    self->intrinsic_height = 0;
-    clear_cached_textures(self);
+    if (self->scene) {
+        // User-property edits on the same project follow KDE's live property model:
+        // keep the SceneWallpaper and render path alive, then forward the new map to
+        // the currently loaded scene instead of rebuilding the native target.
+        sync_scene_user_properties(*self->scene, self->project);
+    }
 
     g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_USER_PROPERTIES_JSON]);
-    gdk_paintable_invalidate_size(GDK_PAINTABLE(self));
     gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
 }
 
 const char* hanabi_scene_paintable_get_user_properties_json(HanabiScenePaintable* self) {
     g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), nullptr);
     return self->user_properties_json;
+}
+
+void hanabi_scene_paintable_set_media_state_json(HanabiScenePaintable* self,
+                                                 const char*           media_state_json) {
+    g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
+
+    if (g_strcmp0(self->media_state_json, media_state_json) == 0)
+        return;
+
+    g_free(self->media_state_json);
+    self->media_state_json = g_strdup(media_state_json);
+    if (self->scene) {
+        hanabi::scene::sync_scene_media_state(
+            *self->scene,
+            hanabi::scene::build_scene_media_state_from_json(self->media_state_json, "paintable"));
+    }
+    gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+}
+
+void hanabi_scene_paintable_set_audio_samples(HanabiScenePaintable* self, GVariant* audio_samples) {
+    g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
+
+    if (self->audio_samples == audio_samples)
+        return;
+    if (self->audio_samples && audio_samples && g_variant_equal(self->audio_samples, audio_samples))
+        return;
+
+    g_clear_pointer(&self->audio_samples, g_variant_unref);
+    if (audio_samples)
+        self->audio_samples = g_variant_ref_sink(audio_samples);
+
+    if (self->scene) {
+        hanabi::scene::sync_scene_audio_samples(
+            *self->scene,
+            hanabi::scene::build_scene_audio_samples_from_variant(self->audio_samples, "paintable"));
+    }
 }
 
 void hanabi_scene_paintable_set_muted(HanabiScenePaintable* self, gboolean muted) {
@@ -651,6 +876,10 @@ void hanabi_scene_paintable_set_fill_mode(HanabiScenePaintable* self, int fill_m
     if (self->fill_mode == fill_mode)
         return;
     self->fill_mode = fill_mode;
+    // Force the next snapshot to restate the full presentation geometry after a fit-mode change.
+    // The log is intentionally tied to the mode mutation because cover/contain bugs can otherwise
+    // look identical in the renderer log while GTK is drawing the same imported texture differently.
+    self->logged_snapshot_geometry = FALSE;
     if (self->scene) {
         self->scene->setPropertyInt32(
             wallpaper::PROPERTY_FILLMODE,
@@ -688,6 +917,10 @@ void hanabi_scene_paintable_set_render_scale(HanabiScenePaintable* self, double 
         return;
 
     self->render_scale = effective_scale;
+    // Render scale changes alter the Vulkan target dimensions derived from the same GTK allocation.
+    // Re-arming the presentation log makes the next frame show whether the new dma-buf size still
+    // matches the widget rectangle by aspect, which is the critical evidence for squeeze/stretch bugs.
+    self->logged_snapshot_geometry = FALSE;
     g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_RENDER_SCALE]);
     gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
 }
@@ -737,4 +970,12 @@ void hanabi_scene_paintable_set_mouse_pos(HanabiScenePaintable* self, double x, 
     const double nx = CLAMP((x * render_scale) / static_cast<double>(self->render_width), 0.0, 1.0);
     const double ny = CLAMP((y * render_scale) / static_cast<double>(self->render_height), 0.0, 1.0);
     self->scene->mouseInput(nx, ny);
+}
+
+void hanabi_scene_paintable_set_cursor_left_down(HanabiScenePaintable* self, gboolean down) {
+    g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
+    if (!self->scene)
+        return;
+
+    self->scene->mouseLeftButton(down);
 }

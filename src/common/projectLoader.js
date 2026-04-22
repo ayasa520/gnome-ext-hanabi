@@ -1,6 +1,8 @@
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 
+const wallpaperEngineWorkshopAppId = '431960';
+
 var ProjectType = {
     VIDEO: 'video',
     WEB: 'web',
@@ -20,10 +22,9 @@ var ScenePropertyType = {
     TEXT_INPUT: 'textinput',
 };
 
-var UserPropertyStoreKey = 'scene-user-properties';
-var SceneUserPropertyStoreKey = UserPropertyStoreKey;
-var WebUserPropertyStoreKey = UserPropertyStoreKey;
-var LegacyWebUserPropertyStoreKey = 'web-user-properties';
+// Web and scene wallpapers both use Wallpaper Engine user properties, so one
+// neutral GSettings key is the only persisted source of truth for overrides.
+var UserPropertyStoreKey = 'user-properties';
 var ProjectBrowserFilterKey = {
     STATE: 'project-browser-filter-state',
 };
@@ -96,6 +97,82 @@ function readJsonFile(path) {
     } catch (_e) {
         return null;
     }
+}
+
+function isDirectoryPath(path) {
+    if (!path)
+        return false;
+
+    const file = Gio.File.new_for_path(path);
+    return file.query_file_type(Gio.FileQueryInfoFlags.NONE, null) === Gio.FileType.DIRECTORY;
+}
+
+function canonicalizeDirectoryPath(path) {
+    if (!path)
+        return '';
+
+    const file = Gio.File.new_for_path(path);
+    try {
+        return file.get_path() ?? path;
+    } catch (_e) {
+        return path;
+    }
+}
+
+function hasWallpaperEngineInstall(steamLibraryPath) {
+    if (!steamLibraryPath)
+        return false;
+
+    return isDirectoryPath(GLib.build_filenamev([
+        steamLibraryPath,
+        'steamapps',
+        'common',
+        'wallpaper_engine',
+    ]));
+}
+
+function normalizeLibraryRootPath(path) {
+    if (!path)
+        return '';
+
+    let current = canonicalizeDirectoryPath(path);
+    while (current) {
+        if (hasWallpaperEngineInstall(current))
+            return current;
+
+        const parent = GLib.path_get_dirname(current);
+        if (!parent || parent === current)
+            break;
+        current = parent;
+    }
+
+    return canonicalizeDirectoryPath(path);
+}
+
+function getSteamWorkshopDirs(steamLibraryPath) {
+    return [
+        ['steamapps', 'workshop', 'content', wallpaperEngineWorkshopAppId],
+        ['Steamapps', 'Workshop', 'content', wallpaperEngineWorkshopAppId],
+        ['Steamapps', 'Workshop', 'Content', wallpaperEngineWorkshopAppId],
+        ['steamapps', 'Workshop', 'Content', wallpaperEngineWorkshopAppId],
+    ].map(parts => GLib.build_filenamev([steamLibraryPath, ...parts]));
+}
+
+function getWallpaperEngineProjectRoots(libraryPath) {
+    const normalized = normalizeLibraryRootPath(libraryPath);
+    if (!normalized)
+        return [];
+
+    if (!hasWallpaperEngineInstall(normalized))
+        return [normalized].filter(isDirectoryPath);
+
+    const roots = [
+        ...getSteamWorkshopDirs(normalized),
+        GLib.build_filenamev([normalized, 'steamapps', 'common', 'wallpaper_engine', 'projects', 'defaultprojects']),
+        GLib.build_filenamev([normalized, 'steamapps', 'common', 'wallpaper_engine', 'projects', 'myprojects']),
+    ];
+
+    return [...new Set(roots.filter(isDirectoryPath))];
 }
 
 function resolveProjectType(project) {
@@ -577,24 +654,6 @@ function serializeStoredScenePropertyOverrides(overrides) {
     return Object.keys(sanitized).length > 0 ? JSON.stringify(sanitized) : '';
 }
 
-function mergeStoredScenePropertyOverrides(...serializedStores) {
-    const merged = {};
-    for (const serializedStore of serializedStores) {
-        const store = parseStoredScenePropertyOverrides(serializedStore);
-        for (const [configId, overrides] of Object.entries(store)) {
-            const sanitized = sanitizeStoredScenePropertyOverrides(overrides);
-            if (Object.keys(sanitized).length === 0)
-                continue;
-
-            merged[configId] = {
-                ...(merged[configId] ?? {}),
-                ...sanitized,
-            };
-        }
-    }
-    return merged;
-}
-
 function getProjectScenePropertyOverrides(serializedOrStore, project) {
     return getProjectUserPropertyOverrides(serializedOrStore, project);
 }
@@ -1038,25 +1097,32 @@ function listProjects(parentDirPath, filter = null) {
     if (!parentDirPath)
         return projects;
 
-    const dir = Gio.File.new_for_path(parentDirPath);
-    if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
-        return projects;
-
-    const enumerator = dir.enumerate_children(
-        'standard::*',
-        Gio.FileQueryInfoFlags.NONE,
-        null
-    );
-
-    let info;
-    while ((info = enumerator.next_file(null))) {
-        if (info.get_file_type() !== Gio.FileType.DIRECTORY)
+    const projectRoots = getWallpaperEngineProjectRoots(parentDirPath);
+    const seenPaths = new Set();
+    for (const projectRoot of projectRoots) {
+        const dir = Gio.File.new_for_path(projectRoot);
+        if (dir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
             continue;
 
-        const child = dir.get_child(info.get_name());
-        const project = loadProject(child.get_path());
-        if (project)
+        const enumerator = dir.enumerate_children(
+            'standard::*',
+            Gio.FileQueryInfoFlags.NONE,
+            null
+        );
+
+        let info;
+        while ((info = enumerator.next_file(null))) {
+            if (info.get_file_type() !== Gio.FileType.DIRECTORY)
+                continue;
+
+            const child = dir.get_child(info.get_name());
+            const project = loadProject(child.get_path());
+            if (!project || seenPaths.has(project.path))
+                continue;
+
+            seenPaths.add(project.path);
             projects.push(project);
+        }
     }
 
     return projects

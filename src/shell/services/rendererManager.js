@@ -53,6 +53,11 @@ export class RendererManager {
 
         this._currentProcess = new Launcher.LaunchSubprocess();
         this._currentProcess.set_cwd(GLib.get_home_dir());
+        // The renderer is a long-lived GJS process that exercises GTK/GStreamer/WPE
+        // on many threads. Constrain glibc arena growth and trim freed pages more
+        // aggressively so repeated wallpaper switches do not leave RSS permanently high.
+        this._currentProcess.setenv('MALLOC_ARENA_MAX', '2');
+        this._currentProcess.setenv('MALLOC_TRIM_THRESHOLD_', '131072');
         this._currentProcess.spawnv(argv);
         this._extension.manager.set_wayland_client(this._currentProcess);
         const process = this._currentProcess;

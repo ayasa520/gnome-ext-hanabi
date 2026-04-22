@@ -158,6 +158,7 @@ root_sources = [
 ]
 
 common_sources = [
+  'common/mpris.js',
   'common/projectLoader.js',
 ]
 

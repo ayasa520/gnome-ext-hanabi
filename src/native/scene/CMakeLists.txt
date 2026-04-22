@@ -7,6 +7,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK4 REQUIRED gtk4)
+pkg_check_modules(GDK_PIXBUF REQUIRED gdk-pixbuf-2.0)
 pkg_check_modules(EPOXY REQUIRED epoxy)
 pkg_check_modules(GI REQUIRED gobject-introspection-1.0)
 pkg_check_modules(JSON_GLIB REQUIRED json-glib-1.0)
@@ -30,6 +31,7 @@ target_include_directories(HanabiScene
     ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
     ${GTK4_INCLUDE_DIRS}
+    ${GDK_PIXBUF_INCLUDE_DIRS}
     ${EPOXY_INCLUDE_DIRS}
     ${GI_INCLUDE_DIRS}
     ${JSON_GLIB_INCLUDE_DIRS}
@@ -37,8 +39,8 @@ target_include_directories(HanabiScene
     ${WESCENE_RENDERER_DIR}/third_party
 )
 
-target_compile_options(HanabiScene PRIVATE ${GTK4_CFLAGS_OTHER} ${EPOXY_CFLAGS_OTHER} ${JSON_GLIB_CFLAGS_OTHER})
-target_link_libraries(HanabiScene PRIVATE ${GTK4_LIBRARIES} ${EPOXY_LIBRARIES} ${JSON_GLIB_LIBRARIES} wescene-renderer)
+target_compile_options(HanabiScene PRIVATE ${GTK4_CFLAGS_OTHER} ${GDK_PIXBUF_CFLAGS_OTHER} ${EPOXY_CFLAGS_OTHER} ${JSON_GLIB_CFLAGS_OTHER})
+target_link_libraries(HanabiScene PRIVATE ${GTK4_LIBRARIES} ${GDK_PIXBUF_LIBRARIES} ${EPOXY_LIBRARIES} ${JSON_GLIB_LIBRARIES} wescene-renderer)
 
 set_target_properties(HanabiScene PROPERTIES
   OUTPUT_NAME HanabiScene
@@ -74,11 +76,13 @@ add_custom_command(
           --include=GObject-2.0
           --include=Gtk-4.0
           --pkg gtk4
+          --pkg gdk-pixbuf-2.0
           --pkg gobject-2.0
           --pkg gio-2.0
           --pkg json-glib-1.0
           --cflags-begin
           ${GTK4_CFLAGS}
+          ${GDK_PIXBUF_CFLAGS}
           ${EPOXY_CFLAGS}
           ${JSON_GLIB_CFLAGS}
           -I${CMAKE_CURRENT_SOURCE_DIR}

@@ -20,10 +20,69 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
     const {createConfiguredPicture} = helpers;
     const {BackendController} = baseClasses;
 
+    const detachVideoPresentationTarget = target => {
+        if (!target)
+            return;
+
+        try {
+            target.set_child?.(null);
+        } catch (_e) {
+        }
+
+        try {
+            target.set_paintable?.(null);
+        } catch (_e) {
+        }
+
+        try {
+            if ('paintable' in target)
+                target.paintable = null;
+        } catch (_e) {
+        }
+    };
+    const detachVideoWidgetTree = widget => {
+        if (!widget)
+            return;
+
+        const children = [];
+        let child = widget.get_first_child?.() ?? null;
+        while (child) {
+            children.push(child);
+            child = child.get_next_sibling?.() ?? null;
+        }
+
+        children.forEach(detachVideoWidgetTree);
+        detachVideoPresentationTarget(widget);
+
+        children.forEach(childWidget => {
+            try {
+                widget.remove_overlay?.(childWidget);
+            } catch (_e) {
+            }
+
+            try {
+                widget.remove?.(childWidget);
+            } catch (_e) {
+            }
+        });
+    };
+    const disposeVideoTarget = target => {
+        if (!target)
+            return;
+
+        try {
+            target.run_dispose?.();
+        } catch (_e) {
+        }
+    };
+
     return class VideoBackend extends BackendController {
         constructor(renderer, project) {
             super(renderer, project);
             this._pictures = [];
+            this._rootWidgets = [];
+            this._presentationTargets = [];
+            this._signalHandlers = [];
             this._sharedPaintable = null;
             this._play = null;
             this._media = null;
@@ -35,9 +94,25 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
         }
 
         destroy() {
+            this._signalHandlers.forEach(([target, signalId]) => {
+                try {
+                    target.disconnect(signalId);
+                } catch (_e) {
+                }
+            });
+            this._signalHandlers = [];
+
             if (this._play) {
                 try {
                     this._play.pause();
+                } catch (_e) {
+                }
+                try {
+                    this._play.stop();
+                } catch (_e) {
+                }
+                try {
+                    this._play.get_pipeline?.()?.set_state?.(Gst.State.NULL);
                 } catch (_e) {
                 }
             }
@@ -45,18 +120,41 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             if (this._media) {
                 try {
                     this._media.pause();
+                } catch (_e) {
+                }
+                try {
                     this._media.stream_unprepared();
+                } catch (_e) {
+                }
+                try {
+                    this._media.clear();
                 } catch (_e) {
                 }
             }
 
+            this._pictures.forEach(picture => detachVideoPresentationTarget(picture));
+            this._presentationTargets.forEach(target => detachVideoPresentationTarget(target));
+            this._rootWidgets.forEach(widget => detachVideoWidgetTree(widget));
+            [...new Set([
+                ...this._pictures,
+                ...this._presentationTargets,
+                ...this._rootWidgets,
+                this._sharedPaintable,
+                this._media,
+                this._adapter,
+                this._play,
+            ].filter(Boolean))].forEach(target => disposeVideoTarget(target));
             this._pictures = [];
+            this._rootWidgets = [];
+            this._presentationTargets = [];
             this._sharedPaintable = null;
             this._play = null;
             this._media = null;
             this._adapter = null;
             this._readyCallback = null;
             this._readyResolved = true;
+            this._renderer = null;
+            this._project = null;
         }
 
         createWidgetForMonitor(index) {
@@ -81,6 +179,9 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
                 if (!widget)
                     widget = this._getGtkStockWidget();
             }
+
+            if (widget)
+                this._rootWidgets.push(widget);
 
             return widget;
         }
@@ -167,6 +268,7 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             if (haveGraphicsOffload) {
                 let offload = Gtk.GraphicsOffload.new(picture);
                 offload.set_enabled(Gtk.GraphicsOffloadEnabled.ENABLED);
+                this._presentationTargets.push(offload);
                 return offload;
             }
 
@@ -181,6 +283,7 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             if (sink.widget) {
                 if (sink.widget instanceof Gtk.Picture) {
                     this._sharedPaintable = sink.widget.paintable;
+                    this._pictures.push(sink.widget);
                     let box = new Gtk.Box();
                     box.append(sink.widget);
                     box.append(this._getWidgetFromSharedPaintable());
@@ -211,9 +314,18 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             );
             this._adapter = GstPlay.PlaySignalAdapter.new(this._play);
 
-            this._adapter.connect('end-of-stream', adapter => adapter.play.seek(0));
-            this._adapter.connect('warning', (_adapter, err) => console.warn(err));
-            this._adapter.connect('error', (_adapter, err) => console.error(err));
+            this._signalHandlers.push([
+                this._adapter,
+                this._adapter.connect('end-of-stream', adapter => adapter.play.seek(0)),
+            ]);
+            this._signalHandlers.push([
+                this._adapter,
+                this._adapter.connect('warning', (_adapter, err) => console.warn(err)),
+            ]);
+            this._signalHandlers.push([
+                this._adapter,
+                this._adapter.connect('error', (_adapter, err) => console.error(err)),
+            ]);
 
             let stateSignal = this._adapter.connect('state-changed', (_adapter, currentState) => {
                 if (currentState >= GstPlay.PlayState.PAUSED) {
@@ -225,9 +337,13 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
                     stateSignal = null;
                 }
             });
-            this._adapter.connect('state-changed', (_adapter, currentState) => {
-                this._renderer._setPlayingState(currentState === GstPlay.PlayState.PLAYING);
-            });
+            this._signalHandlers.push([this._adapter, stateSignal]);
+            this._signalHandlers.push([
+                this._adapter,
+                this._adapter.connect('state-changed', (_adapter, currentState) => {
+                    this._renderer._setPlayingState(currentState === GstPlay.PlayState.PLAYING);
+                }),
+            ]);
 
             let file = Gio.File.new_for_path(this._project.entryPath);
             this._play.set_uri(file.get_uri());
@@ -242,14 +358,20 @@ var createVideoBackendClass = (env, helpers, baseClasses) => {
             this._media.set({
                 loop: true,
             });
-            this._media.connect('notify::prepared', () => {
-                this._markReady();
-                this.setVolume(this._desiredVolume);
-                this.setMute(this._desiredMute);
-            });
-            this._media.connect('notify::playing', media => {
-                this._renderer._setPlayingState(media.get_playing());
-            });
+            this._signalHandlers.push([
+                this._media,
+                this._media.connect('notify::prepared', () => {
+                    this._markReady();
+                    this.setVolume(this._desiredVolume);
+                    this.setMute(this._desiredMute);
+                }),
+            ]);
+            this._signalHandlers.push([
+                this._media,
+                this._media.connect('notify::playing', media => {
+                    this._renderer._setPlayingState(media.get_playing());
+                }),
+            ]);
 
             this._sharedPaintable = this._media;
             return this._getWidgetFromSharedPaintable();

@@ -12,9 +12,14 @@ GtkWidget *hanabi_scene_widget_new(void);
 
 void hanabi_scene_widget_set_project_dir(HanabiSceneWidget *self, const char *project_dir);
 const char *hanabi_scene_widget_get_project_dir(HanabiSceneWidget *self);
+gboolean hanabi_scene_widget_reload_project(HanabiSceneWidget *self,
+                                            const char *project_dir,
+                                            const char *user_properties_json);
 
 void hanabi_scene_widget_set_user_properties_json(HanabiSceneWidget *self, const char *user_properties_json);
 const char *hanabi_scene_widget_get_user_properties_json(HanabiSceneWidget *self);
+void hanabi_scene_widget_set_media_state_json(HanabiSceneWidget *self, const char *media_state_json);
+void hanabi_scene_widget_set_audio_samples(HanabiSceneWidget *self, GVariant *audio_samples);
 
 void hanabi_scene_widget_set_muted(HanabiSceneWidget *self, gboolean muted);
 gboolean hanabi_scene_widget_get_muted(HanabiSceneWidget *self);
@@ -36,5 +41,6 @@ void hanabi_scene_widget_pause(HanabiSceneWidget *self);
 gboolean hanabi_scene_widget_get_playing(HanabiSceneWidget *self);
 gboolean hanabi_scene_widget_get_ready(HanabiSceneWidget *self);
 void hanabi_scene_widget_set_mouse_pos(HanabiSceneWidget *self, double x, double y);
+void hanabi_scene_widget_set_cursor_left_down(HanabiSceneWidget *self, gboolean down);
 
 G_END_DECLS

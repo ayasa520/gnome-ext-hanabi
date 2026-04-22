@@ -23,6 +23,7 @@
 using hanabi::scene::SceneProject;
 using hanabi::scene::configure_scene_wallpaper;
 using hanabi::scene::ensure_scene_wallpaper;
+using hanabi::scene::sync_scene_user_properties;
 using hanabi::scene::to_wallpaper_fill_mode;
 
 namespace {
@@ -48,6 +49,7 @@ struct TextureEntry {
     GLuint memory_object {0};
     int width {0};
     int height {0};
+    uint64_t generation {0};
 };
 
 GLuint compile_shader(GLenum type, const char *source) {
@@ -182,6 +184,8 @@ struct _HanabiSceneWidget {
 
     gchar *project_dir;
     gchar *user_properties_json;
+    gchar *media_state_json;
+    GVariant *audio_samples;
     gboolean muted;
     gdouble volume;
     gint fill_mode;
@@ -197,6 +201,7 @@ struct _HanabiSceneWidget {
     GLuint vbo;
     GLuint ebo;
     GLuint current_texture;
+    uint64_t current_texture_generation;
     gint current_width;
     gint current_height;
     gint render_width;
@@ -209,6 +214,7 @@ struct _HanabiSceneWidget {
     std::unique_ptr<wallpaper::SceneWallpaper> scene;
     std::unordered_map<int, TextureEntry> textures;
     SceneProject project;
+    uint64_t project_generation {1};
 };
 
 G_DEFINE_TYPE(HanabiSceneWidget, hanabi_scene_widget, GTK_TYPE_GL_AREA)
@@ -269,6 +275,7 @@ static void reset_scene_state(HanabiSceneWidget *self) {
     self->scene_ready = false;
     self->render_ready = false;
     self->current_texture = 0;
+    self->current_texture_generation = 0;
     self->current_width = 0;
     self->current_height = 0;
     self->render_width = 0;
@@ -279,6 +286,10 @@ static void reset_scene_state(HanabiSceneWidget *self) {
 
 static void hanabi_scene_widget_dispose(GObject *object) {
     auto *self = HANABI_SCENE_WIDGET(object);
+    g_message("HanabiScene: widget dispose project=%s scene=%s textures=%zu",
+              self->project_dir ? self->project_dir : "(null)",
+              self->scene ? "true" : "false",
+              self->textures.size());
     reset_scene_state(self);
     self->textures.clear();
     G_OBJECT_CLASS(hanabi_scene_widget_parent_class)->dispose(object);
@@ -286,11 +297,17 @@ static void hanabi_scene_widget_dispose(GObject *object) {
 
 static void hanabi_scene_widget_finalize(GObject *object) {
     auto *self = HANABI_SCENE_WIDGET(object);
+    g_message("HanabiScene: widget finalize project=%s scene=%s textures=%zu",
+              self->project_dir ? self->project_dir : "(null)",
+              self->scene ? "true" : "false",
+              self->textures.size());
     self->scene.~unique_ptr<wallpaper::SceneWallpaper>();
     self->textures.~unordered_map<int, TextureEntry>();
     self->project.~SceneProject();
     g_clear_pointer(&self->project_dir, g_free);
     g_clear_pointer(&self->user_properties_json, g_free);
+    g_clear_pointer(&self->media_state_json, g_free);
+    g_clear_pointer(&self->audio_samples, g_variant_unref);
     G_OBJECT_CLASS(hanabi_scene_widget_parent_class)->finalize(object);
 }
 
@@ -377,6 +394,36 @@ static void clear_imported_textures(HanabiSceneWidget *self) {
     }
     self->textures.clear();
     self->current_texture = 0;
+    self->current_texture_generation = 0;
+}
+
+static void delete_texture_entry(TextureEntry *entry) {
+    if (!entry)
+        return;
+
+    if (entry->texture)
+        glDeleteTextures(1, &entry->texture);
+    if (entry->memory_object)
+        glDeleteMemoryObjectsEXT(1, &entry->memory_object);
+
+    entry->texture = 0;
+    entry->memory_object = 0;
+}
+
+static void prune_stale_imported_textures(HanabiSceneWidget *self) {
+    for (auto iter = self->textures.begin(); iter != self->textures.end();) {
+        if (iter->second.generation == self->project_generation) {
+            ++iter;
+            continue;
+        }
+
+        // The GL widget keeps the old frame visible during a source reload, but
+        // frame ids can restart when the reused SceneWallpaper parses the next
+        // wallpaper. Pruning stale generations after the first new frame prevents
+        // an old GL texture from being selected by a colliding frame id.
+        delete_texture_entry(&iter->second);
+        iter = self->textures.erase(iter);
+    }
 }
 
 static void discard_cached_textures(HanabiSceneWidget *self) {
@@ -485,6 +532,12 @@ static bool ensure_scene_initialized(HanabiSceneWidget *self) {
                               self->muted,
                               self->fill_mode,
                               self->fps);
+    hanabi::scene::sync_scene_media_state(
+        *self->scene,
+        hanabi::scene::build_scene_media_state_from_json(self->media_state_json, "widget"));
+    hanabi::scene::sync_scene_audio_samples(
+        *self->scene,
+        hanabi::scene::build_scene_audio_samples_from_variant(self->audio_samples, "widget"));
 
     self->scene_ready = true;
     return true;
@@ -523,6 +576,7 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
     info.export_mode = wallpaper::ExternalFrameExportMode::OPAQUE_FD;
     info.width = static_cast<uint16_t>(render_width);
     info.height = static_cast<uint16_t>(render_height);
+    info.render_scale = get_render_scale(self);
     if (self->has_gl_uuid)
         info.uuid = self->gl_uuid;
     info.offscreen_tiling = pick_tiling();
@@ -601,6 +655,7 @@ static void import_texture(HanabiSceneWidget *self, wallpaper::ExHandle &handle)
     TextureEntry entry {};
     entry.width = handle.width;
     entry.height = handle.height;
+    entry.generation = self->project_generation;
 
     glCreateMemoryObjectsEXT(1, &entry.memory_object);
     glImportMemoryFdEXT(entry.memory_object, handle.size, GL_HANDLE_TYPE_OPAQUE_FD_EXT, import_fd);
@@ -622,6 +677,14 @@ static void import_texture(HanabiSceneWidget *self, wallpaper::ExHandle &handle)
         g_warning("HanabiScene: import texture GL error=0x%x", error);
     }
 
+    if (auto stale = self->textures.find(handle.id()); stale != self->textures.end()) {
+        // Reused SceneWallpaper instances may produce the same external frame id
+        // after a new source is loaded. Replace the stale entry only after the GL
+        // import above succeeded so a transient import failure does not blank the
+        // transition frame.
+        delete_texture_entry(&stale->second);
+        self->textures.erase(stale);
+    }
     self->textures.emplace(handle.id(), entry);
     handle.fd = -1;
 }
@@ -642,16 +705,21 @@ static gboolean hanabi_scene_widget_render(GtkGLArea *area, GdkGLContext *) {
     if (self->scene && self->scene->exSwapchain()) {
         if (auto *handle = self->scene->exSwapchain()->eatFrame()) {
             const gboolean was_ready = hanabi_scene_widget_is_ready(self);
-            if (self->textures.find(handle->id()) == self->textures.end())
+            auto cached = self->textures.find(handle->id());
+            if (cached == self->textures.end() ||
+                cached->second.generation != self->project_generation)
                 import_texture(self, *handle);
 
             auto it = self->textures.find(handle->id());
-            if (it != self->textures.end()) {
+            if (it != self->textures.end() &&
+                it->second.generation == self->project_generation) {
                 self->current_texture = it->second.texture;
+                self->current_texture_generation = it->second.generation;
                 self->current_width = it->second.width;
                 self->current_height = it->second.height;
                 if (!was_ready && hanabi_scene_widget_is_ready(self))
                     g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_READY]);
+                prune_stale_imported_textures(self);
             }
         }
     }
@@ -738,6 +806,10 @@ static void hanabi_scene_widget_init(HanabiSceneWidget *self) {
     self->render_scale = 1.0;
     self->playing = TRUE;
     self->user_properties_json = nullptr;
+    self->media_state_json = nullptr;
+    self->audio_samples = nullptr;
+    self->current_texture_generation = 0;
+    self->project_generation = 1;
 
     gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(self), FALSE);
     gtk_gl_area_set_has_stencil_buffer(GTK_GL_AREA(self), FALSE);
@@ -753,25 +825,108 @@ GtkWidget *hanabi_scene_widget_new(void) {
     return GTK_WIDGET(g_object_new(HANABI_SCENE_TYPE_WIDGET, nullptr));
 }
 
+static gboolean configure_widget_scene_for_current_project(HanabiSceneWidget *self,
+                                                           const char *reason) {
+    if (self->project.scene_path.empty())
+        return FALSE;
+
+    if (!ensure_scene_wallpaper(self->scene, CACHE_DIR_NAME, "widget", self->project))
+        return FALSE;
+
+    // This follows the KDE SceneViewer shape: the GtkGLArea remains attached to
+    // the window and keeps one SceneWallpaper alive, while source/assets updates
+    // ask that reusable renderer to parse the next wallpaper.
+    configure_scene_wallpaper(*self->scene,
+                              self->project,
+                              self->volume,
+                              self->muted,
+                              self->fill_mode,
+                              self->fps);
+    hanabi::scene::sync_scene_media_state(
+        *self->scene,
+        hanabi::scene::build_scene_media_state_from_json(self->media_state_json, "widget"));
+    hanabi::scene::sync_scene_audio_samples(
+        *self->scene,
+        hanabi::scene::build_scene_audio_samples_from_variant(self->audio_samples, "widget"));
+    self->scene_ready = true;
+    if (self->playing)
+        self->scene->play();
+    else
+        self->scene->pause();
+
+    g_message("HanabiScene: widget reused SceneWallpaper reason=%s generation=%" G_GUINT64_FORMAT " source=%s assets=%s render-ready=%s cached-textures=%zu",
+              reason ? reason : "unknown",
+              self->project_generation,
+              self->project.scene_path.c_str(),
+              self->project.assets_path.c_str(),
+              self->render_ready ? "true" : "false",
+              self->textures.size());
+    return TRUE;
+}
+
+gboolean hanabi_scene_widget_reload_project(HanabiSceneWidget *self,
+                                            const char *project_dir,
+                                            const char *user_properties_json) {
+    g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), FALSE);
+
+    SceneProject project;
+    if (!hanabi::scene::load_scene_project_with_overrides(
+            project_dir, user_properties_json, project, "widget")) {
+        g_warning("HanabiScene: rejecting widget project reload because project load failed: %s",
+                  project_dir ? project_dir : "(null)");
+        return FALSE;
+    }
+
+    const bool project_changed =
+        self->project.scene_path != project.scene_path ||
+        self->project.assets_path != project.assets_path ||
+        g_strcmp0(self->project_dir, project_dir) != 0;
+    const bool user_properties_changed =
+        g_strcmp0(self->user_properties_json, user_properties_json) != 0;
+
+    g_message("HanabiScene: widget project reload old=%s new=%s project-changed=%s user-properties-changed=%s",
+              self->project_dir ? self->project_dir : "(null)",
+              project_dir ? project_dir : "(null)",
+              project_changed ? "true" : "false",
+              user_properties_changed ? "true" : "false");
+
+    g_free(self->project_dir);
+    self->project_dir = g_strdup(project_dir);
+    g_free(self->user_properties_json);
+    self->user_properties_json = g_strdup(user_properties_json);
+    self->project = std::move(project);
+
+    if (project_changed) {
+        // Keep the currently bound GL texture as a transition frame, but move
+        // the import path to a new generation so a new wallpaper cannot reuse a
+        // stale cached texture with the same external frame id.
+        self->project_generation++;
+    }
+
+    if (self->scene) {
+        if (project_changed)
+            configure_widget_scene_for_current_project(self, "project-reload");
+        else
+            sync_scene_user_properties(*self->scene, self->project);
+    }
+
+    if (project_changed)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_PROJECT_DIR]);
+    if (user_properties_changed)
+        g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_USER_PROPERTIES_JSON]);
+
+    request_render(self);
+    ensure_render_retry(self);
+    return TRUE;
+}
+
 void hanabi_scene_widget_set_project_dir(HanabiSceneWidget *self, const char *project_dir) {
     g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
 
     if (g_strcmp0(self->project_dir, project_dir) == 0)
         return;
 
-    SceneProject project;
-    if (!hanabi::scene::load_scene_project_with_overrides(
-            project_dir, self->user_properties_json, project, "widget"))
-        return;
-
-    g_free(self->project_dir);
-    self->project_dir = g_strdup(project_dir);
-    self->project = std::move(project);
-    reset_scene_state(self);
-    discard_cached_textures(self);
-    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_PROJECT_DIR]);
-    request_render(self);
-    ensure_render_retry(self);
+    hanabi_scene_widget_reload_project(self, project_dir, self->user_properties_json);
 }
 
 const char *hanabi_scene_widget_get_project_dir(HanabiSceneWidget *self) {
@@ -788,8 +943,12 @@ void hanabi_scene_widget_set_user_properties_json(HanabiSceneWidget *self, const
     g_free(self->user_properties_json);
     self->user_properties_json = g_strdup(user_properties_json);
     hanabi::scene::apply_user_property_overrides(self->project, self->user_properties_json, "widget");
-    reset_scene_state(self);
-    discard_cached_textures(self);
+    if (self->scene) {
+        // User-property edits for the same wallpaper are live updates on the
+        // reusable SceneWallpaper, matching KDE's property setter model instead
+        // of tearing down the native GtkGLArea/render path.
+        sync_scene_user_properties(*self->scene, self->project);
+    }
     g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_USER_PROPERTIES_JSON]);
     request_render(self);
     ensure_render_retry(self);
@@ -798,6 +957,46 @@ void hanabi_scene_widget_set_user_properties_json(HanabiSceneWidget *self, const
 const char *hanabi_scene_widget_get_user_properties_json(HanabiSceneWidget *self) {
     g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), nullptr);
     return self->user_properties_json;
+}
+
+void hanabi_scene_widget_set_media_state_json(HanabiSceneWidget *self, const char *media_state_json) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+
+    if (g_strcmp0(self->media_state_json, media_state_json) == 0)
+        return;
+
+    g_free(self->media_state_json);
+    self->media_state_json = g_strdup(media_state_json);
+    if (self->scene) {
+        hanabi::scene::sync_scene_media_state(
+            *self->scene,
+            hanabi::scene::build_scene_media_state_from_json(self->media_state_json, "widget"));
+    }
+    request_render(self);
+    ensure_render_retry(self);
+}
+
+void hanabi_scene_widget_set_audio_samples(HanabiSceneWidget *self, GVariant *audio_samples) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+
+    if (self->audio_samples == audio_samples)
+        return;
+    if (self->audio_samples && audio_samples && g_variant_equal(self->audio_samples, audio_samples))
+        return;
+
+    g_clear_pointer(&self->audio_samples, g_variant_unref);
+    if (audio_samples)
+        self->audio_samples = g_variant_ref_sink(audio_samples);
+
+    if (self->scene) {
+        hanabi::scene::sync_scene_audio_samples(
+            *self->scene,
+            hanabi::scene::build_scene_audio_samples_from_variant(self->audio_samples, "widget"));
+    }
+    if (!self->playing) {
+        request_render(self);
+        ensure_render_retry(self);
+    }
 }
 
 void hanabi_scene_widget_set_muted(HanabiSceneWidget *self, gboolean muted) {
@@ -927,4 +1126,12 @@ void hanabi_scene_widget_set_mouse_pos(HanabiSceneWidget *self, double x, double
     const double nx = CLAMP(x / static_cast<double>(width), 0.0, 1.0);
     const double ny = CLAMP(y / static_cast<double>(height), 0.0, 1.0);
     self->scene->mouseInput(nx, ny);
+}
+
+void hanabi_scene_widget_set_cursor_left_down(HanabiSceneWidget *self, gboolean down) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+    if (!self->scene)
+        return;
+
+    self->scene->mouseLeftButton(down);
 }
