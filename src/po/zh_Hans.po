@@ -324,3 +324,17 @@ msgstr "逆序"
 #: src/prefs.js:454
 msgid "Random"
 msgstr "随机"
+
+#. Thumbnail context-menu labels for launching one-off renderer previews from
+#. the preferences wallpaper browser.
+#: src/prefs/projectBrowser.js:574
+msgid "Window Preview"
+msgstr "窗口预览"
+
+#: src/prefs/projectBrowser.js:575
+msgid "Fullscreen Preview"
+msgstr "全屏预览"
+
+#: src/prefs/projectBrowser.js:579
+msgid "Preview"
+msgstr "预览"

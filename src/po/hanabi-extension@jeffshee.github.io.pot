@@ -299,3 +299,17 @@ msgstr ""
 #: src/prefs.js:454
 msgid "Random"
 msgstr ""
+
+#. Thumbnail context-menu labels for launching one-off renderer previews from
+#. the preferences wallpaper browser.
+#: src/prefs/projectBrowser.js:574
+msgid "Window Preview"
+msgstr ""
+
+#: src/prefs/projectBrowser.js:575
+msgid "Fullscreen Preview"
+msgstr ""
+
+#: src/prefs/projectBrowser.js:579
+msgid "Preview"
+msgstr ""

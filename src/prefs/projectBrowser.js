@@ -33,6 +33,13 @@ import {
 } from '../project.js';
 import {connectTracked} from './rows.js';
 
+// Resolve paths from this module so the preview actions work both from the
+// installed extension directory and from an in-tree development build where the
+// preferences module still sits next to the renderer directory under src/.
+const moduleDir = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
+const extensionDir = GLib.path_get_dirname(moduleDir);
+const rendererScriptPath = GLib.build_filenamev([extensionDir, 'renderer', 'renderer.js']);
+
 const haveContentFit = Gtk.get_minor_version() >= 8;
 // The Browse grid uses compact square thumbnails so more wallpapers remain
 // visible at once, while zero child spacing removes the gutter between adjacent
@@ -48,6 +55,10 @@ const PROJECT_CARD_SECONDARY_BUTTON = 3;
 // placeholder widgets on the main thread, while disk reads and pixbuf decoding
 // are allowed to complete in a small background stream instead of stampeding.
 const PROJECT_THUMBNAIL_CONCURRENCY = 3;
+// The context-menu window preview mirrors the manual debug command requested by
+// users: a fixed 16:9 window that is large enough to inspect scene/web details
+// without covering the whole desktop.
+const PROJECT_PREVIEW_WINDOW_DIMENSION = '1600:900';
 const SCENE_PROPERTY_PANEL_WIDTH = 360;
 const INSPECTOR_ROW_HORIZONTAL_MARGIN = 24;
 const INSPECTOR_ROW_CONTROL_SPACING = 12;
@@ -508,14 +519,64 @@ function openProjectDirectory(project) {
     }
 }
 
+function launchProjectPreview(project, windowed) {
+    const path = project?.path;
+    if (!path) {
+        console.warn('Hanabi preferences: cannot preview wallpaper because the project path is empty');
+        return;
+    }
+
+    if (!GLib.file_test(rendererScriptPath, GLib.FileTest.IS_REGULAR)) {
+        console.warn(`Hanabi preferences: cannot preview wallpaper because renderer.js was not found at "${rendererScriptPath}"`);
+        return;
+    }
+
+    const argv = [
+        'gjs',
+        rendererScriptPath,
+        '--standalone',
+        '--nohide',
+    ];
+    if (windowed)
+        argv.push('-W', PROJECT_PREVIEW_WINDOW_DIMENSION);
+    argv.push('--project-path', path);
+
+    // Use a small shell wrapper only for the same stderr/stdout tee behavior as
+    // the documented manual preview command. Every argv segment is shell-quoted
+    // before joining so wallpaper paths with spaces or quotes stay data, not
+    // shell syntax.
+    const command = `${argv.map(arg => GLib.shell_quote(arg)).join(' ')} 2>&1 | tee run.log`;
+    try {
+        const launcher = new Gio.SubprocessLauncher({flags: Gio.SubprocessFlags.NONE});
+        launcher.set_cwd(extensionDir);
+        launcher.spawnv(['/bin/sh', '-c', command]);
+    } catch (error) {
+        const mode = windowed ? 'window' : 'fullscreen';
+        console.warn(`Hanabi preferences: failed to launch ${mode} wallpaper preview for "${path}": ${error}`);
+    }
+}
+
 function attachProjectPreviewContextMenu(preview, project) {
     const actions = new Gio.SimpleActionGroup();
     const openFolderAction = new Gio.SimpleAction({name: 'open-folder'});
     openFolderAction.connect('activate', () => openProjectDirectory(project));
     actions.add_action(openFolderAction);
+    const previewWindowAction = new Gio.SimpleAction({name: 'preview-window'});
+    previewWindowAction.connect('activate', () => launchProjectPreview(project, true));
+    actions.add_action(previewWindowAction);
+    const previewFullscreenAction = new Gio.SimpleAction({name: 'preview-fullscreen'});
+    previewFullscreenAction.connect('activate', () => launchProjectPreview(project, false));
+    actions.add_action(previewFullscreenAction);
     preview.insert_action_group('thumbnail', actions);
 
     const menu = new Gio.Menu();
+    const previewMenu = new Gio.Menu();
+    previewMenu.append(_('Window Preview'), 'thumbnail.preview-window');
+    previewMenu.append(_('Fullscreen Preview'), 'thumbnail.preview-fullscreen');
+
+    // Keep both launch modes grouped under one submenu so the thumbnail context
+    // menu stays compact as more wallpaper maintenance actions are added.
+    menu.append_submenu(_('Preview'), previewMenu);
     menu.append(_('Open Wallpaper Folder'), 'thumbnail.open-folder');
 
     // The popover is parented to the thumbnail widget so the menu is only
