@@ -20,8 +20,7 @@ if [ ! -d "$cef_root_dir" ]; then
 fi
 
 echo "==> Configuring gstcefsrc CMake project"
-rm -rf "$build_dir"
-mkdir -p "$build_dir" "$stage_dir"
+mkdir -p "$build_dir"
 
 cmake -S "$src_dir" -B "$build_dir" \
     -DCMAKE_BUILD_TYPE=Release \
