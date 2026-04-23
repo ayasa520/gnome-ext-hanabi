@@ -57,15 +57,20 @@ Required at runtime:
 - GJS / GNOME Shell extension support
 - GTK 4
 - libadwaita with GI typelibs for the preferences window
+- libsoup 3 with GI typelibs for the local project asset bridge used by web backends
+- GdkPixbuf with GI typelibs for preview and scene media thumbnail decoding
 - `libgtk-4-media-gstreamer` or your distro's GTK4 GStreamer media backend package
-- GStreamer typelibs for `GstPlay` and `GstAudio`
-- WPE stack for web wallpapers: `wpewebkit`, `wpebackend-fdo`, and the GI typelibs providing `WPEWebKit-2.0`, `WPEPlatform-2.0`, and `WPEPlatformHeadless-2.0`
+- GStreamer plugins and typelibs for `GstPlay`, `GstAudio`, and `GstApp`
+- WPE stack for the default web backend: `wpewebkit`, `wpebackend-fdo`, and the GI typelibs providing `WPEWebKit-2.0`, `WPEPlatform-2.0`, and `WPEPlatformHeadless-2.0`
 
 Required for the bundled native backends built by Hanabi:
 
+- `gdk-pixbuf-2.0`
 - `json-glib`
 - `epoxy`
 - `liblz4`
+- `pangocairo`, `fontconfig`, and `freetype2` for native scene text layers
+- Vulkan, OpenGL, and GStreamer development files used by the scene renderer
 - `wpe-platform-2.0`
 
 If any of these are missing, Hanabi may still install but some project types will fall back to placeholders or reduced functionality.
@@ -88,6 +93,10 @@ If any of these are missing, Hanabi may still install but some project types wil
     ./run.sh install
     ```
 
+   <!-- Documentation note: run.sh always configures Meson in `.build`, which keeps local build
+   products out of the source tree and matches the project-local development workflow. -->
+   The helper configures Meson in `.build` and installs from there.
+
    To enable the experimental Chromium-based web backend option in preferences:
 
    ```
@@ -108,20 +117,33 @@ Currently supported project types:
 
 - `video`: video wallpaper projects
 - `web`: web wallpaper projects rendered with WPEWebKit by default, with optional experimental `gstcefsrc` support when built with `-Dgstcefsrc-web-backend=true`
-- `scene`: scene wallpaper projects rendered through Hanabi's native scene bridge
+- `scene`: Wallpaper Engine scene projects rendered through Hanabi's native scene bridge
+
+<!-- Documentation note: this backend summary mirrors src/renderer/backends.js and the native
+bridge modules so feature reports can be mapped to the correct renderer path. -->
+Backend highlights:
+
+- WPEWebKit web projects use a local asset/user-property bridge, WPE pointer events, pause/resume state, and audio sample delivery for Wallpaper Engine-style web APIs.
+- The optional `gstcefsrc` web backend serves the project through Hanabi's local HTTP bridge, supports user/general property polling, local media range requests, pointer forwarding, HiDPI device scale, audio output, and Chromium lifecycle suspend/resume while paused.
+- Scene projects use the native scene bridge with `wallpaper-scene-renderer` for images, text layers, particles, puppet warp, scene scripts, user properties, media state, and audio-reactive script data.
 
 ### Repository Layout
 
 - [src](./src): GNOME Shell extension code
 - [src/native/scene](./src/native/scene): Hanabi's native scene bridge and scene backend sources
-- [src/native/third_party/wallpaper-scene-renderer](./src/native/third_party/wallpaper-scene-renderer): upstream scene renderer source used by the native bridge
+- [src/native/wpe](./src/native/wpe): WPE dmabuf/paintable bridge used by the default web backend
+- [src/native/third_party/gstcefsrc](./src/native/third_party/gstcefsrc): optional Chromium/CEF GStreamer source used by the experimental web backend
+- [src/native/third_party/wallpaper-scene-renderer](./src/native/third_party/wallpaper-scene-renderer): upstream scene renderer source used by the native scene bridge
 
-The native scene bridge is installed under the selected Meson prefix's library directories at install time. The third-party renderer sources are kept in this repository for development and build purposes.
+The native scene and WPE bridges are installed under the selected Meson prefix's library directories at install time. The third-party sources are kept in this repository for development and build purposes.
 
 ### Distro-specific Guides
 
 - [Installation Guide for Ubuntu/Pop!\_OS 22.04](docs/ubuntu-22-04.md)
 - [Installation Guide for Ubuntu 23.04](docs/ubuntu-23-04.md)
+- [Installation Guide for Ubuntu 24.04](docs/ubuntu-24-04.md)
+- [Installation Guide for Fedora 40](docs/fedora-40.md)
+- [Installation Guide for Fedora 41](docs/fedora-41.md)
 - [Installation Guide for openSUSE Tumbleweed](docs/opensuse-tumbleweed.md)
 
 ### Troubleshooting
