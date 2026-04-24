@@ -55,10 +55,11 @@ const PROJECT_CARD_SECONDARY_BUTTON = 3;
 // placeholder widgets on the main thread, while disk reads and pixbuf decoding
 // are allowed to complete in a small background stream instead of stampeding.
 const PROJECT_THUMBNAIL_CONCURRENCY = 3;
-// The context-menu window preview mirrors the manual debug command requested by
-// users: a fixed 16:9 window that is large enough to inspect scene/web details
-// without covering the whole desktop.
-const PROJECT_PREVIEW_WINDOW_DIMENSION = '1600:900';
+// Treat 1600x900 as the scale-1 physical preview target, then convert it to
+// GTK logical window units for the monitor where the preferences thumbnail
+// lives. On scale 2 this intentionally becomes 800x450.
+const PROJECT_PREVIEW_WINDOW_BASE_WIDTH = 1600;
+const PROJECT_PREVIEW_WINDOW_BASE_HEIGHT = 900;
 const SCENE_PROPERTY_PANEL_WIDTH = 360;
 const INSPECTOR_ROW_HORIZONTAL_MARGIN = 24;
 const INSPECTOR_ROW_CONTROL_SPACING = 12;
@@ -519,7 +520,17 @@ function openProjectDirectory(project) {
     }
 }
 
-function launchProjectPreview(project, windowed) {
+function getProjectPreviewWindowDimension(anchorWidget) {
+    const scaleFactor = anchorWidget?.get_scale_factor?.() ?? 1;
+    const safeScaleFactor = Number.isFinite(scaleFactor) && scaleFactor > 0
+        ? scaleFactor
+        : 1;
+    const width = Math.max(1, Math.round(PROJECT_PREVIEW_WINDOW_BASE_WIDTH / safeScaleFactor));
+    const height = Math.max(1, Math.round(PROJECT_PREVIEW_WINDOW_BASE_HEIGHT / safeScaleFactor));
+    return `${width}:${height}`;
+}
+
+function launchProjectPreview(project, windowed, anchorWidget = null) {
     const path = project?.path;
     if (!path) {
         console.warn('Hanabi preferences: cannot preview wallpaper because the project path is empty');
@@ -538,7 +549,7 @@ function launchProjectPreview(project, windowed) {
         '--nohide',
     ];
     if (windowed)
-        argv.push('-W', PROJECT_PREVIEW_WINDOW_DIMENSION);
+        argv.push('-W', getProjectPreviewWindowDimension(anchorWidget));
     argv.push('--project-path', path);
 
     // Use a small shell wrapper only for the same stderr/stdout tee behavior as
@@ -562,7 +573,7 @@ function attachProjectPreviewContextMenu(preview, project) {
     openFolderAction.connect('activate', () => openProjectDirectory(project));
     actions.add_action(openFolderAction);
     const previewWindowAction = new Gio.SimpleAction({name: 'preview-window'});
-    previewWindowAction.connect('activate', () => launchProjectPreview(project, true));
+    previewWindowAction.connect('activate', () => launchProjectPreview(project, true, preview));
     actions.add_action(previewWindowAction);
     const previewFullscreenAction = new Gio.SimpleAction({name: 'preview-fullscreen'});
     previewFullscreenAction.connect('activate', () => launchProjectPreview(project, false));
