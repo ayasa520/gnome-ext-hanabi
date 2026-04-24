@@ -291,6 +291,12 @@ let argvContentFitOverride = false;
 const wallpaperSwitchTransitionDurationMs = 1000;
 const wallpaperSwitchTransitionCleanupDelayMs = wallpaperSwitchTransitionDurationMs + 150;
 const wallpaperSwitchReadyTimeoutMs = 15000;
+// GTK scroll controllers report compact per-step deltas, while the renderer
+// stdin protocol and the Shell-side Clutter bridge already use wheel-style
+// 120-unit ticks. Scaling the standalone preview deltas here keeps web, CEF,
+// and scene backends receiving the same mouse-wheel units no matter which GJS
+// surface captured the physical scroll event.
+const previewWindowScrollDeltaScale = 120;
 const formatRendererAspect = (width, height) => {
     if (!Number.isFinite(width) || !Number.isFinite(height) || height <= 0)
         return 'n/a';
@@ -1960,7 +1966,8 @@ const HanabiRenderer = GObject.registerClass(
                     this,
                     this._getManagedWindowTitle(index, gdkMonitor),
                     widget,
-                    gdkMonitor
+                    gdkMonitor,
+                    index
                 );
                 this._hanabiWindows.push(window);
             });
@@ -2361,7 +2368,7 @@ const HanabiRendererWindow = GObject.registerClass(
         GTypeName: 'HanabiRendererWindow',
     },
 	    class HanabiRendererWindow extends Gtk.ApplicationWindow {
-	        constructor(application, title, widget, gdkMonitor) {
+	        constructor(application, title, widget, gdkMonitor, monitorIndex) {
 	            super({
 	                application,
 	                decorated: !!nohide,
@@ -2370,7 +2377,12 @@ const HanabiRendererWindow = GObject.registerClass(
 	                title,
 	            });
 	            this._gdkMonitor = gdkMonitor;
+	            // Pointer forwarding must preserve the renderer monitor index so
+	            // multi-monitor standalone previews target the same backend slot
+	            // as the stdin events sent by the Shell integration.
+	            this._monitorIndex = monitorIndex;
 	            this._windowTitleForLog = title;
+	            this._lastPreviewPointerPosition = null;
 	            this._wallpaperOverlay = new Gtk.Overlay({
 	                hexpand: true,
 	                vexpand: true,
@@ -2385,6 +2397,7 @@ const HanabiRendererWindow = GObject.registerClass(
 	            ensureRendererCssProvider();
 
 	            super.set_child(this._wallpaperOverlay);
+	            this._installPreviewPointerForwarding();
 	            this._logWindowGeometry('construct-before-child', widget);
 	            this.setWallpaperWidget(widget);
 	            if (!windowed) {
@@ -2555,6 +2568,131 @@ const HanabiRendererWindow = GObject.registerClass(
             }
 
             this.destroy();
+        }
+
+        _installPreviewPointerForwarding() {
+            if (!nohide)
+                return;
+
+            // Standalone previews are real GTK windows, so no Shell actor exists
+            // to mirror pointer activity into the renderer stdin pipe. Capture on
+            // the overlay before child widgets see the event, then forward into
+            // the same backend dispatch path used by the extension wallpaper.
+            const motionController = new Gtk.EventControllerMotion();
+            motionController.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+            motionController.connect('motion', (_controller, x, y) => {
+                this._forwardPreviewPointerEvent('mousemove', {x, y});
+            });
+            motionController.connect('leave', () => {
+                this._lastPreviewPointerPosition = null;
+            });
+            this._wallpaperOverlay.add_controller(motionController);
+
+            // A zero-button GestureClick listens to all mouse buttons, preserving
+            // right and middle clicks for Wallpaper Engine web projects and scene
+            // scripts instead of only forwarding the primary button.
+            const clickGesture = new Gtk.GestureClick({button: 0});
+            clickGesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+            clickGesture.connect('pressed', (gesture, _nPress, x, y) => {
+                this._forwardPreviewPointerEvent('mousedown', {
+                    x,
+                    y,
+                    button: gesture.get_current_button(),
+                });
+            });
+            clickGesture.connect('released', (gesture, _nPress, x, y) => {
+                this._forwardPreviewPointerEvent('mouseup', {
+                    x,
+                    y,
+                    button: gesture.get_current_button(),
+                });
+            });
+            this._wallpaperOverlay.add_controller(clickGesture);
+
+            // Scroll coordinates are not part of the scroll signal payload, so
+            // the current GDK event is queried and falls back to the most recent
+            // motion/click position. That keeps wheel events anchored at the
+            // pointer location even when GTK omits precise event coordinates.
+            const scrollController = new Gtk.EventControllerScroll({
+                flags: Gtk.EventControllerScrollFlags.BOTH_AXES,
+            });
+            scrollController.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+            scrollController.connect('scroll', (controller, deltaX, deltaY) => {
+                const position = this._getPreviewControllerEventPosition(controller);
+                this._forwardPreviewPointerEvent('wheel', {
+                    x: position.x,
+                    y: position.y,
+                    deltaX: deltaX * previewWindowScrollDeltaScale,
+                    deltaY: deltaY * previewWindowScrollDeltaScale,
+                });
+                return false;
+            });
+            this._wallpaperOverlay.add_controller(scrollController);
+        }
+
+        _getPreviewControllerEventPosition(controller) {
+            const event = controller.get_current_event?.() ?? null;
+            if (event?.get_position) {
+                try {
+                    const position = event.get_position();
+                    const [ok, x, y] = position.length === 3
+                        ? position
+                        : [true, position[0], position[1]];
+                    if (ok && Number.isFinite(x) && Number.isFinite(y))
+                        return {x, y};
+                } catch (_e) {
+                }
+            }
+
+            return this._lastPreviewPointerPosition ?? {
+                x: this._wallpaperOverlay.get_width() / 2,
+                y: this._wallpaperOverlay.get_height() / 2,
+            };
+        }
+
+        _normalizePreviewPointerPosition(x, y) {
+            const pointerX = Number(x);
+            const pointerY = Number(y);
+            if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY))
+                return null;
+
+            const width = this._wallpaperOverlay.get_width();
+            const height = this._wallpaperOverlay.get_height();
+            if (pointerX < 0 || pointerY < 0 || pointerX > width || pointerY > height)
+                return null;
+
+            return {x: pointerX, y: pointerY};
+        }
+
+        _forwardPreviewPointerEvent(type, event) {
+            const position = this._normalizePreviewPointerPosition(event.x, event.y);
+            if (!position)
+                return;
+
+            if (type === 'mousemove') {
+                if (this._lastPreviewPointerPosition) {
+                    const dx = Math.abs(position.x - this._lastPreviewPointerPosition.x);
+                    const dy = Math.abs(position.y - this._lastPreviewPointerPosition.y);
+                    if (dx === 0 && dy === 0)
+                        return;
+                }
+                this._lastPreviewPointerPosition = position;
+            } else {
+                this._lastPreviewPointerPosition = position;
+            }
+
+            // Forward directly through the renderer object rather than spawning
+            // a fake stdin packet; this keeps standalone preview input in lockstep
+            // with the existing validation and backend fan-out code.
+            this.get_application()?.dispatchPointerEvent({
+                monitorIndex: this._monitorIndex,
+                type,
+                x: position.x,
+                y: position.y,
+                button: Number(event.button ?? 0),
+                deltaX: Number(event.deltaX ?? 0),
+                deltaY: Number(event.deltaY ?? 0),
+            });
         }
 
         _prepareWallpaperWidget(widget) {
