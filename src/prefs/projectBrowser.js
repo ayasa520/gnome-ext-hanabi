@@ -65,6 +65,80 @@ const INSPECTOR_ROW_HORIZONTAL_MARGIN = 24;
 const INSPECTOR_ROW_CONTROL_SPACING = 12;
 const INSPECTOR_WIDE_CONTROL_WIDTH = 180;
 const INSPECTOR_NARROW_CONTROL_WIDTH = 56;
+const PROJECT_BROWSER_SORT_KEYS = {
+    NAME: 'name',
+    FILE_SIZE: 'file-size',
+    SUBSCRIBE_TIME: 'subscribe-time',
+};
+
+function compareProjectTitles(left, right) {
+    const leftTitle = `${left?.title || left?.basename || left?.path || ''}`.toLowerCase();
+    const rightTitle = `${right?.title || right?.basename || right?.path || ''}`.toLowerCase();
+    return leftTitle.localeCompare(rightTitle) || `${left?.path ?? ''}`.localeCompare(`${right?.path ?? ''}`);
+}
+
+function compareNumbersDescending(left, right) {
+    // GTK only needs the sign of a sort result; normalizing the comparison
+    // keeps very large directory sizes or microsecond timestamps from relying
+    // on callback marshalling of oversized numeric differences.
+    if (left === right)
+        return 0;
+    return left > right ? -1 : 1;
+}
+
+function queryProjectDirectoryTime(project) {
+    try {
+        const file = Gio.File.new_for_path(project.path);
+        const info = file.query_info(
+            'time::modified,time::modified-usec',
+            Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
+            null
+        );
+
+        // Wallpaper Engine subscriptions live as project directories here, so
+        // the directory timestamp is the local stand-in for "subscribe time".
+        return (
+            info.get_attribute_uint64('time::modified') * GLib.USEC_PER_SEC +
+            info.get_attribute_uint32('time::modified-usec')
+        );
+    } catch (_error) {
+        return 0;
+    }
+}
+
+function queryProjectDirectorySize(path) {
+    let totalSize = 0;
+
+    try {
+        const dir = Gio.File.new_for_path(path);
+        const enumerator = dir.enumerate_children(
+            'standard::name,standard::type,standard::size',
+            Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
+            null
+        );
+
+        let info;
+        while ((info = enumerator.next_file(null))) {
+            const child = dir.get_child(info.get_name());
+            if (info.get_file_type() === Gio.FileType.DIRECTORY) {
+                totalSize += queryProjectDirectorySize(child.get_path());
+                continue;
+            }
+
+            // Sorting by "file size" means the whole wallpaper project payload,
+            // not only project.json or the launch entry, so every regular child
+            // file contributes to the cached total.
+            if (info.get_file_type() === Gio.FileType.REGULAR)
+                totalSize += info.get_size();
+        }
+
+        enumerator.close(null);
+    } catch (_error) {
+        return totalSize;
+    }
+
+    return totalSize;
+}
 
 export function formatProjectSubtitle(path) {
     if (!path)
@@ -979,6 +1053,23 @@ function createProjectBrowserDialog(window, settings) {
         hexpand: true,
         placeholder_text: _('Search wallpapers'),
     });
+    // Keep Browse sorting as a dialog-local view choice: it should reorder the
+    // currently loaded cards without changing the shared project loader order
+    // that renderer-side rotation and other callers may still depend on.
+    const sortOptions = [
+        {key: PROJECT_BROWSER_SORT_KEYS.NAME, label: _('Name')},
+        {key: PROJECT_BROWSER_SORT_KEYS.FILE_SIZE, label: _('File size')},
+        {key: PROJECT_BROWSER_SORT_KEYS.SUBSCRIBE_TIME, label: _('Subscribe time')},
+    ];
+    const sortLabel = new Gtk.Label({
+        label: _('Sort'),
+        valign: Gtk.Align.CENTER,
+    });
+    const sortDropdown = new Gtk.DropDown({
+        model: Gtk.StringList.new(sortOptions.map(option => option.label)),
+        selected: 0,
+        valign: Gtk.Align.CENTER,
+    });
     const filterButton = new Gtk.MenuButton({
         label: _('Filter'),
         valign: Gtk.Align.CENTER,
@@ -1028,6 +1119,8 @@ function createProjectBrowserDialog(window, settings) {
     filterPopover.set_child(filterPopoverScrolled);
     filterButton.set_popover(filterPopover);
     searchRow.append(searchEntry);
+    searchRow.append(sortLabel);
+    searchRow.append(sortDropdown);
     searchRow.append(filterButton);
     toolbar.append(searchRow);
     content.append(toolbar);
@@ -1135,8 +1228,10 @@ function createProjectBrowserDialog(window, settings) {
     let currentProjectsByPath = new Map();
     let currentFilterTagOptions = getProjectFilterTagOptions([]);
     let inspectorSections = [];
+    let currentSortKey = sortOptions[sortDropdown.selected]?.key ?? PROJECT_BROWSER_SORT_KEYS.NAME;
     const sceneImageSession = new Soup.Session();
     const cards = [];
+    const projectSortMetadata = new Map();
     // The Browse dialog owns one thumbnail queue. Destroying the dialog cancels
     // pending preview IO and prevents late async callbacks from touching widgets
     // that GTK has already removed from the preferences window.
@@ -1149,6 +1244,49 @@ function createProjectBrowserDialog(window, settings) {
     };
 
     dialog.connect('destroy', () => previewQueue.destroy());
+
+    const getProjectSortMetadata = project => {
+        let metadata = projectSortMetadata.get(project.path);
+        if (metadata)
+            return metadata;
+
+        // The sort metadata is cached per rebuild because file-size sorting has
+        // to walk project directories recursively, while name and timestamp can
+        // be reused by every GTK sort callback for the same wallpaper row.
+        metadata = {
+            sizeBytes: null,
+            timeUs: queryProjectDirectoryTime(project),
+        };
+        projectSortMetadata.set(project.path, metadata);
+        return metadata;
+    };
+
+    const getProjectSortSize = project => {
+        const metadata = getProjectSortMetadata(project);
+        if (metadata.sizeBytes === null)
+            metadata.sizeBytes = queryProjectDirectorySize(project.path);
+        return metadata.sizeBytes;
+    };
+
+    const compareProjectsForCurrentSort = (left, right) => {
+        if (currentSortKey === PROJECT_BROWSER_SORT_KEYS.FILE_SIZE) {
+            const sizeComparison = compareNumbersDescending(
+                getProjectSortSize(left),
+                getProjectSortSize(right)
+            );
+            return sizeComparison || compareProjectTitles(left, right);
+        }
+
+        if (currentSortKey === PROJECT_BROWSER_SORT_KEYS.SUBSCRIBE_TIME) {
+            const timeComparison = compareNumbersDescending(
+                getProjectSortMetadata(left).timeUs,
+                getProjectSortMetadata(right).timeUs
+            );
+            return timeComparison || compareProjectTitles(left, right);
+        }
+
+        return compareProjectTitles(left, right);
+    };
 
     const projectMatchesCurrentFilters = project => {
         const query = currentQuery.trim().toLowerCase();
@@ -1810,6 +1948,7 @@ function createProjectBrowserDialog(window, settings) {
     const rebuild = () => {
         const projects = listProjects(settings.get_string(libraryKey));
         currentProjectsByPath = new Map(projects.map(project => [project.path, project]));
+        projectSortMetadata.clear();
         rebuildFilterControls(projects);
         while (true) {
             const child = flowBox.get_first_child();
@@ -1847,6 +1986,7 @@ function createProjectBrowserDialog(window, settings) {
             flowBox.append(flowChild);
         });
 
+        flowBox.invalidate_sort();
         flowBox.invalidate_filter();
         updateEmptyState();
         syncSelectionState();
@@ -1859,6 +1999,20 @@ function createProjectBrowserDialog(window, settings) {
             return false;
 
         return projectMatchesCurrentFilters(item.project);
+    });
+
+    flowBox.set_sort_func((leftChild, rightChild) => {
+        const leftItem = cards.find(entry => entry.card === leftChild.get_child());
+        const rightItem = cards.find(entry => entry.card === rightChild.get_child());
+        if (!leftItem || !rightItem)
+            return 0;
+
+        return compareProjectsForCurrentSort(leftItem.project, rightItem.project);
+    });
+
+    sortDropdown.connect('notify::selected', dropdown => {
+        currentSortKey = sortOptions[dropdown.selected]?.key ?? PROJECT_BROWSER_SORT_KEYS.NAME;
+        flowBox.invalidate_sort();
     });
 
     searchEntry.connect('search-changed', entry => {
