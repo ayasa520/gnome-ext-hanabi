@@ -110,6 +110,25 @@ inline std::string describe_user_property_for_log(const wallpaper::UserPropertyM
     return describe_user_property_value_for_log(iter->second);
 }
 
+inline std::string describe_user_property_keys_for_log(const wallpaper::UserPropertyMap& properties) {
+    // The native bridge should report the actual payload shape it forwards to SceneWallpaper
+    // without knowing anything about a specific scene's UI properties or shader uniform names.
+    std::string description = "[";
+    size_t count = 0;
+    for (const auto& [name, _] : properties) {
+        if (count != 0)
+            description += ",";
+        description += name;
+        count++;
+        if (count >= 12 && properties.size() > count) {
+            description += ",...";
+            break;
+        }
+    }
+    description += "]";
+    return description;
+}
+
 inline bool parse_numeric_components_from_string(const char* text, std::vector<float>* out_components) {
     if (!text || !out_components)
         return false;
@@ -530,6 +549,10 @@ inline bool ensure_scene_wallpaper(std::unique_ptr<wallpaper::SceneWallpaper>& s
 
 inline void sync_scene_user_properties(wallpaper::SceneWallpaper& scene,
                                        const SceneProject& project) {
+    g_message("HanabiScene: forwarding live PROPERTY_USER_PROPERTIES project=%s count=%zu keys=%s",
+              project.project_dir.c_str(),
+              project.user_properties.size(),
+              describe_user_property_keys_for_log(project.user_properties).c_str());
     scene.setPropertyObject(
         wallpaper::PROPERTY_USER_PROPERTIES,
         std::make_shared<wallpaper::UserPropertyMap>(project.user_properties));
