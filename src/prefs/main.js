@@ -29,23 +29,43 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
 
         const page = new Adw.PreferencesPage();
 
+        // Keep renderer-neutral controls together so web-only and scene-only
+        // options do not visually mix with shared wallpaper behavior.
         const generalGroup = new Adw.PreferencesGroup({
-            title: _('General'),
+            title: _('General Settings'),
         });
         page.add(generalGroup);
         prefsRowLibraryPath(window, generalGroup);
         prefsRowProjectChooser(window, generalGroup);
         prefsRowFitMode(window, generalGroup);
-        if (BuildConfig.enableGstCefSrcWebBackend) {
-            prefsRowWebBackend(window, generalGroup, [
-                {value: 'wpewebkit', label: _('WPE WebKit')},
-                {value: 'gstcefsrc', label: _('CEF (gstcefsrc)')},
-            ]);
-        }
-        prefsRowInt(window, generalGroup, _('Scene FPS'), 'scene-fps', _('Set target FPS for scene wallpapers'), 5, 240, 5, 10);
         prefsRowBoolean(window, generalGroup, _('Mute Audio'), 'mute', '');
         prefsRowInt(window, generalGroup, _('Volume Level'), 'volume', '', 0, 100, 1, 10);
         prefsRowBoolean(window, generalGroup, _('Show Panel Menu'), 'show-panel-menu', '');
+
+        // Web renderer controls live in their own group because these settings
+        // only affect Wallpaper Engine web projects and should not imply scene
+        // backend behavior.
+        const webGroup = new Adw.PreferencesGroup({
+            title: _('Web Settings'),
+        });
+        page.add(webGroup);
+        const webBackends = [
+            {value: 'wpewebkit', label: _('WPE WebKit')},
+        ];
+        if (BuildConfig.enableGstCefSrcWebBackend) {
+            // Append the optional Chromium backend only when this build ships
+            // the native gstcefsrc artifacts that can actually launch it.
+            webBackends.push({value: 'gstcefsrc', label: _('CEF (gstcefsrc)')});
+        }
+        prefsRowWebBackend(window, webGroup, webBackends);
+
+        // Scene renderer controls stay separate from shared settings because
+        // native scene projects have their own performance and timing model.
+        const sceneGroup = new Adw.PreferencesGroup({
+            title: _('Scene Settings'),
+        });
+        page.add(sceneGroup);
+        prefsRowInt(window, sceneGroup, _('Scene FPS'), 'scene-fps', _('Set target FPS for scene wallpapers'), 5, 240, 5, 10);
 
         const autoPauseGroup = new Adw.PreferencesGroup({
             title: _('Auto Pause'),

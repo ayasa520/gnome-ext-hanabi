@@ -116,10 +116,15 @@ export function prefsRowWebBackend(window, prefsGroup, backends) {
         selected: selectedIndex,
     });
 
-    row.set_tooltip_markup(_(`
-    <b>WPE WebKit</b>: The default backend for web wallpapers.
-    <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using GStreamer.
-    `));
+    // Describe only the backend choices that this build exposes, so the
+    // preferences window does not advertise an unavailable native renderer.
+    const tooltip = values.includes('gstcefsrc')
+        ? _(`
+        <b>WPE WebKit</b>: The default backend for web wallpapers.
+        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using GStreamer.
+        `)
+        : _('<b>WPE WebKit</b>: The default backend for web wallpapers.');
+    row.set_tooltip_markup(tooltip);
     prefsGroup.add(row);
 
     if (values[selectedIndex] !== currentValue)
