@@ -6,6 +6,7 @@
 #include <drm/drm_fourcc.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -57,6 +58,63 @@ double safe_aspect_ratio(double width, double height) {
 struct PaintableTextureEntry {
     GdkTexture* texture { nullptr };
     uint64_t generation { 0 };
+};
+
+class PaintableRedrawBridge : public std::enable_shared_from_this<PaintableRedrawBridge> {
+public:
+    explicit PaintableRedrawBridge(GObject* paintable) {
+        g_weak_ref_init(&paintable_, paintable);
+    }
+
+    PaintableRedrawBridge(const PaintableRedrawBridge&) = delete;
+    PaintableRedrawBridge& operator=(const PaintableRedrawBridge&) = delete;
+
+    ~PaintableRedrawBridge() {
+        g_weak_ref_clear(&paintable_);
+    }
+
+    void invalidate() {
+        active_.store(false, std::memory_order_release);
+    }
+
+    void request_redraw() {
+        if (!active_.load(std::memory_order_acquire))
+            return;
+
+        gpointer paintable = g_weak_ref_get(&paintable_);
+        if (!paintable)
+            return;
+        auto* object = G_OBJECT(paintable);
+
+        auto* request = new PaintableRedrawRequest { object, shared_from_this() };
+
+        // The renderer thread can outlive the paintable while SceneWallpaper is
+        // tearing down. Taking the strong reference from the weak ref before
+        // entering GTK's main context makes the queued invalidation own a valid
+        // GObject instead of racing a raw HanabiScenePaintable pointer. Keeping
+        // the bridge in the request also lets the main-thread task observe a
+        // dispose-time invalidation that happened after the request was queued.
+        g_main_context_invoke(
+            nullptr,
+            +[] (gpointer data) -> gboolean {
+                std::unique_ptr<PaintableRedrawRequest> request(
+                    static_cast<PaintableRedrawRequest*>(data));
+                if (request->bridge->active_.load(std::memory_order_acquire))
+                    gdk_paintable_invalidate_contents(GDK_PAINTABLE(request->paintable));
+                g_object_unref(request->paintable);
+                return G_SOURCE_REMOVE;
+            },
+            request);
+    }
+
+private:
+    struct PaintableRedrawRequest {
+        GObject* paintable;
+        std::shared_ptr<PaintableRedrawBridge> bridge;
+    };
+
+    GWeakRef paintable_ {};
+    std::atomic<bool> active_ { true };
 };
 
 std::vector<uint64_t> collect_dmabuf_modifiers(GdkDisplay* display, guint32 fourcc) {
@@ -126,6 +184,7 @@ struct _HanabiScenePaintable {
 
     std::unique_ptr<wallpaper::SceneWallpaper> scene;
     SceneProject project;
+    std::shared_ptr<PaintableRedrawBridge> redraw_bridge;
     std::unordered_map<int32_t, PaintableTextureEntry> textures;
     uint64_t project_generation { 1 };
     uint64_t imported_texture_count { 0 };
@@ -269,17 +328,9 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                         info.width = static_cast<uint16_t>(target_width);
                                         info.height = static_cast<uint16_t>(target_height);
                                         info.render_scale = render_scale;
-                                        info.redraw_callback = [self]() {
-                                            g_main_context_invoke(
-                                                nullptr,
-                                                +[] (gpointer data) -> gboolean {
-                                                    auto* self = HANABI_SCENE_PAINTABLE(data);
-                                                    gdk_paintable_invalidate_contents(
-                                                        GDK_PAINTABLE(self));
-                                                    g_object_unref(self);
-                                                    return G_SOURCE_REMOVE;
-                                                },
-                                                g_object_ref(self));
+                                        info.redraw_callback = [bridge = self->redraw_bridge]() {
+                                            if (bridge)
+                                                bridge->request_redraw();
                                         };
                                         self->scene->initVulkan(info);
                                         self->render_width = target_width;
@@ -482,6 +533,8 @@ static void hanabi_scene_paintable_dispose(GObject* object) {
               self->scene ? "true" : "false",
               self->textures.size(),
               self->imported_texture_count);
+    if (self->redraw_bridge)
+        self->redraw_bridge->invalidate();
     self->scene.reset();
     self->scene_ready = false;
     self->render_ready = false;
@@ -498,6 +551,7 @@ static void hanabi_scene_paintable_finalize(GObject* object) {
               self->textures.size(),
               self->imported_texture_count);
     self->textures.~unordered_map<int32_t, PaintableTextureEntry>();
+    self->redraw_bridge.~shared_ptr<PaintableRedrawBridge>();
     self->scene.~unique_ptr<wallpaper::SceneWallpaper>();
     self->project.~SceneProject();
     g_clear_pointer(&self->project_dir, g_free);
@@ -628,6 +682,8 @@ static void hanabi_scene_paintable_init(HanabiScenePaintable* self) {
     new (&self->textures) std::unordered_map<int32_t, PaintableTextureEntry>();
     new (&self->scene) std::unique_ptr<wallpaper::SceneWallpaper>();
     new (&self->project) SceneProject();
+    new (&self->redraw_bridge) std::shared_ptr<PaintableRedrawBridge>(
+        std::make_shared<PaintableRedrawBridge>(G_OBJECT(self)));
     self->volume = 1.0;
     self->fill_mode = 2;
     self->fps = 30;

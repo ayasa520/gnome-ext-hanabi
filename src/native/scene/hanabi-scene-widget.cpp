@@ -7,6 +7,7 @@
 
 #include <array>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -171,11 +172,60 @@ wallpaper::TexTiling pick_tiling() {
     return wallpaper::TexTiling::OPTIMAL;
 }
 
-void queue_render_on_main(gpointer data) {
-    auto *self = HANABI_SCENE_WIDGET(data);
-    gtk_gl_area_queue_render(GTK_GL_AREA(self));
-    g_object_unref(self);
-}
+class WidgetRedrawBridge : public std::enable_shared_from_this<WidgetRedrawBridge> {
+public:
+    explicit WidgetRedrawBridge(GObject *widget) {
+        g_weak_ref_init(&widget_, widget);
+    }
+
+    WidgetRedrawBridge(const WidgetRedrawBridge&) = delete;
+    WidgetRedrawBridge& operator=(const WidgetRedrawBridge&) = delete;
+
+    ~WidgetRedrawBridge() {
+        g_weak_ref_clear(&widget_);
+    }
+
+    void invalidate() {
+        active_.store(false, std::memory_order_release);
+    }
+
+    void request_redraw() {
+        if (!active_.load(std::memory_order_acquire))
+            return;
+
+        gpointer widget = g_weak_ref_get(&widget_);
+        if (!widget)
+            return;
+        auto *object = G_OBJECT(widget);
+
+        auto *request = new WidgetRedrawRequest { object, shared_from_this() };
+
+        // RenderHandler emits redraws from its own looper thread. The bridge
+        // converts that thread-owned notification into a main-context task that
+        // owns a temporary strong widget reference, and the active flag lets a
+        // dispose that happens after queueing suppress stale GTK render requests.
+        g_main_context_invoke(
+            nullptr,
+            +[] (gpointer data) -> gboolean {
+                std::unique_ptr<WidgetRedrawRequest> request(
+                    static_cast<WidgetRedrawRequest*>(data));
+                if (request->bridge->active_.load(std::memory_order_acquire))
+                    gtk_gl_area_queue_render(GTK_GL_AREA(request->widget));
+                g_object_unref(request->widget);
+                return G_SOURCE_REMOVE;
+            },
+            request);
+    }
+
+private:
+    struct WidgetRedrawRequest {
+        GObject *widget;
+        std::shared_ptr<WidgetRedrawBridge> bridge;
+    };
+
+    GWeakRef widget_ {};
+    std::atomic<bool> active_ { true };
+};
 
 } // namespace
 
@@ -212,6 +262,7 @@ struct _HanabiSceneWidget {
     bool has_gl_uuid;
 
     std::unique_ptr<wallpaper::SceneWallpaper> scene;
+    std::shared_ptr<WidgetRedrawBridge> redraw_bridge;
     std::unordered_map<int, TextureEntry> textures;
     SceneProject project;
     uint64_t project_generation {1};
@@ -290,6 +341,8 @@ static void hanabi_scene_widget_dispose(GObject *object) {
               self->project_dir ? self->project_dir : "(null)",
               self->scene ? "true" : "false",
               self->textures.size());
+    if (self->redraw_bridge)
+        self->redraw_bridge->invalidate();
     reset_scene_state(self);
     self->textures.clear();
     G_OBJECT_CLASS(hanabi_scene_widget_parent_class)->dispose(object);
@@ -302,6 +355,7 @@ static void hanabi_scene_widget_finalize(GObject *object) {
               self->scene ? "true" : "false",
               self->textures.size());
     self->scene.~unique_ptr<wallpaper::SceneWallpaper>();
+    self->redraw_bridge.~shared_ptr<WidgetRedrawBridge>();
     self->textures.~unordered_map<int, TextureEntry>();
     self->project.~SceneProject();
     g_clear_pointer(&self->project_dir, g_free);
@@ -512,13 +566,6 @@ static GdkGLContext *hanabi_scene_widget_create_context(GtkGLArea *area) {
     return context;
 }
 
-static void redraw_callback(gpointer data) {
-    g_main_context_invoke(nullptr, reinterpret_cast<GSourceFunc>(+[] (gpointer user_data) -> gboolean {
-        queue_render_on_main(user_data);
-        return G_SOURCE_REMOVE;
-    }), data);
-}
-
 static bool ensure_scene_initialized(HanabiSceneWidget *self) {
     if (self->scene_ready || self->project.scene_path.empty())
         return self->scene_ready;
@@ -580,8 +627,9 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
     if (self->has_gl_uuid)
         info.uuid = self->gl_uuid;
     info.offscreen_tiling = pick_tiling();
-    info.redraw_callback = [self]() {
-        redraw_callback(g_object_ref(self));
+    info.redraw_callback = [bridge = self->redraw_bridge]() {
+        if (bridge)
+            bridge->request_redraw();
     };
     self->scene->initVulkan(info);
 
@@ -798,6 +846,8 @@ static void hanabi_scene_widget_class_init(HanabiSceneWidgetClass *klass) {
 
 static void hanabi_scene_widget_init(HanabiSceneWidget *self) {
     new (&self->scene) std::unique_ptr<wallpaper::SceneWallpaper>();
+    new (&self->redraw_bridge) std::shared_ptr<WidgetRedrawBridge>(
+        std::make_shared<WidgetRedrawBridge>(G_OBJECT(self)));
     new (&self->textures) std::unordered_map<int, TextureEntry>();
     new (&self->project) SceneProject();
     self->volume = 1.0;
