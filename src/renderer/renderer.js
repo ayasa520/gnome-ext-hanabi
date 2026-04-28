@@ -562,7 +562,10 @@ const applyProjectUserPropertyState = project => {
     return project;
 };
 
-const loadConfiguredProject = path => applyProjectUserPropertyState(loadProject(path));
+// Renderer startup is the single place where an invalid configured project
+// blocks visible wallpaper output, so enable detailed loader diagnostics here
+// while keeping project-browser directory scans quiet.
+const loadConfiguredProject = path => applyProjectUserPropertyState(loadProject(path, {logInvalid: true}));
 const serializeProjectPropertyPayload = project => {
     if (project?.type === ProjectType.SCENE)
         return JSON.stringify(project?.scenePropertyPayload ?? {});

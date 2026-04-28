@@ -346,6 +346,32 @@ inline std::string resolve_regular_file(const std::string& project_dir, const st
     return path.string();
 }
 
+inline std::string get_optional_string_member(JsonObject* object, const char* member_name) {
+    if (!object || !member_name || !json_object_has_member(object, member_name))
+        return {};
+
+    JsonNode* member = json_object_get_member(object, member_name);
+    if (!member || !JSON_NODE_HOLDS_VALUE(member) || json_node_get_value_type(member) != G_TYPE_STRING)
+        return {};
+
+    const char* value = json_node_get_string(member);
+    return value ? value : "";
+}
+
+inline bool entry_file_is_legacy_scene_project(const std::string& entry_file) {
+    if (entry_file.empty())
+        return false;
+
+    const auto extension = std::filesystem::path(entry_file).extension().string();
+
+    // Some older official Wallpaper Engine scene manifests omit the top-level
+    // "type" field, but still point at a scene document. Keep this native-side
+    // inference as narrow as the JavaScript loader so unsupported executables or
+    // unrelated project formats cannot enter the scene renderer by accident.
+    return g_ascii_strcasecmp(extension.c_str(), ".json") == 0 ||
+        g_ascii_strcasecmp(extension.c_str(), ".pkg") == 0;
+}
+
 inline std::string resolve_assets_path(const std::string& project_dir) {
     auto dir = std::filesystem::path(project_dir);
     for (auto current = dir; current.has_parent_path(); current = current.parent_path()) {
@@ -380,20 +406,27 @@ inline bool load_scene_project(const char* project_dir, SceneProject& project, c
     }
 
     JsonObject* object = json_node_get_object(root);
-    const char* type = json_object_has_member(object, "type")
-        ? json_object_get_string_member(object, "type")
-        : "";
-    if (g_ascii_strcasecmp(type, "scene") != 0) {
+    const std::string type = get_optional_string_member(object, "type");
+    std::string file_member = get_optional_string_member(object, "file");
+    if (!type.empty() && g_ascii_strcasecmp(type.c_str(), "scene") != 0) {
         g_warning("HanabiScene(%s): unsupported project type '%s' in %s",
                   log_context,
-                  type,
+                  type.c_str(),
                   manifest_path.c_str());
         return false;
     }
 
-    std::string file_member = json_object_has_member(object, "file")
-        ? json_object_get_string_member(object, "file")
-        : "";
+    // Explicit project metadata remains authoritative. Only manifests with a
+    // missing type get the legacy scene inference, matching the common official
+    // default-project shape used by Techno and Audiophile.
+    if (type.empty() && !entry_file_is_legacy_scene_project(file_member)) {
+        g_warning("HanabiScene(%s): project type is missing and entry file '%s' is not a legacy scene entry in %s",
+                  log_context,
+                  file_member.c_str(),
+                  manifest_path.c_str());
+        return false;
+    }
+
     std::string scene_path = resolve_regular_file(project_dir, file_member);
     if (scene_path.empty())
         scene_path = resolve_regular_file(project_dir, "scene.pkg");

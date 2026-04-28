@@ -175,15 +175,37 @@ function getWallpaperEngineProjectRoots(libraryPath) {
     return [...new Set(roots.filter(isDirectoryPath))];
 }
 
+function resolveLegacyProjectType(project) {
+    const entry = typeof project?.file === 'string' ? project.file.trim().toLowerCase() : '';
+    if (!entry)
+        return null;
+
+    // Older official Wallpaper Engine scene projects can omit "type" while
+    // still pointing at the scene document. Keep the inference narrow so
+    // unsupported executables, videos without explicit metadata, and malformed
+    // manifests continue to fail closed instead of being routed to a backend
+    // that cannot render them.
+    if (entry.endsWith('.json') || entry.endsWith('.pkg'))
+        return ProjectType.SCENE;
+
+    // Web projects are the only legacy projects we can safely identify from the
+    // entry file alone, because their launch surface is an HTML document.
+    if (entry.endsWith('.html') || entry.endsWith('.htm'))
+        return ProjectType.WEB;
+
+    return null;
+}
+
 function resolveProjectType(project) {
-    const type = `${project?.type ?? ''}`.toLowerCase();
+    const rawType = typeof project?.type === 'string' ? project.type.trim() : '';
+    const type = rawType.toLowerCase();
     switch (type) {
     case ProjectType.VIDEO:
     case ProjectType.WEB:
     case ProjectType.SCENE:
         return type;
     default:
-        return null;
+        return rawType ? null : resolveLegacyProjectType(project);
     }
 }
 
@@ -1036,29 +1058,68 @@ function buildWebUserPropertyPayload(project, overrides = {}) {
     return payload;
 }
 
-function loadProject(projectDirPath) {
-    if (!projectDirPath)
+function warnInvalidProject(projectDirPath, reason) {
+    console.warn(`Hanabi project loader: invalid project "${projectDirPath || '<empty>'}": ${reason}`);
+}
+
+function loadProject(projectDirPath, options = {}) {
+    const logInvalid = options?.logInvalid === true;
+
+    if (!projectDirPath) {
+        if (logInvalid)
+            warnInvalidProject(projectDirPath, 'project path is empty');
         return null;
+    }
 
     const projectDir = Gio.File.new_for_path(projectDirPath);
-    if (projectDir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY)
+    if (projectDir.query_file_type(Gio.FileQueryInfoFlags.NONE, null) !== Gio.FileType.DIRECTORY) {
+        if (logInvalid)
+            warnInvalidProject(projectDirPath, 'path is not a directory');
         return null;
+    }
 
     const projectJsonPath = GLib.build_filenamev([projectDirPath, 'project.json']);
     const project = readJsonFile(projectJsonPath);
-    if (!project)
+    if (!project) {
+        if (logInvalid)
+            warnInvalidProject(projectDirPath, 'project.json could not be read or parsed');
         return null;
+    }
 
-    const type = resolveProjectType(project);
-    if (!type)
+    if (typeof project !== 'object' || Array.isArray(project)) {
+        if (logInvalid)
+            warnInvalidProject(projectDirPath, 'project.json root is not an object');
         return null;
+    }
+
+    if (typeof project.type === 'string' && project.type.trim() !== '') {
+        const normalizedType = project.type.trim().toLowerCase();
+        if (![ProjectType.VIDEO, ProjectType.WEB, ProjectType.SCENE].includes(normalizedType)) {
+            if (logInvalid)
+                warnInvalidProject(projectDirPath, `unsupported project type "${project.type}"`);
+            return null;
+        }
+    }
+
+    // Keep type resolution centralized after validation so explicit metadata
+    // always wins, while legacy official scene projects without "type" can use
+    // the constrained entry-file inference above.
+    const type = resolveProjectType(project);
+    if (!type) {
+        if (logInvalid)
+            warnInvalidProject(projectDirPath, 'project type is missing and could not be inferred from the entry file');
+        return null;
+    }
 
     const entry = resolveEntryFile(project, type);
     let entryPath = resolveRegularFile(projectDirPath, entry);
     if (type === ProjectType.SCENE && !entryPath)
         entryPath = resolveRegularFile(projectDirPath, 'scene.pkg');
-    if (entry && !entryPath && type !== ProjectType.SCENE)
+    if (entry && !entryPath && type !== ProjectType.SCENE) {
+        if (logInvalid)
+            warnInvalidProject(projectDirPath, `entry file "${entry}" is not a regular file`);
         return null;
+    }
 
     const previewPath = resolvePreviewFile(projectDirPath, project);
     const tags = normalizeProjectTags(project);
