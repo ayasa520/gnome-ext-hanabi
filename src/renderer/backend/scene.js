@@ -411,10 +411,15 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
         }
 
         canReuseForProject(project) {
+            const currentProjectPath = this._project?.path ?? '';
+            const nextProjectPath = project?.path ?? '';
+
             return !this._destroyed &&
                 haveSceneBackend &&
                 this._project?.type === ProjectType.SCENE &&
                 project?.type === ProjectType.SCENE &&
+                currentProjectPath !== '' &&
+                currentProjectPath === nextProjectPath &&
                 Boolean(project?.entryPath) &&
                 (this._scenePaintables.length > 0 || this._sceneWidgets.length > 0);
         }
@@ -427,6 +432,21 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             const nextProjectPath = project?.path ?? '';
             const projectChanged = previousProjectPath !== nextProjectPath;
 
+            if (projectChanged) {
+                // Different scene projects can exercise completely different Vulkan render graphs,
+                // model resources, shader pipelines, and driver synchronization paths.  Keeping the
+                // same native SceneWallpaper alive across those graph changes made Arsenal inherit
+                // a previously compiled render path and eventually hit an NVIDIA Xid 109 followed by
+                // VK_ERROR_DEVICE_LOST.  Reuse is now intentionally limited to same-project property
+                // updates; cross-project switches must allocate a fresh native target so each scene
+                // owns a clean Vulkan lifecycle.
+                console.log(
+                    `HanabiScene: refusing reusable project switch old=${previousProjectPath || '(none)'} ` +
+                    `new=${nextProjectPath || '(none)'}`
+                );
+                return false;
+            }
+
             this._project = project;
             this._sceneUserPropertiesJson = JSON.stringify(project?.scenePropertyPayload ?? {});
             console.log(
@@ -435,20 +455,11 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                 `${describeTrackedSceneUserProperties(project?.scenePropertyPayload)}`
             );
 
-            if (projectChanged) {
-                // KDE keeps one SceneViewer item alive and changes its source.  Do
-                // the same here: every monitor keeps its existing native target, and
-                // only the project state is sent into that target for the reusable
-                // SceneWallpaper to parse.
-                this._scenePaintables.forEach(paintable => {
-                    this._reloadSceneTargetProject(paintable, project);
-                });
-                this._sceneWidgets.forEach(widget => {
-                    this._reloadSceneTargetProject(widget, project);
-                });
-            } else {
-                this.setSceneUserProperties(project?.scenePropertyPayload ?? {});
-            }
+            // Same-project reuse is still valuable for preference edits because it keeps the GTK
+            // widget, native target, and render thread stable while only forwarding the small
+            // Wallpaper Engine user-property payload that scripts and materials already know how to
+            // apply live.
+            this.setSceneUserProperties(project?.scenePropertyPayload ?? {});
 
             this._pushSceneMediaStateToSceneTargets();
             this._pushAudioSamplesToSceneTargets();

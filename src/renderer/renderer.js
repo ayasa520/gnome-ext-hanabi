@@ -1754,11 +1754,11 @@ const HanabiRenderer = GObject.registerClass(
             if (!this._backend.switchProject?.(nextProject))
                 return false;
 
-            // Scene backends follow the KDE plugin's persistent item model: the
-            // Gtk window and native render target stay mounted while the current
-            // backend updates its SceneWallpaper source.  That means the normal
-            // crossfade path, which builds a second backend and second target, is
-            // skipped for scene-to-scene switches.
+            // Scene backend reuse is deliberately scoped to same-project property
+            // edits.  Different scene project paths can carry unrelated Vulkan
+            // render graphs, model resources, and shader pipelines, so they must
+            // pass through the normal switch path that creates a fresh native
+            // SceneWallpaper target instead of mutating the current one in place.
             this._project = nextProject;
             this._syncApplicationHoldForBackend(this._backend);
             this._applyActiveBackendSettings(this._backend, this._project);
