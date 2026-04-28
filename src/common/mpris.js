@@ -104,12 +104,18 @@ function _normalizeArtists(value) {
     return String(unpacked ?? '');
 }
 
+function _normalizeString(value) {
+    const unpacked = _deepUnpack(value);
+    return String(unpacked ?? '');
+}
+
 function buildMprisPlayerSnapshot(name, proxy) {
     const playbackStatus = _deepUnpack(proxy?.get_cached_property?.('PlaybackStatus')) ?? '';
     const metadata = _deepUnpack(proxy?.get_cached_property?.('Metadata')) ?? {};
-    const title = _deepUnpack(metadata['xesam:title']) ?? metadata['xesam:title'] ?? '';
+    const title = _normalizeString(metadata['xesam:title']);
     const artist = _normalizeArtists(metadata['xesam:artist']);
-    const artUrl = _deepUnpack(metadata['mpris:artUrl']) ?? metadata['mpris:artUrl'] ?? '';
+    const albumArtist = _normalizeArtists(metadata['xesam:albumArtist']);
+    const artUrl = _normalizeString(metadata['mpris:artUrl']);
     const score =
         playbackStatus === 'Playing' ? 3 :
         playbackStatus === 'Paused' ? 2 :
@@ -118,9 +124,14 @@ function buildMprisPlayerSnapshot(name, proxy) {
     return {
         name,
         playbackStatus,
-        title: String(title ?? ''),
+        title,
         artist,
-        artUrl: String(artUrl ?? ''),
+        albumTitle: _normalizeString(metadata['xesam:album']),
+        albumArtist,
+        subTitle: _normalizeString(metadata['xesam:comment']),
+        genres: _normalizeArtists(metadata['xesam:genre']),
+        contentType: title || artist || albumArtist ? 'music' : '',
+        artUrl,
         score,
     };
 }

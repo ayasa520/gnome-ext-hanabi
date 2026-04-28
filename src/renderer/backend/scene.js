@@ -12,6 +12,24 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
     const sceneMediaDebounceDelayMs = 80;
     const sceneMediaSlowOperationThresholdUs = 20000;
     const thumbnailDecodeSize = 512;
+    // These palette constants intentionally describe algorithmic tuning rather than wallpaper-
+    // specific behavior. Keeping them together makes future album-art sampling adjustments local
+    // and avoids scattering unexplained thresholds through the octree implementation.
+    const mediaPaletteSampleGridSize = 48;
+    const mediaPaletteOctreeMaxDepth = 6;
+    const mediaPaletteMaxSwatches = 12;
+    const mediaPaletteMinimumAlpha = 16;
+    const mediaPaletteDistinctColorDistance = 0.045;
+    const mediaPaletteHighContrastLuminance = 0.55;
+    const mediaPaletteDarkTextColor = [0.05, 0.05, 0.05];
+    const mediaPaletteLightTextColor = [0.95, 0.95, 0.95];
+    const mediaPaletteEmptyPrimaryColor = [0, 0, 0];
+    const mediaPaletteEmptySecondaryColor = [1, 1, 1];
+    const mediaPaletteSecondaryPrimaryWeight = 0.7;
+    const mediaPaletteSecondaryTextWeight = 0.3;
+    const mediaPaletteRankPopulationFloor = 0.35;
+    const mediaPaletteRankLuminanceWeight = 1.15;
+    const mediaPaletteRankTargetLuminance = 0.52;
     const trackedSceneUserProperties = ['hrbigb2'];
     const describeTrackedSceneUserProperties = payload => {
         // These probes intentionally stay tiny and stable because scene project
@@ -63,9 +81,214 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
     };
 
     const clampColorChannel = value => Math.max(0, Math.min(1, Number(value) || 0));
+    const clampByte = value => Math.max(0, Math.min(255, Number(value) || 0));
+    const cloneMediaColor = color => color.map(channel => clampColorChannel(channel));
+    const normalizeByteColor = color => color.map(channel => clampColorChannel(channel / 255));
+    const formatMediaColorForLog = color => (Array.isArray(color) ? color : [])
+        .map(channel => clampColorChannel(channel).toFixed(3))
+        .join(',');
+    const colorLuminance = color =>
+        0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2];
+    const colorDistanceSquared = (left, right) =>
+        (left[0] - right[0]) ** 2 + (left[1] - right[1]) ** 2 + (left[2] - right[2]) ** 2;
     const deriveSecondaryColor = (primaryColor, textColor) => primaryColor.map(
-        (channel, index) => clampColorChannel(channel * 0.7 + (textColor[index] ?? 1) * 0.3)
+        (channel, index) => clampColorChannel(
+            channel * mediaPaletteSecondaryPrimaryWeight +
+            (textColor[index] ?? 1) * mediaPaletteSecondaryTextWeight
+        )
     );
+    const createOctreeColorNode = (level, maxDepth) => ({
+        level,
+        isLeaf: level >= maxDepth,
+        count: 0,
+        r: 0,
+        g: 0,
+        b: 0,
+        children: level >= maxDepth ? null : new Array(8).fill(null),
+    });
+    const insertOctreeColor = (node, r, g, b, maxDepth) => {
+        node.count++;
+        node.r += r;
+        node.g += g;
+        node.b += b;
+        if (node.isLeaf)
+            return;
+
+        const bit = 7 - node.level;
+        const childIndex =
+            (((r >> bit) & 1) << 2) |
+            (((g >> bit) & 1) << 1) |
+            ((b >> bit) & 1);
+        if (!node.children[childIndex])
+            node.children[childIndex] = createOctreeColorNode(node.level + 1, maxDepth);
+        insertOctreeColor(node.children[childIndex], r, g, b, maxDepth);
+    };
+    const countOctreeLeaves = node => {
+        if (!node)
+            return 0;
+        if (node.isLeaf)
+            return 1;
+        return node.children.reduce((sum, child) => sum + countOctreeLeaves(child), 0);
+    };
+    const findOctreeReductionCandidate = node => {
+        if (!node || node.isLeaf)
+            return null;
+
+        let candidate = null;
+        for (const child of node.children) {
+            const childCandidate = findOctreeReductionCandidate(child);
+            if (!childCandidate)
+                continue;
+            if (
+                !candidate ||
+                childCandidate.level > candidate.level ||
+                (childCandidate.level === candidate.level && childCandidate.count < candidate.count)
+            )
+                candidate = childCandidate;
+        }
+
+        const childCount = node.children.filter(Boolean).length;
+        if (childCount > 0) {
+            if (
+                !candidate ||
+                node.level > candidate.level ||
+                (node.level === candidate.level && node.count < candidate.count)
+            )
+                candidate = node;
+        }
+        return candidate;
+    };
+    const reduceOctreeColorNode = node => {
+        if (!node || node.isLeaf)
+            return 0;
+
+        // Collapsing the deepest low-population branch is the canonical octree quantization step:
+        // each branch already stores accumulated RGB totals, so reducing it preserves the branch's
+        // average color while freeing enough leaves to converge on a compact album-art palette.
+        const removedLeaves = countOctreeLeaves(node);
+        node.isLeaf = true;
+        node.children = null;
+        return Math.max(0, removedLeaves - 1);
+    };
+    const collectOctreeSwatches = (node, swatches = []) => {
+        if (!node)
+            return swatches;
+        if (node.isLeaf) {
+            if (node.count > 0) {
+                swatches.push({
+                    count: node.count,
+                    color: [node.r / node.count, node.g / node.count, node.b / node.count],
+                });
+            }
+            return swatches;
+        }
+
+        node.children.forEach(child => collectOctreeSwatches(child, swatches));
+        return swatches;
+    };
+    const extractOctreePalette = (samples, maxSwatches) => {
+        const root = createOctreeColorNode(0, mediaPaletteOctreeMaxDepth);
+        samples.forEach(([r, g, b]) => insertOctreeColor(root, r, g, b, mediaPaletteOctreeMaxDepth));
+
+        let leafCount = countOctreeLeaves(root);
+        while (leafCount > maxSwatches) {
+            const candidate = findOctreeReductionCandidate(root);
+            if (!candidate)
+                break;
+            const removedLeaves = reduceOctreeColorNode(candidate);
+            if (removedLeaves <= 0)
+                break;
+            leafCount -= removedLeaves;
+        }
+
+        return collectOctreeSwatches(root);
+    };
+    const rankPaletteSwatch = swatch => {
+        const maxChannel = Math.max(swatch.color[0], swatch.color[1], swatch.color[2]);
+        const minChannel = Math.min(swatch.color[0], swatch.color[1], swatch.color[2]);
+        const saturation = maxChannel <= 0 ? 0 : (maxChannel - minChannel) / maxChannel;
+        const luminance = colorLuminance(normalizeByteColor(swatch.color));
+
+        // Album art often has large black/white borders. Weight population, saturation, and
+        // mid-tone luminance together so mediaThumbnailChanged receives a representative accent
+        // instead of a flat average that scripts perceive as "not following the cover".
+        return swatch.count * (mediaPaletteRankPopulationFloor + saturation) *
+            (mediaPaletteRankLuminanceWeight - Math.abs(luminance - mediaPaletteRankTargetLuminance));
+    };
+    const computeArtworkPalette = pixbuf => {
+        const width = pixbuf.get_width();
+        const height = pixbuf.get_height();
+        const rowstride = pixbuf.get_rowstride();
+        const channels = pixbuf.get_n_channels();
+        const pixels = pixbuf.get_pixels();
+        const samples = [];
+        const stepY = Math.max(1, Math.floor(height / mediaPaletteSampleGridSize));
+        const stepX = Math.max(1, Math.floor(width / mediaPaletteSampleGridSize));
+        let totalR = 0;
+        let totalG = 0;
+        let totalB = 0;
+        let count = 0;
+
+        for (let y = 0; y < height; y += stepY) {
+            for (let x = 0; x < width; x += stepX) {
+                const offset = y * rowstride + x * channels;
+                const alpha = channels >= 4 ? pixels[offset + 3] : 255;
+                if (alpha < mediaPaletteMinimumAlpha)
+                    continue;
+
+                const r = clampByte(pixels[offset]);
+                const g = clampByte(pixels[offset + 1]);
+                const b = clampByte(pixels[offset + 2]);
+                totalR += r;
+                totalG += g;
+                totalB += b;
+                count++;
+                samples.push([r, g, b]);
+            }
+        }
+
+        if (count === 0) {
+            return {
+                primaryColor: cloneMediaColor(mediaPaletteEmptyPrimaryColor),
+                secondaryColor: cloneMediaColor(mediaPaletteEmptySecondaryColor),
+                tertiaryColor: cloneMediaColor(mediaPaletteEmptySecondaryColor),
+                textColor: cloneMediaColor(mediaPaletteEmptySecondaryColor),
+                highContrastColor: cloneMediaColor(mediaPaletteEmptySecondaryColor),
+            };
+        }
+
+        const average = normalizeByteColor([totalR / count, totalG / count, totalB / count]);
+        const ranked = extractOctreePalette(samples, mediaPaletteMaxSwatches)
+            .sort((left, right) => rankPaletteSwatch(right) - rankPaletteSwatch(left));
+        const chooseDistinct = fallback => {
+            const picked = [];
+            for (const swatch of ranked) {
+                const normalized = normalizeByteColor(swatch.color);
+                if (picked.every(color =>
+                    colorDistanceSquared(color, normalized) > mediaPaletteDistinctColorDistance))
+                    picked.push(normalized);
+                if (picked.length >= 3)
+                    break;
+            }
+            while (picked.length < 3)
+                picked.push(picked[picked.length - 1] ?? fallback);
+            return picked;
+        };
+        const [primaryColor, secondaryCandidate, tertiaryCandidate] = chooseDistinct(average);
+        const highContrastColor = colorLuminance(primaryColor) > mediaPaletteHighContrastLuminance
+            ? cloneMediaColor(mediaPaletteDarkTextColor)
+            : cloneMediaColor(mediaPaletteLightTextColor);
+        const secondaryColor = secondaryCandidate ?? deriveSecondaryColor(primaryColor, highContrastColor);
+        const tertiaryColor = tertiaryCandidate ?? average;
+
+        return {
+            primaryColor,
+            secondaryColor,
+            tertiaryColor,
+            textColor: highContrastColor,
+            highContrastColor,
+        };
+    };
     const mapPlaybackState = playbackStatus => {
         switch (String(playbackStatus ?? '')) {
         case 'Playing':
@@ -250,40 +473,15 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                 const thumbnailPath = GLib.build_filenamev([MEDIA_CACHE_DIR, `${hash}.png`]);
                 await this._writeThumbnailAsync(pixbuf, thumbnailPath);
 
-                const width = pixbuf.get_width();
-                const height = pixbuf.get_height();
-                const rowstride = pixbuf.get_rowstride();
-                const channels = pixbuf.get_n_channels();
-                const pixels = pixbuf.get_pixels();
-                let totalR = 0;
-                let totalG = 0;
-                let totalB = 0;
-                let count = 0;
-                for (let y = 0; y < height; y += Math.max(1, Math.floor(height / 32))) {
-                    for (let x = 0; x < width; x += Math.max(1, Math.floor(width / 32))) {
-                        const offset = y * rowstride + x * channels;
-                        const alpha = channels >= 4 ? pixels[offset + 3] : 255;
-                        if (alpha < 16)
-                            continue;
-                        totalR += pixels[offset];
-                        totalG += pixels[offset + 1];
-                        totalB += pixels[offset + 2];
-                        count++;
-                    }
-                }
-
-                const primaryColor = count > 0
-                    ? [totalR / count / 255, totalG / count / 255, totalB / count / 255]
-                    : [0, 0, 0];
-                const luminance =
-                    0.2126 * primaryColor[0] + 0.7152 * primaryColor[1] + 0.0722 * primaryColor[2];
-                const textColor = luminance > 0.55 ? [0.05, 0.05, 0.05] : [0.95, 0.95, 0.95];
-                const secondaryColor = deriveSecondaryColor(primaryColor, textColor);
-                const payload = {thumbnailPath, primaryColor, secondaryColor, textColor};
+                const palette = computeArtworkPalette(pixbuf);
+                const payload = {thumbnailPath, ...palette};
                 const elapsedUs = GLib.get_monotonic_time() - startedAtUs;
                 if (elapsedUs >= sceneMediaSlowOperationThresholdUs) {
                     console.warn(
-                        `HanabiScene media thumbnail load slow: ${(elapsedUs / 1000).toFixed(2)}ms artUrl=${artUrl} cachePath=${thumbnailPath}`
+                        `HanabiScene media thumbnail load slow: ${(elapsedUs / 1000).toFixed(2)}ms ` +
+                        `artUrl=${artUrl} cachePath=${thumbnailPath} ` +
+                        `primary=${formatMediaColorForLog(palette.primaryColor)} ` +
+                        `secondary=${formatMediaColorForLog(palette.secondaryColor)}`
                     );
                 }
                 return payload;
@@ -309,17 +507,29 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             let payload = {
                 title: '',
                 artist: '',
+                albumTitle: '',
+                albumArtist: '',
+                subTitle: '',
+                genres: '',
+                contentType: '',
                 hasThumbnail: false,
                 playbackState: MEDIA_PLAYBACK_STOPPED,
                 primaryColor: [0, 0, 0],
                 secondaryColor: [1, 1, 1],
+                tertiaryColor: [1, 1, 1],
                 textColor: [1, 1, 1],
+                highContrastColor: [1, 1, 1],
                 thumbnailPath: '',
             };
 
             if (active) {
                 payload.title = active.title || '';
                 payload.artist = active.artist || '';
+                payload.albumTitle = active.albumTitle || '';
+                payload.albumArtist = active.albumArtist || '';
+                payload.subTitle = active.subTitle || '';
+                payload.genres = active.genres || '';
+                payload.contentType = active.contentType || '';
                 payload.playbackState = mapPlaybackState(active.playbackStatus);
                 const thumbnail = await this._loadThumbnailAsync(active.artUrl);
                 if (this._destroyed || recomputeSerial !== this._recomputeSerial)
@@ -331,7 +541,9 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                         hasThumbnail: true,
                         primaryColor: thumbnail.primaryColor,
                         secondaryColor: thumbnail.secondaryColor,
+                        tertiaryColor: thumbnail.tertiaryColor,
                         textColor: thumbnail.textColor,
+                        highContrastColor: thumbnail.highContrastColor,
                         thumbnailPath: thumbnail.thumbnailPath,
                     };
                 }
@@ -364,11 +576,18 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._sceneMediaStateJson = JSON.stringify({
                 title: '',
                 artist: '',
+                albumTitle: '',
+                albumArtist: '',
+                subTitle: '',
+                genres: '',
+                contentType: '',
                 hasThumbnail: false,
                 playbackState: MEDIA_PLAYBACK_STOPPED,
                 primaryColor: [0, 0, 0],
                 secondaryColor: [1, 1, 1],
+                tertiaryColor: [1, 1, 1],
                 textColor: [1, 1, 1],
+                highContrastColor: [1, 1, 1],
                 thumbnailPath: '',
             });
             this._mediaMonitor = null;

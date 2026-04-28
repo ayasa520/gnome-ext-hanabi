@@ -778,6 +778,16 @@ build_scene_media_state_from_json(const char* media_state_json, const char* log_
         media_state->title = json_object_get_string_member(object, "title");
     if (json_object_has_member(object, "artist"))
         media_state->artist = json_object_get_string_member(object, "artist");
+    if (json_object_has_member(object, "albumTitle"))
+        media_state->album_title = json_object_get_string_member(object, "albumTitle");
+    if (json_object_has_member(object, "albumArtist"))
+        media_state->album_artist = json_object_get_string_member(object, "albumArtist");
+    if (json_object_has_member(object, "subTitle"))
+        media_state->sub_title = json_object_get_string_member(object, "subTitle");
+    if (json_object_has_member(object, "genres"))
+        media_state->genres = json_object_get_string_member(object, "genres");
+    if (json_object_has_member(object, "contentType"))
+        media_state->content_type = json_object_get_string_member(object, "contentType");
     if (json_object_has_member(object, "hasThumbnail"))
         media_state->has_thumbnail = json_object_get_boolean_member(object, "hasThumbnail");
     if (json_object_has_member(object, "playbackState"))
@@ -785,7 +795,9 @@ build_scene_media_state_from_json(const char* media_state_json, const char* log_
 
     parse_media_color(object, "primaryColor", &media_state->primary_color);
     parse_media_color(object, "secondaryColor", &media_state->secondary_color);
+    parse_media_color(object, "tertiaryColor", &media_state->tertiary_color);
     parse_media_color(object, "textColor", &media_state->text_color);
+    parse_media_color(object, "highContrastColor", &media_state->high_contrast_color);
 
     if (!media_state->has_thumbnail)
         return media_state;
