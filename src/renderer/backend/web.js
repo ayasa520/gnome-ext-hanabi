@@ -18,7 +18,12 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
         haveContentFit,
         haveGraphicsOffload,
     } = flags;
-    const {setExpandFill, createConfiguredPicture, buildWebPointerDispatchScript} = helpers;
+    const {
+        setExpandFill,
+        createConfiguredPicture,
+        buildWebPointerDispatchScript,
+        LocalWebProjectHttpServer,
+    } = helpers;
     const {BackendController} = baseClasses;
 
     const isLittleEndian = new Uint8Array(new Uint32Array([0x01020304]).buffer)[0] === 0x04;
@@ -66,6 +71,15 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
         } catch (_e) {
         }
     };
+    const assignWebObjectProperty = (object, propertyName, value) => {
+        if (!object)
+            return;
+
+        try {
+            object[propertyName] = value;
+        } catch (_e) {
+        }
+    };
 
     return class WebBackend extends BackendController {
         constructor(renderer, project) {
@@ -82,6 +96,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._webUserPropertyPayload = project?.webPropertyPayload ?? {};
             this._webDirectorySnapshots = new Map();
             this._webAudioSamples = renderer.getCurrentWebAudioFrame?.() ?? new Array(128).fill(0);
+            this._projectServer = new LocalWebProjectHttpServer(project);
             this.usesNativeWindows = false;
             this.displayName = 'WPEWebKit';
             this._renderer.registerAudioSamplesBackend?.(this);
@@ -101,6 +116,8 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             this._wpeStates.clear();
             this._webDirectorySnapshots.clear();
             this._webAudioSamples = new Array(128).fill(0);
+            this._projectServer?.destroy();
+            this._projectServer = null;
             this._wpeDisplay = null;
             this._renderer = null;
             this._project = null;
@@ -156,14 +173,20 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
         }
 
         dispatchPointerEvent(event) {
-            if (this._dispatchWPEPointerEvent(event))
-                return;
-
             const webView = this._webViews.get(event.monitorIndex);
+            const dispatchedToWPE = this._dispatchWPEPointerEvent(event);
             if (!webView)
                 return;
 
+            // Headless WPEPlatform can accept native pointer packets without
+            // delivering a DOM click to the offscreen WebKit page. Mirror every
+            // pointer packet through the JavaScript dispatcher as a compatibility
+            // layer so interactive Wallpaper Engine web projects receive the same
+            // mouse/pointer/click events that the gstcef backend provides.
             this._dispatchSyntheticPointerEvent(webView, event);
+
+            if (dispatchedToWPE && (event.type === 'mousedown' || event.type === 'mouseup'))
+                console.log(`WPE route: mirrored ${event.type} to DOM at ${event.x},${event.y} button=${event.button}`);
         }
 
         applyContentFit(fit) {
@@ -198,6 +221,9 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
         _createWPEWidgetForMonitor(index) {
             if (!this._wpeDisplay)
                 return this._createPlaceholderWidget('WPE headless display initialization failed');
+
+            if (!this._projectServer?.browserUri)
+                return this._createPlaceholderWidget('WPE backend could not start the local web project server');
 
             const userContentManager = this._createUserContentManager(WPEWebKit);
             const settings = this._createWebSettings(WPEWebKit);
@@ -325,7 +351,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             userContentManager.add_script(
                 new api.UserScript(
                     `
-                    (() => {
+                    (function() {
                         if (window.__hanabiPlaybackBridgeInstalled)
                             return;
                         window.__hanabiPlaybackBridgeInstalled = true;
@@ -353,7 +379,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                         }
 
                         window.__hanabiAudioContexts = window.__hanabiAudioContexts || [];
-                        const wrapAudioContext = key => {
+                        function wrapAudioContext(key) {
                             const Original = window[key];
                             if (typeof Original !== 'function')
                                 return;
@@ -366,13 +392,13 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                             };
                             Object.setPrototypeOf(Wrapped, Original);
                             window[key] = Wrapped;
-                        };
+                        }
 
                         wrapAudioContext('AudioContext');
                         wrapAudioContext('webkitAudioContext');
 
                         const hanabiMediaHttpUrlPrefix = ${JSON.stringify(this._localMediaHttpUrlPrefix)};
-                        const rewriteMediaUrl = rawValue => {
+                        function rewriteMediaUrl(rawValue) {
                             if (typeof rawValue !== 'string' || rawValue === '')
                                 return rawValue;
 
@@ -398,8 +424,8 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                             return hanabiMediaHttpUrlPrefix
                                 ? hanabiMediaHttpUrlPrefix + encodeURIComponent(decodedPath)
                                 : rawValue;
-                        };
-                        const patchSrcProperty = proto => {
+                        }
+                        function patchSrcProperty(proto) {
                             if (!proto)
                                 return;
 
@@ -418,8 +444,8 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                                 get: descriptor.get,
                                 set: wrappedSetter,
                             });
-                        };
-                        const patchSetAttribute = proto => {
+                        }
+                        function patchSetAttribute(proto) {
                             if (!proto || proto.setAttribute?.__hanabiWrapped)
                                 return;
 
@@ -431,7 +457,7 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                             };
                             wrappedSetAttribute.__hanabiWrapped = true;
                             proto.setAttribute = wrappedSetAttribute;
-                        };
+                        }
 
                         patchSrcProperty(window.HTMLMediaElement?.prototype);
                         patchSrcProperty(window.HTMLSourceElement?.prototype);
@@ -446,53 +472,166 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                         };
                         let wallpaperPropertyListenerValue = window.wallpaperPropertyListener;
                         let wallpaperAudioListenerValue = null;
+                        let bridgeCallbacksReady = document.readyState === 'complete';
+                        let bridgeReplayScheduled = false;
+                        const bridgeReplayPending = {
+                            audioFrame: false,
+                            directoryEvents: false,
+                            generalProperties: false,
+                            pausedState: false,
+                            userProperties: false,
+                        };
+                        const pendingDirectoryEvents = [];
 
-                        const getPropertyListener = () => {
+                        // GameMaker HTML5 runtimes used by older Wallpaper Engine
+                        // projects inspect function.caller/function.arguments while
+                        // formatting fatal errors. WPE has to keep project callbacks
+                        // on classic timer frames and catch each bridge callback so
+                        // those runtimes do not trip over strict, async, or arrow
+                        // function frames that belong to Hanabi's compatibility layer.
+                        function getPropertyListener() {
                             const listener = wallpaperPropertyListenerValue;
                             if (!listener || typeof listener !== 'object')
                                 return null;
                             return listener;
-                        };
+                        }
 
-                        const getAudioListener = () => {
+                        function getAudioListener() {
                             if (typeof wallpaperAudioListenerValue !== 'function')
                                 return null;
                             return wallpaperAudioListenerValue;
-                        };
+                        }
 
-                        const flushAudioFrame = () => {
+                        function logWallpaperBridgeError(methodName, error) {
+                            const message = error && (error.stack || error.message || String(error));
+                            console.warn('[Hanabi] wallpaper bridge callback failed in ' + methodName + ': ' + message);
+                        }
+
+                        function safeInvokeWallpaperListener(listener, methodName, args) {
+                            if (!listener || typeof listener[methodName] !== 'function')
+                                return;
+
+                            try {
+                                listener[methodName].apply(listener, args || []);
+                            } catch (error) {
+                                // Keep a project-side bridge callback failure from
+                                // escaping into legacy wallpaper runtimes. The warning
+                                // records the exact WE API callback in run.log so the
+                                // next compatibility issue has a concrete trace.
+                                logWallpaperBridgeError(methodName, error);
+                            }
+                        }
+
+                        function flushAudioFrame() {
                             const listener = getAudioListener();
                             if (!listener)
                                 return;
                             try {
                                 listener(bridgeState.audioFrame);
-                            } catch (_e) {
+                            } catch (error) {
+                                logWallpaperBridgeError('wallpaperRegisterAudioListener', error);
                             }
-                        };
+                        }
 
-                        const flushUserProperties = () => {
-                            const listener = getPropertyListener();
-                            if (!listener)
-                                return;
-                            if (typeof listener.applyUserProperties === 'function')
-                                listener.applyUserProperties(bridgeState.userProperties);
-                        };
+                        function flushUserProperties() {
+                            safeInvokeWallpaperListener(getPropertyListener(), 'applyUserProperties', [bridgeState.userProperties]);
+                        }
 
-                        const flushGeneralProperties = () => {
-                            const listener = getPropertyListener();
-                            if (!listener)
-                                return;
-                            if (typeof listener.applyGeneralProperties === 'function')
-                                listener.applyGeneralProperties(bridgeState.generalProperties);
-                        };
+                        function flushGeneralProperties() {
+                            safeInvokeWallpaperListener(getPropertyListener(), 'applyGeneralProperties', [bridgeState.generalProperties]);
+                        }
 
-                        const flushPausedState = () => {
-                            const listener = getPropertyListener();
-                            if (!listener)
+                        function flushPausedState() {
+                            safeInvokeWallpaperListener(getPropertyListener(), 'setPaused', [bridgeState.paused]);
+                        }
+
+                        function flushPendingDirectoryEvents() {
+                            while (pendingDirectoryEvents.length > 0) {
+                                const flushEvent = pendingDirectoryEvents.shift();
+                                try {
+                                    flushEvent();
+                                } catch (error) {
+                                    // Directory bridge events are queued as small
+                                    // closures so ordering is preserved. Any failure
+                                    // here means the compatibility layer itself needs
+                                    // attention, so emit a precise warning while
+                                    // keeping the wallpaper process alive.
+                                    logWallpaperBridgeError('queuedDirectoryEvent', error);
+                                }
+                            }
+                        }
+
+                        function hasPendingBridgeReplay() {
+                            return bridgeReplayPending.userProperties ||
+                                bridgeReplayPending.generalProperties ||
+                                bridgeReplayPending.pausedState ||
+                                bridgeReplayPending.audioFrame ||
+                                bridgeReplayPending.directoryEvents;
+                        }
+
+                        function markBridgeReplayPending(kind) {
+                            if (kind in bridgeReplayPending)
+                                bridgeReplayPending[kind] = true;
+                        }
+
+                        function markPropertyBridgeReplayPending() {
+                            bridgeReplayPending.userProperties = true;
+                            bridgeReplayPending.generalProperties = true;
+                            bridgeReplayPending.pausedState = true;
+                        }
+
+                        function replayBridgeState() {
+                            const shouldFlushUserProperties = bridgeReplayPending.userProperties;
+                            const shouldFlushGeneralProperties = bridgeReplayPending.generalProperties;
+                            const shouldFlushPausedState = bridgeReplayPending.pausedState;
+                            const shouldFlushAudioFrame = bridgeReplayPending.audioFrame;
+                            const shouldFlushDirectoryEvents = bridgeReplayPending.directoryEvents;
+
+                            bridgeReplayPending.userProperties = false;
+                            bridgeReplayPending.generalProperties = false;
+                            bridgeReplayPending.pausedState = false;
+                            bridgeReplayPending.audioFrame = false;
+                            bridgeReplayPending.directoryEvents = false;
+
+                            if (shouldFlushUserProperties)
+                                flushUserProperties();
+                            if (shouldFlushGeneralProperties)
+                                flushGeneralProperties();
+                            if (shouldFlushPausedState)
+                                flushPausedState();
+                            if (shouldFlushAudioFrame)
+                                flushAudioFrame();
+                            if (shouldFlushDirectoryEvents)
+                                flushPendingDirectoryEvents();
+                        }
+
+                        function scheduleBridgeReplay(kind) {
+                            markBridgeReplayPending(kind);
+                            if (!bridgeCallbacksReady || bridgeReplayScheduled)
                                 return;
-                            if (typeof listener.setPaused === 'function')
-                                listener.setPaused(bridgeState.paused);
-                        };
+
+                            bridgeReplayScheduled = true;
+                            window.setTimeout(function() {
+                                bridgeReplayScheduled = false;
+                                if (!hasPendingBridgeReplay() || !bridgeCallbacksReady)
+                                    return;
+
+                                replayBridgeState();
+                            }, 0);
+                        }
+
+                        function applyBridgeMutation(mutator, pendingKind) {
+                            mutator();
+                            // Some web wallpapers register Wallpaper Engine callbacks
+                            // before their own window.load initializers create WebGL
+                            // canvases, media elements, or audio nodes. Store each
+                            // native update immediately, but only replay that update's
+                            // own callback family after the page is ready. Audio frames
+                            // must not replay applyUserProperties(), because projects
+                            // such as the sakura wallpaper rebuild effects from that
+                            // callback and audio updates arrive every rendered frame.
+                            scheduleBridgeReplay(pendingKind);
+                        }
 
                         Object.defineProperty(window, 'wallpaperPropertyListener', {
                             configurable: true,
@@ -502,11 +641,8 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                             },
                             set(value) {
                                 wallpaperPropertyListenerValue = value;
-                                queueMicrotask(() => {
-                                    flushUserProperties();
-                                    flushGeneralProperties();
-                                    flushPausedState();
-                                });
+                                markPropertyBridgeReplayPending();
+                                scheduleBridgeReplay();
                             },
                         });
 
@@ -516,42 +652,73 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
                             writable: true,
                             value(callback) {
                                 wallpaperAudioListenerValue = typeof callback === 'function' ? callback : null;
-                                queueMicrotask(() => {
-                                    flushAudioFrame();
-                                });
+                                scheduleBridgeReplay('audioFrame');
                             },
                         });
 
-                        window.__hanabiApplyUserProperties = payload => {
-                            bridgeState.userProperties = payload && typeof payload === 'object' ? payload : {};
-                            flushUserProperties();
+                        window.__hanabiApplyUserProperties = function(payload) {
+                            applyBridgeMutation(function() {
+                                bridgeState.userProperties = payload && typeof payload === 'object' ? payload : {};
+                            }, 'userProperties');
                         };
-                        window.__hanabiApplyGeneralProperties = payload => {
-                            bridgeState.generalProperties = payload && typeof payload === 'object' ? payload : {};
-                            flushGeneralProperties();
+                        window.__hanabiApplyGeneralProperties = function(payload) {
+                            applyBridgeMutation(function() {
+                                bridgeState.generalProperties = payload && typeof payload === 'object' ? payload : {};
+                            }, 'generalProperties');
                         };
-                        window.__hanabiSetPaused = isPaused => {
-                            bridgeState.paused = Boolean(isPaused);
-                            flushPausedState();
+                        window.__hanabiSetPaused = function(isPaused) {
+                            applyBridgeMutation(function() {
+                                bridgeState.paused = Boolean(isPaused);
+                            }, 'pausedState');
                         };
-                        window.__hanabiUserDirectoryFilesAddedOrChanged = (propertyName, changedFiles) => {
-                            const listener = getPropertyListener();
-                            if (!listener)
+                        window.__hanabiUserDirectoryFilesAddedOrChanged = function(propertyName, changedFiles) {
+                            if (!bridgeCallbacksReady) {
+                                // Directory notifications are edge-triggered by the
+                                // native side. Delay early events until the page has
+                                // installed all WE callbacks, but keep them as events
+                                // instead of merging them into property state.
+                                pendingDirectoryEvents.push(function() {
+                                    safeInvokeWallpaperListener(getPropertyListener(), 'userDirectoryFilesAddedOrChanged', [propertyName, changedFiles]);
+                                });
+                                scheduleBridgeReplay('directoryEvents');
                                 return;
-                            if (typeof listener.userDirectoryFilesAddedOrChanged === 'function')
-                                listener.userDirectoryFilesAddedOrChanged(propertyName, changedFiles);
+                            }
+                            safeInvokeWallpaperListener(getPropertyListener(), 'userDirectoryFilesAddedOrChanged', [propertyName, changedFiles]);
                         };
-                        window.__hanabiUserDirectoryFilesRemoved = (propertyName, removedFiles) => {
-                            const listener = getPropertyListener();
-                            if (!listener)
+                        window.__hanabiUserDirectoryFilesRemoved = function(propertyName, removedFiles) {
+                            if (!bridgeCallbacksReady) {
+                                // Removed-file notifications must preserve ordering
+                                // relative to added-file notifications, so each early
+                                // callback is retained in an explicit FIFO until the
+                                // page is ready for project bridge callbacks.
+                                pendingDirectoryEvents.push(function() {
+                                    safeInvokeWallpaperListener(getPropertyListener(), 'userDirectoryFilesRemoved', [propertyName, removedFiles]);
+                                });
+                                scheduleBridgeReplay('directoryEvents');
                                 return;
-                            if (typeof listener.userDirectoryFilesRemoved === 'function')
-                                listener.userDirectoryFilesRemoved(propertyName, removedFiles);
+                            }
+                            safeInvokeWallpaperListener(getPropertyListener(), 'userDirectoryFilesRemoved', [propertyName, removedFiles]);
                         };
-                        window.__hanabiApplyAudioFrame = payload => {
-                            bridgeState.audioFrame = Array.isArray(payload) ? payload : new Array(128).fill(0);
-                            flushAudioFrame();
+                        window.__hanabiApplyAudioFrame = function(payload) {
+                            applyBridgeMutation(function() {
+                                bridgeState.audioFrame = Array.isArray(payload) ? payload : new Array(128).fill(0);
+                            }, 'audioFrame');
                         };
+                        function markBridgeCallbacksReady() {
+                            window.setTimeout(function() {
+                                bridgeCallbacksReady = true;
+                                markPropertyBridgeReplayPending();
+                                bridgeReplayPending.audioFrame = true;
+                                if (pendingDirectoryEvents.length > 0)
+                                    bridgeReplayPending.directoryEvents = true;
+                                scheduleBridgeReplay();
+                            }, 0);
+                        }
+
+                        if (bridgeCallbacksReady)
+                            markBridgeCallbacksReady();
+                        else
+                            window.addEventListener('load', markBridgeCallbacksReady, {once: true});
                     })();
                     `,
                     api.UserContentInjectedFrames.ALL_FRAMES,
@@ -564,31 +731,11 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
         }
 
         _loadProjectEntry(webView) {
-            const file = Gio.File.new_for_path(this._project.entryPath);
-            const uri = file.get_uri();
-            if (!this._shouldLoadEntryAsHtml(this._project.entryPath)) {
-                webView.load_uri(uri);
-                return;
-            }
-
-            try {
-                const [ok, contents] = GLib.file_get_contents(this._project.entryPath);
-                if (!ok)
-                    throw new Error('GLib.file_get_contents returned false');
-
-                // Force local `.html` wallpaper entries through the HTML parser so
-                // legacy Wallpaper Engine projects with XHTML-like markup still load.
-                webView.load_html(new TextDecoder().decode(contents), uri);
-                return;
-            } catch (e) {
-                console.warn(`Failed to load HTML entry via load_html; falling back to URI load: ${e}`);
-            }
-
-            webView.load_uri(uri);
-        }
-
-        _shouldLoadEntryAsHtml(entryPath) {
-            return /\.(?:html?|xhtml)$/i.test(entryPath);
+            // WPEWebKit must enter web wallpapers through the project HTTP
+            // document root so relative assets, media requests, and the page
+            // origin all match the gstcefsrc backend instead of mixing a file://
+            // entry page with an HTTP-only media bridge.
+            webView.load_uri(this._projectServer.browserUri);
         }
 
         _createWebSettings(api) {
@@ -1247,6 +1394,24 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             if (!wpeState || !webView)
                 return;
 
+            // Remove the state from every lookup before touching GTK/WPE objects.
+            // Monitor events and late WPE buffer callbacks can still arrive while
+            // teardown is in progress; making the state unreachable first keeps
+            // those callbacks from racing back into a half-destroyed widget graph.
+            this._wpeStates.delete(index);
+            this._webViews.delete(index);
+            this._webPausePictures.delete(index);
+            this._webViewReadyStates.delete(index);
+            this._lastAppliedWebUserPropertyPayloads.delete(index);
+
+            const {
+                overlay,
+                livePicture,
+                pausePicture,
+                livePaintable,
+                presentationTarget,
+            } = wpeState;
+
             if (wpeState.metricsSourceId) {
                 GLib.source_remove(wpeState.metricsSourceId);
                 wpeState.metricsSourceId = 0;
@@ -1280,37 +1445,35 @@ var createWebBackendClass = (env, helpers, baseClasses) => {
             } catch (_e) {
             }
             try {
-                wpeState.livePaintable?.clear();
+                livePaintable?.clear();
             } catch (_e) {
             }
-            detachWebPresentationTarget(wpeState.presentationTarget);
-            wpeState.livePicture.paintable = null;
-            wpeState.pausePicture.paintable = null;
-            wpeState.pausePicture.visible = false;
+            // GTK may already have disposed the presentation widgets when the
+            // renderer swaps backends or closes quickly. Every detach operation
+            // is therefore best-effort and isolated so one stale object cannot
+            // prevent the remaining web process and paintable cleanup.
+            detachWebPresentationTarget(presentationTarget);
+            assignWebObjectProperty(livePicture, 'paintable', null);
+            assignWebObjectProperty(pausePicture, 'paintable', null);
+            assignWebObjectProperty(pausePicture, 'visible', false);
             wpeState.lastTexture = null;
             wpeState.livePaintable = null;
             wpeState.presentationTarget = null;
             try {
-                if (wpeState.overlay.get_child())
-                    wpeState.overlay.set_child(null);
+                if (overlay.get_child())
+                    overlay.set_child(null);
             } catch (_e) {
             }
             try {
-                wpeState.overlay.remove_overlay(wpeState.pausePicture);
+                overlay.remove_overlay(pausePicture);
             } catch (_e) {
             }
-            disposeWebObject(wpeState.presentationTarget);
-            disposeWebObject(wpeState.overlay);
-            disposeWebObject(wpeState.livePicture);
-            disposeWebObject(wpeState.pausePicture);
-            disposeWebObject(wpeState.livePaintable);
+            disposeWebObject(presentationTarget);
+            disposeWebObject(overlay);
+            disposeWebObject(livePicture);
+            disposeWebObject(pausePicture);
+            disposeWebObject(livePaintable);
             disposeWebObject(webView);
-
-            this._wpeStates.delete(index);
-            this._webViews.delete(index);
-            this._webPausePictures.delete(index);
-            this._webViewReadyStates.delete(index);
-            this._lastAppliedWebUserPropertyPayloads.delete(index);
         }
 
         _destroyAllWPEWidgets() {

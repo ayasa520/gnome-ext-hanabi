@@ -6,7 +6,6 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
         Gst,
         GstPlay,
         GstAudio,
-        Soup,
         flags,
         state,
     } = env;
@@ -19,97 +18,10 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
         haveContentFit,
         haveGraphicsOffload,
     } = flags;
-    const {setExpandFill, createConfiguredPicture} = helpers;
+    const {setExpandFill, createConfiguredPicture, LocalWebProjectHttpServer} = helpers;
     const {BackendController} = baseClasses;
     const defaultAudioFrame = new Array(128).fill(0);
     const RESUME_FREEZE_HOLD_MS = 120;
-
-    const guessMimeType = path => {
-        if (typeof path !== 'string' || path === '')
-            return 'application/octet-stream';
-
-        try {
-            const [contentType] = Gio.content_type_guess(path, null);
-            const mimeType = contentType
-                ? Gio.content_type_get_mime_type(contentType)
-                : null;
-            if (mimeType)
-                return mimeType;
-        } catch (_e) {
-        }
-
-        const extension = path.split('.').pop()?.toLowerCase?.() ?? '';
-        switch (extension) {
-        case 'css':
-            return 'text/css';
-        case 'gif':
-            return 'image/gif';
-        case 'htm':
-        case 'html':
-            return 'text/html';
-        case 'jpeg':
-        case 'jpg':
-            return 'image/jpeg';
-        case 'js':
-            return 'application/javascript';
-        case 'json':
-            return 'application/json';
-        case 'mp3':
-            return 'audio/mpeg';
-        case 'mp4':
-            return 'video/mp4';
-        case 'ogg':
-            return 'audio/ogg';
-        case 'png':
-            return 'image/png';
-        case 'svg':
-            return 'image/svg+xml';
-        case 'wav':
-            return 'audio/wav';
-        case 'webm':
-            return 'video/webm';
-        case 'webp':
-            return 'image/webp';
-        default:
-            return 'application/octet-stream';
-        }
-    };
-
-    const parseHttpRangeHeader = (value, totalLength) => {
-        if (typeof value !== 'string' || !value.startsWith('bytes=') || !Number.isFinite(totalLength) || totalLength <= 0)
-            return null;
-
-        const match = value.trim().match(/^bytes=(\d*)-(\d*)$/i);
-        if (!match)
-            return null;
-
-        const [, startText, endText] = match;
-        if (startText === '' && endText === '')
-            return null;
-
-        let start = 0;
-        let end = totalLength - 1;
-
-        if (startText === '') {
-            const suffixLength = Number.parseInt(endText, 10);
-            if (!Number.isFinite(suffixLength) || suffixLength <= 0)
-                return null;
-            start = Math.max(0, totalLength - suffixLength);
-        } else {
-            start = Number.parseInt(startText, 10);
-            if (!Number.isFinite(start) || start < 0 || start >= totalLength)
-                return null;
-
-            if (endText !== '') {
-                end = Number.parseInt(endText, 10);
-                if (!Number.isFinite(end) || end < start)
-                    return null;
-                end = Math.min(end, totalLength - 1);
-            }
-        }
-
-        return {start, end};
-    };
 
     const normalizeWebFilesystemPath = path => {
         if (typeof path !== 'string')
@@ -125,7 +37,7 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
     };
 
     const buildBootstrapScript = (stateEndpointPath, localMediaHttpUrlPrefix, initialState) => `
-        (() => {
+        (function() {
             if (window.__hanabiPlaybackBridgeInstalled)
                 return;
             window.__hanabiPlaybackBridgeInstalled = true;
@@ -154,7 +66,7 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
 
             const hanabiMediaHttpUrlPrefix = ${JSON.stringify(localMediaHttpUrlPrefix)};
             const stateEndpoint = ${JSON.stringify(stateEndpointPath)};
-            const rewriteMediaUrl = rawValue => {
+            function rewriteMediaUrl(rawValue) {
                 if (typeof rawValue !== 'string' || rawValue === '')
                     return rawValue;
 
@@ -180,8 +92,8 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 return hanabiMediaHttpUrlPrefix
                     ? hanabiMediaHttpUrlPrefix + encodeURIComponent(decodedPath)
                     : rawValue;
-            };
-            const patchSrcProperty = proto => {
+            }
+            function patchSrcProperty(proto) {
                 if (!proto)
                     return;
 
@@ -200,8 +112,8 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                     get: descriptor.get,
                     set: wrappedSetter,
                 });
-            };
-            const patchSetAttribute = proto => {
+            }
+            function patchSetAttribute(proto) {
                 if (!proto || proto.setAttribute?.__hanabiWrapped)
                     return;
 
@@ -213,7 +125,7 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 };
                 wrappedSetAttribute.__hanabiWrapped = true;
                 proto.setAttribute = wrappedSetAttribute;
-            };
+            }
 
             patchSrcProperty(window.HTMLMediaElement?.prototype);
             patchSrcProperty(window.HTMLSourceElement?.prototype);
@@ -228,59 +140,104 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 userProperties: {},
             };
             let wallpaperPropertyListenerValue = window.wallpaperPropertyListener;
+            let bridgeCallbacksReady = document.readyState === 'complete';
+            let bridgeReplayPending = false;
+            let bridgeReplayScheduled = false;
 
-            const getPropertyListener = () => {
+            // GameMaker HTML5 runtimes used by older Wallpaper Engine projects
+            // inspect function.caller/function.arguments while formatting fatal
+            // errors. Chromium throws when that walk reaches strict, async, or
+            // arrow-function frames, so every bridge path that can call project
+            // code intentionally uses classic functions and timer/XHR callbacks.
+            function getPropertyListener() {
                 const listener = wallpaperPropertyListenerValue;
                 if (!listener || typeof listener !== 'object')
                     return null;
                 return listener;
-            };
+            }
 
-            const flushUserProperties = () => {
-                const listener = getPropertyListener();
-                if (!listener)
+            function logWallpaperBridgeError(methodName, error) {
+                const message = error && (error.stack || error.message || String(error));
+                console.warn('[Hanabi] wallpaper bridge callback failed in ' + methodName + ': ' + message);
+            }
+
+            function safeInvokeWallpaperListener(listener, methodName, args) {
+                if (!listener || typeof listener[methodName] !== 'function')
                     return;
-                if (typeof listener.applyUserProperties === 'function')
-                    listener.applyUserProperties(bridgeState.userProperties);
-            };
 
-            const flushGeneralProperties = () => {
-                const listener = getPropertyListener();
-                if (!listener)
-                    return;
-                if (typeof listener.applyGeneralProperties === 'function')
-                    listener.applyGeneralProperties(bridgeState.generalProperties);
-            };
+                try {
+                    listener[methodName].apply(listener, args || []);
+                } catch (error) {
+                    // Keep a project-side bridge callback failure from escaping
+                    // into GameMaker's global fatal-error handler. The warning is
+                    // deliberately explicit so run.log still records which WE API
+                    // callback needs the next compatibility adjustment.
+                    logWallpaperBridgeError(methodName, error);
+                }
+            }
 
-            const flushPausedState = () => {
-                const listener = getPropertyListener();
-                if (!listener)
-                    return;
-                if (typeof listener.setPaused === 'function')
-                    listener.setPaused(bridgeState.paused);
-            };
+            function flushUserProperties() {
+                safeInvokeWallpaperListener(getPropertyListener(), 'applyUserProperties', [bridgeState.userProperties]);
+            }
 
-            const applyPlaybackState = () => {
+            function flushGeneralProperties() {
+                safeInvokeWallpaperListener(getPropertyListener(), 'applyGeneralProperties', [bridgeState.generalProperties]);
+            }
+
+            function flushPausedState() {
+                safeInvokeWallpaperListener(getPropertyListener(), 'setPaused', [bridgeState.paused]);
+            }
+
+            function applyPlaybackState() {
                 const playing = !bridgeState.paused;
                 const mediaElements = document.querySelectorAll('audio, video');
                 for (const media of mediaElements) {
-                    if (playing)
-                        media.play?.().catch?.(() => {});
-                    else
+                    if (playing) {
+                        const playPromise = media.play?.();
+                        if (playPromise && typeof playPromise.catch === 'function')
+                            playPromise.catch(function(_e) {});
+                    } else {
                         media.pause?.();
+                    }
                 }
 
-                window.dispatchEvent(new CustomEvent('hanabi-playback-change', {
-                    detail: {playing},
-                }));
-            };
+                try {
+                    window.dispatchEvent(new CustomEvent('hanabi-playback-change', {
+                        detail: {playing},
+                    }));
+                } catch (error) {
+                    logWallpaperBridgeError('hanabi-playback-change', error);
+                }
+            }
 
-            const flushDirectorySnapshots = (nextSnapshots = {}) => {
-                const listener = getPropertyListener();
-                const previousSnapshots = bridgeState.directorySnapshots || {};
-                bridgeState.directorySnapshots = nextSnapshots && typeof nextSnapshots === 'object'
+            function collectAddedFiles(nextFiles, previousSet) {
+                const added = [];
+                for (const file of nextFiles) {
+                    if (!previousSet.has(file))
+                        added.push(file);
+                }
+                return added;
+            }
+
+            function collectRemovedFiles(previousFiles, nextSet) {
+                const removed = [];
+                for (const file of previousFiles) {
+                    if (!nextSet.has(file))
+                        removed.push(file);
+                }
+                return removed;
+            }
+
+            function normalizeDirectorySnapshots(nextSnapshots) {
+                return nextSnapshots && typeof nextSnapshots === 'object'
                     ? nextSnapshots
                     : {};
+            }
+
+            function flushDirectorySnapshots(nextSnapshots) {
+                const listener = getPropertyListener();
+                const previousSnapshots = bridgeState.directorySnapshots || {};
+                bridgeState.directorySnapshots = normalizeDirectorySnapshots(nextSnapshots);
 
                 if (!listener)
                     return;
@@ -299,17 +256,33 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                         : [];
                     const previousSet = new Set(previousFiles);
                     const nextSet = new Set(nextFiles);
-                    const changedFiles = nextFiles.filter(file => !previousSet.has(file));
-                    const removedFiles = previousFiles.filter(file => !nextSet.has(file));
+                    const changedFiles = collectAddedFiles(nextFiles, previousSet);
+                    const removedFiles = collectRemovedFiles(previousFiles, nextSet);
 
-                    if (changedFiles.length > 0 && typeof listener.userDirectoryFilesAddedOrChanged === 'function')
-                        listener.userDirectoryFilesAddedOrChanged(propertyName, changedFiles);
-                    if (removedFiles.length > 0 && typeof listener.userDirectoryFilesRemoved === 'function')
-                        listener.userDirectoryFilesRemoved(propertyName, removedFiles);
+                    if (changedFiles.length > 0)
+                        safeInvokeWallpaperListener(listener, 'userDirectoryFilesAddedOrChanged', [propertyName, changedFiles]);
+                    if (removedFiles.length > 0)
+                        safeInvokeWallpaperListener(listener, 'userDirectoryFilesRemoved', [propertyName, removedFiles]);
                 }
-            };
+            }
 
-            const applyState = payload => {
+            function scheduleBridgeReplay() {
+                bridgeReplayPending = true;
+                if (!bridgeCallbacksReady || bridgeReplayScheduled)
+                    return;
+
+                bridgeReplayScheduled = true;
+                window.setTimeout(function() {
+                    bridgeReplayScheduled = false;
+                    if (!bridgeReplayPending || !bridgeCallbacksReady)
+                        return;
+
+                    bridgeReplayPending = false;
+                    replayBridgeState();
+                }, 0);
+            }
+
+            function applyState(payload) {
                 if (!payload || typeof payload !== 'object')
                     return;
                 if (payload.version === bridgeState.version)
@@ -324,12 +297,32 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                     : {};
                 bridgeState.paused = Boolean(payload.paused);
 
+                if (!bridgeCallbacksReady) {
+                    // Some web wallpapers register wallpaperPropertyListener
+                    // before their own window.load initializers create WebGL
+                    // canvases or media elements. Store the latest state now,
+                    // then replay it after the page's load handlers have run so
+                    // property callbacks like sakuraResize() see initialized
+                    // project objects instead of half-built globals.
+                    bridgeState.directorySnapshots = normalizeDirectorySnapshots(payload.directorySnapshots);
+                    scheduleBridgeReplay();
+                    return;
+                }
+
                 flushUserProperties();
                 flushGeneralProperties();
                 flushPausedState();
                 applyPlaybackState();
                 flushDirectorySnapshots(payload.directorySnapshots);
-            };
+            }
+
+            function replayBridgeState() {
+                flushUserProperties();
+                flushGeneralProperties();
+                flushPausedState();
+                applyPlaybackState();
+                flushDirectorySnapshots(bridgeState.directorySnapshots);
+            }
 
             Object.defineProperty(window, 'wallpaperPropertyListener', {
                 configurable: true,
@@ -339,30 +332,25 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 },
                 set(value) {
                     wallpaperPropertyListenerValue = value;
-                    queueMicrotask(() => {
-                        flushUserProperties();
-                        flushGeneralProperties();
-                        flushPausedState();
-                        flushDirectorySnapshots(bridgeState.directorySnapshots);
-                    });
+                    scheduleBridgeReplay();
                 },
             });
 
-            window.__hanabiApplyUserProperties = payload => {
+            window.__hanabiApplyUserProperties = function(payload) {
                 applyState({
                     ...bridgeState,
                     version: bridgeState.version + 1,
                     userProperties: payload,
                 });
             };
-            window.__hanabiApplyGeneralProperties = payload => {
+            window.__hanabiApplyGeneralProperties = function(payload) {
                 applyState({
                     ...bridgeState,
                     version: bridgeState.version + 1,
                     generalProperties: payload,
                 });
             };
-            window.__hanabiSetPaused = isPaused => {
+            window.__hanabiSetPaused = function(isPaused) {
                 applyState({
                     ...bridgeState,
                     version: bridgeState.version + 1,
@@ -371,262 +359,52 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
             };
 
             let pollPending = false;
-            const pollState = async () => {
+            function pollState() {
                 if (pollPending)
                     return;
                 pollPending = true;
-                try {
-                    const response = await fetch(stateEndpoint, {
-                        cache: 'no-store',
-                    });
-                    if (!response.ok)
+
+                const request = new XMLHttpRequest();
+                request.open('GET', stateEndpoint, true);
+                request.setRequestHeader('Cache-Control', 'no-store');
+                request.onreadystatechange = function() {
+                    if (request.readyState !== XMLHttpRequest.DONE)
                         return;
-                    applyState(await response.json());
-                } catch (_e) {
-                } finally {
                     pollPending = false;
-                }
-            };
+
+                    if (request.status < 200 || request.status >= 300)
+                        return;
+
+                    try {
+                        applyState(JSON.parse(request.responseText));
+                    } catch (error) {
+                        console.warn('[Hanabi] failed to parse wallpaper bridge state: ' + (error && error.message ? error.message : String(error)));
+                    }
+                };
+                request.onerror = function() {
+                    pollPending = false;
+                };
+                request.send();
+            }
 
             applyState(${JSON.stringify(initialState)});
-            window.addEventListener('load', () => {
-                pollState();
-            }, {once: true});
-            window.setInterval(() => {
+            function markBridgeCallbacksReady() {
+                window.setTimeout(function() {
+                    bridgeCallbacksReady = true;
+                    scheduleBridgeReplay();
+                    pollState();
+                }, 0);
+            }
+
+            if (bridgeCallbacksReady)
+                markBridgeCallbacksReady();
+            else
+                window.addEventListener('load', markBridgeCallbacksReady, {once: true});
+            window.setInterval(function() {
                 pollState();
             }, 100);
         })();
     `;
-
-    class LocalWebProjectHttpServer {
-        constructor(project, options = {}) {
-            this._project = project;
-            this._server = null;
-            this._baseUri = '';
-            this._playbackUri = '';
-            this._stateVersion = 0;
-            this._state = {
-                version: this._stateVersion,
-                userProperties: options.initialUserProperties ?? {},
-                generalProperties: options.initialGeneralProperties ?? {},
-                paused: Boolean(options.initialPaused),
-                directorySnapshots: options.initialDirectorySnapshots ?? {},
-            };
-            this._localMediaHttpUrlPrefix = options.localMediaHttpUrlPrefix ?? '';
-            this._start();
-        }
-
-        get playbackUri() {
-            return this._playbackUri;
-        }
-
-        get browserUri() {
-            return this._playbackUri.replace(/^web\+/, '');
-        }
-
-        destroy() {
-            this._server = null;
-            this._baseUri = '';
-            this._playbackUri = '';
-        }
-
-        updateState(nextState = {}) {
-            this._state = {
-                ...this._state,
-                ...nextState,
-                directorySnapshots: nextState.directorySnapshots ?? this._state.directorySnapshots,
-                userProperties: nextState.userProperties ?? this._state.userProperties,
-                generalProperties: nextState.generalProperties ?? this._state.generalProperties,
-                version: ++this._stateVersion,
-            };
-        }
-
-        _start() {
-            try {
-                this._server = new Soup.Server({
-                    server_header: 'HanabiWebProject',
-                });
-                this._server.add_handler('/', (_server, message) => {
-                    this._handleMessage(message);
-                });
-                this._server.listen_local(0, Soup.ServerListenOptions.IPV4_ONLY);
-
-                const uri = this._server.get_uris()?.[0] ?? null;
-                if (!uri) {
-                    console.warn('Local web project HTTP server started without an advertised URI');
-                    return;
-                }
-
-                this._baseUri = uri.to_string().replace(/\/$/, '');
-                this._playbackUri = `web+${this._baseUri}/${this._encodeRelativePath(this._project.entry ?? 'index.html')}`;
-                console.log(`Local web project HTTP server listening at ${this._baseUri}`);
-            } catch (e) {
-                this._server = null;
-                this._baseUri = '';
-                this._playbackUri = '';
-                console.warn(`Failed to start local web project HTTP server: ${e}`);
-            }
-        }
-
-        _handleMessage(message) {
-            const method = message.get_method?.() ?? 'GET';
-            if (method !== 'GET' && method !== 'HEAD') {
-                message.set_status(Soup.Status.NOT_IMPLEMENTED, null);
-                return;
-            }
-
-            const requestPath = message.get_uri()?.get_path?.() ?? '/';
-            if (requestPath === '/__hanabi__/state') {
-                this._serveState(method, message);
-                return;
-            }
-
-            this._serveProjectFile(method, message, requestPath);
-        }
-
-        _serveState(method, message) {
-            const responseHeaders = message.get_response_headers();
-            responseHeaders.replace('Cache-Control', 'no-store, no-cache, must-revalidate');
-            responseHeaders.replace('Pragma', 'no-cache');
-            responseHeaders.replace('Expires', '0');
-
-            const body = method === 'HEAD'
-                ? new Uint8Array(0)
-                : new TextEncoder().encode(JSON.stringify(this._state));
-            responseHeaders.set_content_type('application/json', null);
-            responseHeaders.set_content_length(body.length);
-            message.set_status(Soup.Status.OK, null);
-            message.set_response('application/json', Soup.MemoryUse.COPY, body);
-        }
-
-        _serveProjectFile(method, message, requestPath) {
-            const relativePath = this._resolveRequestedRelativePath(requestPath);
-            if (!relativePath) {
-                message.set_status(Soup.Status.NOT_FOUND, null);
-                return;
-            }
-
-            const filePath = GLib.build_filenamev([this._project.path, relativePath]);
-            if (!this._isWithinProjectRoot(filePath)) {
-                message.set_status(Soup.Status.NOT_FOUND, null);
-                return;
-            }
-
-            try {
-                const file = Gio.File.new_for_path(filePath);
-                const info = file.query_info(
-                    'standard::content-type,standard::size,standard::type',
-                    Gio.FileQueryInfoFlags.NONE,
-                    null
-                );
-                if (info.get_file_type() !== Gio.FileType.REGULAR) {
-                    message.set_status(Soup.Status.NOT_FOUND, null);
-                    return;
-                }
-
-                const [bytes] = file.load_bytes(null);
-                let data = bytes.get_data();
-                let mimeType = Gio.content_type_get_mime_type(info.get_content_type?.() ?? '')
-                    ?? guessMimeType(filePath);
-                const isHtml = /\.(?:html?|xhtml)$/i.test(filePath);
-
-                if (isHtml) {
-                    data = new TextEncoder().encode(
-                        this._injectBootstrapScript(new TextDecoder().decode(data))
-                    );
-                    mimeType = 'text/html';
-                }
-
-                const responseHeaders = message.get_response_headers();
-                responseHeaders.replace('Accept-Ranges', 'bytes');
-                responseHeaders.set_content_type(mimeType, null);
-
-                const requestedRange = parseHttpRangeHeader(
-                    message.get_request_headers()?.get_one?.('Range') ?? '',
-                    data.length
-                );
-
-                if ((message.get_request_headers()?.get_one?.('Range') ?? '') && !requestedRange) {
-                    message.set_status(416, 'Range Not Satisfiable');
-                    responseHeaders.replace('Content-Range', `bytes */${data.length}`);
-                    message.set_response(
-                        'application/octet-stream',
-                        Soup.MemoryUse.STATIC,
-                        new Uint8Array(0)
-                    );
-                    return;
-                }
-
-                const start = requestedRange?.start ?? 0;
-                const end = requestedRange?.end ?? (data.length - 1);
-                const body = method === 'HEAD'
-                    ? new Uint8Array(0)
-                    : data.slice(start, end + 1);
-
-                if (requestedRange) {
-                    message.set_status(Soup.Status.PARTIAL_CONTENT, null);
-                    responseHeaders.set_content_range(start, end, data.length);
-                    responseHeaders.set_content_length(end - start + 1);
-                } else {
-                    message.set_status(Soup.Status.OK, null);
-                    responseHeaders.set_content_length(data.length);
-                }
-
-                message.set_response(
-                    mimeType,
-                    Soup.MemoryUse.COPY,
-                    body
-                );
-            } catch (e) {
-                console.warn(`Failed to serve local web project file ${filePath}: ${e}`);
-                message.set_status(Soup.Status.INTERNAL_SERVER_ERROR, null);
-            }
-        }
-
-        _injectBootstrapScript(html) {
-            const script = `<script>${buildBootstrapScript('/__hanabi__/state', this._localMediaHttpUrlPrefix, this._state)}</script>`;
-            if (/<\/head>/i.test(html))
-                return html.replace(/<\/head>/i, `${script}</head>`);
-            if (/<body[^>]*>/i.test(html))
-                return html.replace(/<body[^>]*>/i, match => `${match}${script}`);
-            return `${script}${html}`;
-        }
-
-        _resolveRequestedRelativePath(requestPath) {
-            const normalizedRequestPath = requestPath === '/' ? `/${this._project.entry ?? 'index.html'}` : requestPath;
-            const trimmed = normalizedRequestPath.replace(/^\/+/, '');
-            if (trimmed === '')
-                return this._project.entry ?? 'index.html';
-
-            let decoded = trimmed;
-            try {
-                decoded = decodeURIComponent(trimmed);
-            } catch (_e) {
-            }
-
-            const segments = decoded
-                .split('/')
-                .filter(segment => segment !== '' && segment !== '.');
-            if (segments.some(segment => segment === '..'))
-                return null;
-
-            return segments.join('/');
-        }
-
-        _encodeRelativePath(relativePath) {
-            return relativePath
-                .split('/')
-                .filter(segment => segment !== '')
-                .map(segment => encodeURIComponent(segment))
-                .join('/');
-        }
-
-        _isWithinProjectRoot(candidatePath) {
-            const normalizedRoot = GLib.build_filenamev([this._project.path]);
-            const normalizedCandidate = GLib.build_filenamev([candidatePath]);
-            return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`);
-        }
-    }
 
     return class WebGstCefBackend extends BackendController {
         constructor(renderer, project) {
@@ -655,6 +433,10 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
             this._syncFetchAllDirectoryProperties();
             this._renderer.registerWebAudioBackend?.(this);
             this._projectServer = new LocalWebProjectHttpServer(project, {
+                // gstcefsrc cannot rely on WPE's UserContentManager injection,
+                // so the shared project-root server receives this backend's
+                // bootstrap builder and injects it only into served HTML files.
+                bootstrapScriptBuilder: buildBootstrapScript,
                 localMediaHttpUrlPrefix: renderer.getLocalMediaHttpUrlPrefix?.() ?? '',
                 initialDirectorySnapshots: this._webDirectorySnapshots,
                 initialGeneralProperties: this._buildGeneralPropertyPayload(),
@@ -705,7 +487,7 @@ var createWebGstCefBackendClass = (env, helpers, baseClasses) => {
                 return this._createPlaceholderWidget('gstcefsrc renderer could not be shared across monitors');
 
             if (!widget) {
-                if (!this._projectServer?.playbackUri)
+                if (!this._projectServer?.browserUri)
                     return this._createPlaceholderWidget('gstcefsrc backend could not start the local web project server');
 
                 widget = this._createPipelineWidget(this._getEffectiveOutputMetrics());
