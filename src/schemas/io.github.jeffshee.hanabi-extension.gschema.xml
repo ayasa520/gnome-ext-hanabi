@@ -155,5 +155,11 @@
             <summary>Project Browser Filter State</summary>
             <description>Structured filter state for wallpaper browser categories</description>
         </key>
+
+        <key name="project-browser-sort-key" type="s">
+            <default>'name'</default>
+            <summary>Project Browser Sort Key</summary>
+            <description>Selected wallpaper browser sort rule</description>
+        </key>
     </schema>
 </schemalist>

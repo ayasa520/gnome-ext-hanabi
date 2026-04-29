@@ -68,8 +68,9 @@ const INSPECTOR_NARROW_CONTROL_WIDTH = 56;
 const PROJECT_BROWSER_SORT_KEYS = {
     NAME: 'name',
     FILE_SIZE: 'file-size',
-    SUBSCRIBE_TIME: 'subscribe-time',
+    UPDATED_TIME: 'updated-time',
 };
+const PROJECT_BROWSER_SORT_SETTINGS_KEY = 'project-browser-sort-key';
 
 function compareProjectTitles(left, right) {
     const leftTitle = `${left?.title || left?.basename || left?.path || ''}`.toLowerCase();
@@ -86,24 +87,29 @@ function compareNumbersDescending(left, right) {
     return left > right ? -1 : 1;
 }
 
-function queryProjectDirectoryTime(project) {
+function getFileInfoModifiedTimeUs(info) {
+    return (
+        info.get_attribute_uint64('time::modified') * GLib.USEC_PER_SEC +
+        info.get_attribute_uint32('time::modified-usec')
+    );
+}
+
+function queryFileModifiedTimeUs(file) {
     try {
-        const file = Gio.File.new_for_path(project.path);
         const info = file.query_info(
             'time::modified,time::modified-usec',
             Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
             null
         );
 
-        // Wallpaper Engine subscriptions live as project directories here, so
-        // the directory timestamp is the local stand-in for "subscribe time".
-        return (
-            info.get_attribute_uint64('time::modified') * GLib.USEC_PER_SEC +
-            info.get_attribute_uint32('time::modified-usec')
-        );
+        return getFileInfoModifiedTimeUs(info);
     } catch (_error) {
         return 0;
     }
+}
+
+function queryProjectLastUpdatedTime(project) {
+    return project?.path ? queryFileModifiedTimeUs(Gio.File.new_for_path(project.path)) : 0;
 }
 
 function queryProjectDirectorySize(path) {
@@ -138,6 +144,12 @@ function queryProjectDirectorySize(path) {
     }
 
     return totalSize;
+}
+
+function normalizeProjectBrowserSortKey(key) {
+    return Object.values(PROJECT_BROWSER_SORT_KEYS).includes(key)
+        ? key
+        : PROJECT_BROWSER_SORT_KEYS.NAME;
 }
 
 export function formatProjectSubtitle(path) {
@@ -1059,15 +1071,19 @@ function createProjectBrowserDialog(window, settings) {
     const sortOptions = [
         {key: PROJECT_BROWSER_SORT_KEYS.NAME, label: _('Name')},
         {key: PROJECT_BROWSER_SORT_KEYS.FILE_SIZE, label: _('File size')},
-        {key: PROJECT_BROWSER_SORT_KEYS.SUBSCRIBE_TIME, label: _('Subscribe time')},
+        {key: PROJECT_BROWSER_SORT_KEYS.UPDATED_TIME, label: _('Last updated')},
     ];
+    const savedSortKey = normalizeProjectBrowserSortKey(
+        settings.get_string(PROJECT_BROWSER_SORT_SETTINGS_KEY)
+    );
+    const savedSortIndex = Math.max(0, sortOptions.findIndex(option => option.key === savedSortKey));
     const sortLabel = new Gtk.Label({
         label: _('Sort'),
         valign: Gtk.Align.CENTER,
     });
     const sortDropdown = new Gtk.DropDown({
         model: Gtk.StringList.new(sortOptions.map(option => option.label)),
-        selected: 0,
+        selected: savedSortIndex,
         valign: Gtk.Align.CENTER,
     });
     const filterButton = new Gtk.MenuButton({
@@ -1228,7 +1244,7 @@ function createProjectBrowserDialog(window, settings) {
     let currentProjectsByPath = new Map();
     let currentFilterTagOptions = getProjectFilterTagOptions([]);
     let inspectorSections = [];
-    let currentSortKey = sortOptions[sortDropdown.selected]?.key ?? PROJECT_BROWSER_SORT_KEYS.NAME;
+    let currentSortKey = savedSortKey;
     const sceneImageSession = new Soup.Session();
     const cards = [];
     const projectSortMetadata = new Map();
@@ -1255,7 +1271,7 @@ function createProjectBrowserDialog(window, settings) {
         // be reused by every GTK sort callback for the same wallpaper row.
         metadata = {
             sizeBytes: null,
-            timeUs: queryProjectDirectoryTime(project),
+            updatedTimeUs: null,
         };
         projectSortMetadata.set(project.path, metadata);
         return metadata;
@@ -1268,6 +1284,13 @@ function createProjectBrowserDialog(window, settings) {
         return metadata.sizeBytes;
     };
 
+    const getProjectSortUpdatedTime = project => {
+        const metadata = getProjectSortMetadata(project);
+        if (metadata.updatedTimeUs === null)
+            metadata.updatedTimeUs = queryProjectLastUpdatedTime(project);
+        return metadata.updatedTimeUs;
+    };
+
     const compareProjectsForCurrentSort = (left, right) => {
         if (currentSortKey === PROJECT_BROWSER_SORT_KEYS.FILE_SIZE) {
             const sizeComparison = compareNumbersDescending(
@@ -1277,10 +1300,10 @@ function createProjectBrowserDialog(window, settings) {
             return sizeComparison || compareProjectTitles(left, right);
         }
 
-        if (currentSortKey === PROJECT_BROWSER_SORT_KEYS.SUBSCRIBE_TIME) {
+        if (currentSortKey === PROJECT_BROWSER_SORT_KEYS.UPDATED_TIME) {
             const timeComparison = compareNumbersDescending(
-                getProjectSortMetadata(left).timeUs,
-                getProjectSortMetadata(right).timeUs
+                getProjectSortUpdatedTime(left),
+                getProjectSortUpdatedTime(right)
             );
             return timeComparison || compareProjectTitles(left, right);
         }
@@ -2011,7 +2034,8 @@ function createProjectBrowserDialog(window, settings) {
     });
 
     sortDropdown.connect('notify::selected', dropdown => {
-        currentSortKey = sortOptions[dropdown.selected]?.key ?? PROJECT_BROWSER_SORT_KEYS.NAME;
+        currentSortKey = normalizeProjectBrowserSortKey(sortOptions[dropdown.selected]?.key);
+        settings.set_string(PROJECT_BROWSER_SORT_SETTINGS_KEY, currentSortKey);
         flowBox.invalidate_sort();
     });
 
