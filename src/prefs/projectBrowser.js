@@ -469,7 +469,6 @@ function createProjectPreviewFrame() {
 
 function attachAnimatedProjectPreview(picture, animation, isCancelled) {
     const iter = animation.get_iter(null);
-    const frameTextures = new Map();
     let timerId = 0;
 
     const updateFrame = () => {
@@ -478,20 +477,16 @@ function attachAnimatedProjectPreview(picture, animation, isCancelled) {
 
         const pixbuf = iter.get_pixbuf();
         if (pixbuf) {
-            let texture = frameTextures.get(pixbuf);
-            if (!texture) {
-                // Each GIF frame is scaled once and cached as a texture; this
-                // keeps animation playback cheap after the asynchronous open has
-                // delivered the first decoded frame to the preview widget.
-                const scaled = pixbuf.scale_simple(
-                    PROJECT_CARD_WIDTH,
-                    PROJECT_CARD_WIDTH,
-                    GdkPixbuf.InterpType.BILINEAR
-                ) ?? pixbuf;
-                texture = Gdk.Texture.new_for_pixbuf(scaled);
-                frameTextures.set(pixbuf, texture);
-            }
-            picture.set_paintable(texture);
+            // Hover playback must not retain a texture per GIF frame. Keeping
+            // only the currently painted frame gives the browser a bounded
+            // lifetime for animation resources: enter creates them, leave
+            // releases them, and normal grid browsing stays static.
+            const scaled = pixbuf.scale_simple(
+                PROJECT_CARD_WIDTH,
+                PROJECT_CARD_WIDTH,
+                GdkPixbuf.InterpType.BILINEAR
+            ) ?? pixbuf;
+            picture.set_paintable(Gdk.Texture.new_for_pixbuf(scaled));
         }
 
         const delay = iter.get_delay_time();
@@ -515,7 +510,6 @@ function attachAnimatedProjectPreview(picture, animation, isCancelled) {
             GLib.source_remove(timerId);
             timerId = 0;
         }
-        frameTextures.clear();
         picture.set_paintable(null);
     };
 }
@@ -527,7 +521,11 @@ function createProjectPreview(project, previewQueue) {
 
     let destroyed = false;
     let cancelLoad = null;
+    let cancelAnimationLoad = null;
+    let animationLoadToken = 0;
     let stopAnimation = null;
+    let staticTexture = null;
+    let hoverActive = false;
     const path = project.previewPath;
     const isGif = path.toLowerCase().endsWith('.gif');
 
@@ -545,38 +543,81 @@ function createProjectPreview(project, previewQueue) {
             console.warn(`Hanabi preferences: failed to load wallpaper thumbnail "${path}": ${error}`);
     };
 
+    const stopHoverAnimation = () => {
+        animationLoadToken++;
+        cancelAnimationLoad?.();
+        cancelAnimationLoad = null;
+        stopAnimation?.();
+        stopAnimation = null;
+        if (staticTexture)
+            picture.set_paintable(staticTexture);
+    };
+
+    const startHoverAnimation = () => {
+        if (!isGif || destroyed || !hoverActive || stopAnimation || cancelAnimationLoad)
+            return;
+
+        const loadToken = ++animationLoadToken;
+        cancelAnimationLoad = previewQueue.enqueue(async cancellable => {
+            try {
+                const animation = await loadProjectPreviewAnimationAsync(path, cancellable);
+                if (destroyed || cancellable.is_cancelled() || !hoverActive || loadToken !== animationLoadToken)
+                    return;
+
+                stopAnimation = attachAnimatedProjectPreview(
+                    picture,
+                    animation,
+                    () => destroyed || !hoverActive || loadToken !== animationLoadToken
+                );
+                picture.visible = true;
+            } catch (error) {
+                if (!isPreviewLoadCancelled(error))
+                    console.warn(`Hanabi preferences: failed to play wallpaper GIF thumbnail "${path}": ${error}`);
+            } finally {
+                if (loadToken === animationLoadToken)
+                    cancelAnimationLoad = null;
+            }
+        });
+    };
+
     spinner.visible = true;
     spinner.spinning = true;
     cancelLoad = previewQueue.enqueue(async cancellable => {
         try {
-            if (isGif) {
-                const animation = await loadProjectPreviewAnimationAsync(path, cancellable);
-                if (destroyed || cancellable.is_cancelled())
-                    return;
-
-                stopAnimation = attachAnimatedProjectPreview(picture, animation, () => destroyed || cancellable.is_cancelled());
-                picture.visible = true;
-                finishLoading();
-                return;
-            }
-
             const pixbuf = await loadProjectPreviewPixbufAsync(path, cancellable);
             if (destroyed || cancellable.is_cancelled())
                 return;
 
-            picture.set_paintable(Gdk.Texture.new_for_pixbuf(pixbuf));
+            staticTexture = Gdk.Texture.new_for_pixbuf(pixbuf);
+            if (!hoverActive || !stopAnimation)
+                picture.set_paintable(staticTexture);
             picture.visible = true;
             finishLoading();
+            startHoverAnimation();
         } catch (error) {
             failLoading(error);
         }
     });
 
+    if (isGif) {
+        const hoverController = new Gtk.EventControllerMotion();
+        hoverController.connect('enter', () => {
+            hoverActive = true;
+            startHoverAnimation();
+        });
+        hoverController.connect('leave', () => {
+            hoverActive = false;
+            stopHoverAnimation();
+        });
+        frame.add_controller(hoverController);
+    }
+
     frame.connect('destroy', () => {
         destroyed = true;
         cancelLoad?.();
-        stopAnimation?.();
+        stopHoverAnimation();
         finishLoading();
+        picture.set_paintable(null);
     });
 
     return frame;
