@@ -7,6 +7,8 @@ scene_artifacts = custom_target(
   input: files(
     'CMakeLists.txt',
     'hanabi-scene-dmabuf-texture.cpp',
+    'hanabi-scene-gpu-policy.cpp',
+    'hanabi-scene-gpu-policy.hpp',
     'hanabi-scene-paintable.cpp',
     'hanabi-scene-paintable.h',
     'hanabi-scene-widget.cpp',

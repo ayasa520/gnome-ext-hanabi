@@ -86,16 +86,10 @@
             <description>Enable printing debug messages to log</description>
         </key>
 
-        <key name="enable-va" type="b">
-            <default>false</default>
-            <summary>Experimental VA Plugin</summary>
-            <description>Enable VA decoders for improved performance on Intel/AMD Wayland setups</description>
-        </key>
-
-        <key name="enable-nvsl" type="b">
-            <default>false</default>
-            <summary>NVIDIA Stateless Decoders</summary>
-            <description>Use new stateless NVIDIA decoders</description>
+        <key name="gpu-pipeline" type="s">
+            <default>'auto'</default>
+            <summary>GPU Pipeline</summary>
+            <description>Choose one GPU pipeline for video wallpapers, scene rendering, and scene video textures. Supported values are auto, nvidia, nvidia-stateless, and va.</description>
         </key>
 
         <key name="force-gtk4paintablesink" type="b">

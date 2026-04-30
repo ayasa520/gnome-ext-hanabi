@@ -135,6 +135,29 @@ export function prefsRowWebBackend(window, prefsGroup, backends) {
     });
 }
 
+export function prefsRowStringChoice(window, prefsGroup, title, key, subtitle, choices) {
+    const settings = window._settings;
+    const items = Gtk.StringList.new(choices.map(choice => choice.label));
+    const values = choices.map(choice => choice.value);
+    const currentValue = settings.get_string(key);
+    const selectedIndex = Math.max(0, values.indexOf(currentValue));
+
+    const row = new Adw.ComboRow({
+        title,
+        subtitle,
+        model: items,
+        selected: selectedIndex,
+    });
+    prefsGroup.add(row);
+
+    if (values[selectedIndex] !== currentValue)
+        settings.set_string(key, values[selectedIndex]);
+
+    row.connect('notify::selected', () => {
+        settings.set_string(key, values[row.selected] ?? values[0]);
+    });
+}
+
 export function prefsRowPauseOnMaximizeOrFullscreen(window, prefsGroup) {
     const settings = window._settings;
     const title = _('Pause on Maximize or Fullscreen');

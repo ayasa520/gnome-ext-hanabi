@@ -38,6 +38,9 @@ int  hanabi_scene_paintable_get_fill_mode(HanabiScenePaintable* self);
 void hanabi_scene_paintable_set_fps(HanabiScenePaintable* self, int fps);
 int  hanabi_scene_paintable_get_fps(HanabiScenePaintable* self);
 
+void        hanabi_scene_paintable_set_gpu_pipeline(HanabiScenePaintable* self, const char* gpu_pipeline);
+const char* hanabi_scene_paintable_get_gpu_pipeline(HanabiScenePaintable* self);
+
 void   hanabi_scene_paintable_set_render_scale(HanabiScenePaintable* self, double render_scale);
 double hanabi_scene_paintable_get_render_scale(HanabiScenePaintable* self);
 

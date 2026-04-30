@@ -54,6 +54,7 @@ prependRepositoryDir(
 
 const ProjectLoader = imports.projectLoader;
 const RendererBackends = imports.backends;
+const GpuPipelinePolicy = imports.gpuPipelinePolicy;
 
 // [major, minor, micro, nano]
 const gstVersion = Gst.version();
@@ -190,12 +191,19 @@ const forceMediaFile = extSettings
     ? extSettings.get_boolean('force-mediafile')
     : false;
 
-const isEnableVADecoders = extSettings
-    ? extSettings.get_boolean('enable-va')
-    : false;
-const isEnableNvSl = extSettings
-    ? extSettings.get_boolean('enable-nvsl')
-    : false;
+let configuredGpuPipeline = 'auto';
+if (extSettings) {
+    try {
+        configuredGpuPipeline = GpuPipelinePolicy.normalizeGpuPipeline(
+            extSettings.get_string('gpu-pipeline')
+        );
+    } catch (e) {
+        configuredGpuPipeline = 'auto';
+    }
+}
+let resolvedGpuPipeline = configuredGpuPipeline === GpuPipelinePolicy.GpuPipeline.AUTO
+    ? GpuPipelinePolicy.GpuPipeline.NVIDIA
+    : configuredGpuPipeline;
 
 // Support for dmabus and graphics offload is available from Gtk 4.14+
 const isEnableGraphicsOffload = extSettings
@@ -218,6 +226,14 @@ const getEffectiveWebBackend = value => {
     if (normalized === WebBackendKind.GST_CEF_SRC && gstCefSrcWebBackendEnabled)
         return normalized;
     return WebBackendKind.WPE_WEBKIT;
+};
+
+const hasGstElementFactory = factoryName => {
+    try {
+        return Boolean(Gst.ElementFactory.find(factoryName));
+    } catch (_e) {
+        return false;
+    }
 };
 
 const prependEnvPath = (name, value) => {
@@ -1277,6 +1293,7 @@ const createBackend = RendererBackends.createBackendFactory({
         getVolume: () => volume,
         getSceneFps: () => sceneFps,
         getWebBackend: () => webBackend,
+        getGpuPipeline: () => resolvedGpuPipeline,
     },
 });
 
@@ -1499,6 +1516,13 @@ const HanabiRenderer = GObject.registerClass(
                     sceneFps = settings.get_int(key);
                     this.setSceneFps(sceneFps);
                     break;
+                case 'gpu-pipeline':
+                    configuredGpuPipeline = GpuPipelinePolicy.normalizeGpuPipeline(
+                        settings.get_string(key)
+                    );
+                    this._setupGst();
+                    this._switchProject();
+                    break;
                 case 'change-wallpaper':
                     changeWallpaper = settings.get_boolean(key);
                     this.setAutoWallpaper();
@@ -1627,18 +1651,37 @@ const HanabiRenderer = GObject.registerClass(
         }
 
         _setupGst() {
-            // Software libav decoders have "primary" rank, set Nvidia higher
-            // to use NVDEC hardware acceleration.
-            this._setPluginDecodersRank(
-                'nvcodec',
-                Gst.Rank.PRIMARY + 1,
-                isEnableNvSl
+            resolvedGpuPipeline = GpuPipelinePolicy.resolveGpuPipeline(
+                configuredGpuPipeline,
+                hasGstElementFactory
             );
+            console.log(`HanabiRenderer: gpu-pipeline configured=${configuredGpuPipeline} resolved=${resolvedGpuPipeline}`);
+            if (GpuPipelinePolicy.isNvidiaPipeline(resolvedGpuPipeline)) {
+                console.log(
+                    `HanabiRenderer: nvidia-offload-env DRI_PRIME=${GLib.getenv('DRI_PRIME') ?? ''} ` +
+                    `__NV_PRIME_RENDER_OFFLOAD=${GLib.getenv('__NV_PRIME_RENDER_OFFLOAD') ?? ''} ` +
+                    `__VK_LAYER_NV_optimus=${GLib.getenv('__VK_LAYER_NV_optimus') ?? ''} ` +
+                    `WPE_DRM_DEVICE=${GLib.getenv('WPE_DRM_DEVICE') ?? ''}`
+                );
+            }
 
-            // Legacy "vaapidecodebin" have rank "primary + 2",
-            // we need to set VA higher then that to be used
-            if (isEnableVADecoders)
-                this._setPluginDecodersRank('va', Gst.Rank.PRIMARY + 3);
+            // Keep ordinary video wallpapers aligned with native scene rendering
+            // and scene video textures. A single combo value gets the explicit
+            // rank advantage here, then the same resolved value is passed into
+            // the native scene objects instead of being rediscovered there.
+            const preferredRank = Gst.Rank.PRIMARY + 4;
+            if (resolvedGpuPipeline === 'va') {
+                this._setPluginDecodersRank('va', preferredRank);
+                this._setPluginDecodersRank('nvcodec', Gst.Rank.NONE, false);
+                this._setPluginDecodersRank('nvcodec', Gst.Rank.NONE, true);
+            } else {
+                this._setPluginDecodersRank('va', Gst.Rank.NONE);
+                this._setPluginDecodersRank('nvcodec', preferredRank, false);
+                if (resolvedGpuPipeline === 'nvidia-stateless')
+                    this._setPluginDecodersRank('nvcodec', preferredRank + 1, true);
+                else
+                    this._setPluginDecodersRank('nvcodec', Gst.Rank.NONE, true);
+            }
         }
 
         _setPluginDecodersRank(pluginName, rank, useStateless = false) {

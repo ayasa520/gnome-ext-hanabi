@@ -4,6 +4,8 @@ import GLib from 'gi://GLib';
 import * as Launcher from './launcher.js';
 import {loadProject} from '../../project.js';
 
+const GpuPipelinePolicy = imports.gpuPipelinePolicy;
+
 export class RendererManager {
     constructor(extension) {
         this._extension = extension;
@@ -33,6 +35,7 @@ export class RendererManager {
 
         const projectPath = settings.get_string('project-path');
         const contentFit = settings.get_int('content-fit');
+        const gpuPipeline = settings.get_string('gpu-pipeline');
         const project = loadProject(projectPath);
         if (!project) {
             this._extension.openPreferences();
@@ -58,6 +61,7 @@ export class RendererManager {
         // aggressively so repeated wallpaper switches do not leave RSS permanently high.
         this._currentProcess.setenv('MALLOC_ARENA_MAX', '2');
         this._currentProcess.setenv('MALLOC_TRIM_THRESHOLD_', '131072');
+        GpuPipelinePolicy.applyEnvironmentToLauncher(this._currentProcess, gpuPipeline);
         this._currentProcess.spawnv(argv);
         this._extension.manager.set_wayland_client(this._currentProcess);
         const process = this._currentProcess;
@@ -94,6 +98,12 @@ export class RendererManager {
         this._currentProcess = null;
         this._currentProjectType = null;
         this._extension.manager?.set_wayland_client(null);
+    }
+
+    restart(delay = 100) {
+        this.stop();
+        if (this._extension.isEnabled)
+            this._scheduleLaunch(delay);
     }
 
     killAll() {

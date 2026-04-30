@@ -33,6 +33,9 @@ int hanabi_scene_widget_get_fill_mode(HanabiSceneWidget *self);
 void hanabi_scene_widget_set_fps(HanabiSceneWidget *self, int fps);
 int hanabi_scene_widget_get_fps(HanabiSceneWidget *self);
 
+void hanabi_scene_widget_set_gpu_pipeline(HanabiSceneWidget *self, const char *gpu_pipeline);
+const char *hanabi_scene_widget_get_gpu_pipeline(HanabiSceneWidget *self);
+
 void hanabi_scene_widget_set_render_scale(HanabiSceneWidget *self, double render_scale);
 double hanabi_scene_widget_get_render_scale(HanabiSceneWidget *self);
 

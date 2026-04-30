@@ -158,6 +158,8 @@ root_sources = [
 ]
 
 common_sources = [
+  'common/gpuPipelineEnv.js',
+  'common/gpuPipelinePolicy.js',
   'common/mpris.js',
   'common/projectLoader.js',
 ]

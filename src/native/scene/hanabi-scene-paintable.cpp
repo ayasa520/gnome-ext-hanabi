@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "hanabi-scene-dmabuf-texture.h"
+#include "hanabi-scene-gpu-policy.hpp"
 #include "hanabi-scene-project.hpp"
 
 #include "SceneWallpaper.hpp"
@@ -25,8 +26,12 @@
 using hanabi::scene::SceneProject;
 using hanabi::scene::configure_scene_wallpaper;
 using hanabi::scene::ensure_scene_wallpaper;
+using hanabi::scene::gpu_pipeline_policy_name;
+using hanabi::scene::parse_gpu_pipeline_policy;
+using hanabi::scene::render_gpu_pipeline_preference_for_policy;
 using hanabi::scene::sync_scene_user_properties;
 using hanabi::scene::to_wallpaper_fill_mode;
+using hanabi::scene::vulkan_device_preference_for_policy;
 
 namespace {
 
@@ -41,6 +46,7 @@ enum {
     PROP_VOLUME,
     PROP_FILL_MODE,
     PROP_FPS,
+    PROP_GPU_PIPELINE,
     PROP_RENDER_SCALE,
     PROP_PLAYING,
     PROP_READY,
@@ -161,6 +167,7 @@ struct _HanabiScenePaintable {
     gdouble volume;
     gint fill_mode;
     gint fps;
+    gchar* gpu_pipeline;
     gboolean playing;
 
     bool scene_ready;
@@ -312,19 +319,33 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                         target_width > 0 && target_height > 0) {
                                         const auto dmabuf_modifiers =
                                             collect_dmabuf_modifiers(self->display, DEFAULT_DMABUF_FOURCC);
+                                        const std::vector<uint64_t> export_modifiers;
                                         g_message(
-                                            "HanabiScene: initVulkan offscreen render %dx%d fourcc=0x%x modifiers=%zu playing=%s",
+                                            "HanabiScene: initVulkan offscreen render %dx%d fourcc=0x%x display-modifiers=%zu export-modifiers=%zu playing=%s",
                                             target_width,
                                             target_height,
                                             DEFAULT_DMABUF_FOURCC,
                                             dmabuf_modifiers.size(),
+                                            export_modifiers.size(),
                                             bool_to_string(self->playing));
                                         wallpaper::RenderInitInfo info {};
+                                        const auto gpu_policy =
+                                            parse_gpu_pipeline_policy(self->gpu_pipeline);
                                         info.offscreen = true;
                                         info.export_mode = wallpaper::ExternalFrameExportMode::DMA_BUF;
+                                        info.device_preference =
+                                            vulkan_device_preference_for_policy(gpu_policy);
+                                        info.gpu_pipeline_preference =
+                                            render_gpu_pipeline_preference_for_policy(gpu_policy);
                                         info.offscreen_tiling = wallpaper::TexTiling::LINEAR;
                                         info.export_drm_fourcc = DEFAULT_DMABUF_FOURCC;
-                                        info.export_drm_modifiers = dmabuf_modifiers;
+                                        // GDK may advertise tiled/compressed modifiers that can build a
+                                        // GdkDmabufTexture but later fail when GTK's renderer downloads or
+                                        // composites the texture.  Scene paintable presentation needs a stable
+                                        // cross-GPU handoff more than a modifier-specific allocation, so request
+                                        // linear dma-buf export here and leave GPU-specific modifiers to paths
+                                        // that can prove end-to-end renderer support.
+                                        info.export_drm_modifiers = export_modifiers;
                                         info.width = static_cast<uint16_t>(target_width);
                                         info.height = static_cast<uint16_t>(target_height);
                                         info.render_scale = render_scale;
@@ -332,6 +353,8 @@ G_DEFINE_TYPE_WITH_CODE(HanabiScenePaintable,
                                             if (bridge)
                                                 bridge->request_redraw();
                                         };
+                                        g_message("HanabiScene: scene paintable gpu-pipeline=%s",
+                                                  gpu_pipeline_policy_name(gpu_policy));
                                         self->scene->initVulkan(info);
                                         self->render_width = target_width;
                                         self->render_height = target_height;
@@ -557,6 +580,7 @@ static void hanabi_scene_paintable_finalize(GObject* object) {
     g_clear_pointer(&self->project_dir, g_free);
     g_clear_pointer(&self->user_properties_json, g_free);
     g_clear_pointer(&self->media_state_json, g_free);
+    g_clear_pointer(&self->gpu_pipeline, g_free);
     g_clear_pointer(&self->audio_samples, g_variant_unref);
     G_OBJECT_CLASS(hanabi_scene_paintable_parent_class)->finalize(object);
 }
@@ -584,6 +608,9 @@ static void hanabi_scene_paintable_set_property(GObject* object,
         break;
     case PROP_FPS:
         hanabi_scene_paintable_set_fps(self, g_value_get_int(value));
+        break;
+    case PROP_GPU_PIPELINE:
+        hanabi_scene_paintable_set_gpu_pipeline(self, g_value_get_string(value));
         break;
     case PROP_RENDER_SCALE:
         hanabi_scene_paintable_set_render_scale(self, g_value_get_double(value));
@@ -626,6 +653,9 @@ static void hanabi_scene_paintable_get_property(GObject* object,
     case PROP_FPS:
         g_value_set_int(value, self->fps);
         break;
+    case PROP_GPU_PIPELINE:
+        g_value_set_string(value, self->gpu_pipeline);
+        break;
     case PROP_RENDER_SCALE:
         g_value_set_double(value, self->render_scale);
         break;
@@ -665,6 +695,9 @@ static void hanabi_scene_paintable_class_init(HanabiScenePaintableClass* klass) 
     properties[PROP_FPS] =
         g_param_spec_int("fps", nullptr, nullptr, 5, 240, 30,
                          static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_GPU_PIPELINE] =
+        g_param_spec_string("gpu-pipeline", nullptr, nullptr, "nvidia",
+                            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
     properties[PROP_RENDER_SCALE] =
         g_param_spec_double("render-scale", nullptr, nullptr, 1.0, G_MAXDOUBLE, 1.0,
                             static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
@@ -687,6 +720,7 @@ static void hanabi_scene_paintable_init(HanabiScenePaintable* self) {
     self->volume = 1.0;
     self->fill_mode = 2;
     self->fps = 30;
+    self->gpu_pipeline = g_strdup("nvidia");
     self->render_scale = 1.0;
     self->playing = TRUE;
     self->user_properties_json = nullptr;
@@ -963,6 +997,22 @@ void hanabi_scene_paintable_set_fps(HanabiScenePaintable* self, int fps) {
 int hanabi_scene_paintable_get_fps(HanabiScenePaintable* self) {
     g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), 30);
     return self->fps;
+}
+
+void hanabi_scene_paintable_set_gpu_pipeline(HanabiScenePaintable* self, const char* gpu_pipeline) {
+    g_return_if_fail(HANABI_SCENE_IS_PAINTABLE(self));
+    const char* next = gpu_pipeline != nullptr ? gpu_pipeline : "nvidia";
+    if (g_strcmp0(self->gpu_pipeline, next) == 0)
+        return;
+
+    g_free(self->gpu_pipeline);
+    self->gpu_pipeline = g_strdup(next);
+    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_GPU_PIPELINE]);
+}
+
+const char* hanabi_scene_paintable_get_gpu_pipeline(HanabiScenePaintable* self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_PAINTABLE(self), nullptr);
+    return self->gpu_pipeline;
 }
 
 void hanabi_scene_paintable_set_render_scale(HanabiScenePaintable* self, double render_scale) {

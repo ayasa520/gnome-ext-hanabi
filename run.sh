@@ -8,6 +8,18 @@ fi
 
 UUID="hanabi-extension@jeffshee.github.io"
 
+configure_gpu_pipeline_environment() {
+    local helper="$HANABI_EXTENSION_INSTALL_DIR/common/gpuPipelineEnv.js"
+
+    [ -f "$helper" ] || return 0
+    command -v gjs >/dev/null 2>&1 || return 0
+
+    # Keep run.sh as a thin wrapper around the same GPU policy used by the Shell and prefs
+    # launchers. The helper prints shell-quoted export statements for variables that must
+    # exist before GJS loads GTK/GDK/WPE.
+    eval "$(gjs -m "$helper")"
+}
+
 if [ "$1" == "install" ]; then
     shift
     rm -rf .build
@@ -53,6 +65,7 @@ elif [ "$1" == "renderer" ]; then
         exit 1
     fi
 
+    configure_gpu_pipeline_environment
     "$RENDERER_SCRIPT" --standalone "$@"
 elif [ "$1" == "log" ]; then
     journalctl -f -o cat /usr/bin/gnome-shell

@@ -12,6 +12,10 @@ export class SettingsBindings {
             else
                 this._extension.panelMenu.disable();
         }));
+
+        this._signalHandles.push(this._settings.connect('changed::gpu-pipeline', () => {
+            this._extension.rendererManager?.restart();
+        }));
     }
 
     destroy() {

@@ -14,6 +14,7 @@
 #include <unordered_map>
 
 #include "hanabi-scene-project.hpp"
+#include "hanabi-scene-gpu-policy.hpp"
 #include "SceneWallpaper.hpp"
 #include "SceneWallpaperSurface.hpp"
 #include "Scene/include/Scene/SceneShader.h"
@@ -24,8 +25,12 @@
 using hanabi::scene::SceneProject;
 using hanabi::scene::configure_scene_wallpaper;
 using hanabi::scene::ensure_scene_wallpaper;
+using hanabi::scene::gpu_pipeline_policy_name;
+using hanabi::scene::parse_gpu_pipeline_policy;
+using hanabi::scene::render_gpu_pipeline_preference_for_policy;
 using hanabi::scene::sync_scene_user_properties;
 using hanabi::scene::to_wallpaper_fill_mode;
+using hanabi::scene::vulkan_device_preference_for_policy;
 
 namespace {
 
@@ -39,6 +44,7 @@ enum {
     PROP_VOLUME,
     PROP_FILL_MODE,
     PROP_FPS,
+    PROP_GPU_PIPELINE,
     PROP_RENDER_SCALE,
     PROP_PLAYING,
     PROP_READY,
@@ -162,13 +168,16 @@ wallpaper::TexTiling pick_tiling() {
             support_linear = true;
     }
 
-    const char *vendor = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
-    if (support_linear && vendor && g_strrstr(vendor, "AMD"))
+    if (support_linear) {
+        // Prefer linear external-memory images for the GTK widget bridge as well.  On
+        // hybrid systems the GL context and Vulkan renderer can be backed by the iGPU,
+        // where optimal tiling is advertised but the cross-API import path can still
+        // present black frames.  Linear keeps the OPAQUE_FD handoff deterministic while
+        // preserving the same frame rate and pixels.
         return wallpaper::TexTiling::LINEAR;
+    }
     if (support_optimal)
         return wallpaper::TexTiling::OPTIMAL;
-    if (support_linear)
-        return wallpaper::TexTiling::LINEAR;
     return wallpaper::TexTiling::OPTIMAL;
 }
 
@@ -240,6 +249,7 @@ struct _HanabiSceneWidget {
     gdouble volume;
     gint fill_mode;
     gint fps;
+    gchar *gpu_pipeline;
     gboolean playing;
 
     bool gl_ready;
@@ -361,6 +371,7 @@ static void hanabi_scene_widget_finalize(GObject *object) {
     g_clear_pointer(&self->project_dir, g_free);
     g_clear_pointer(&self->user_properties_json, g_free);
     g_clear_pointer(&self->media_state_json, g_free);
+    g_clear_pointer(&self->gpu_pipeline, g_free);
     g_clear_pointer(&self->audio_samples, g_variant_unref);
     G_OBJECT_CLASS(hanabi_scene_widget_parent_class)->finalize(object);
 }
@@ -385,6 +396,9 @@ static void hanabi_scene_widget_set_property(GObject *object, guint prop_id, con
         break;
     case PROP_FPS:
         hanabi_scene_widget_set_fps(self, g_value_get_int(value));
+        break;
+    case PROP_GPU_PIPELINE:
+        hanabi_scene_widget_set_gpu_pipeline(self, g_value_get_string(value));
         break;
     case PROP_RENDER_SCALE:
         hanabi_scene_widget_set_render_scale(self, g_value_get_double(value));
@@ -423,6 +437,9 @@ static void hanabi_scene_widget_get_property(GObject *object, guint prop_id, GVa
         break;
     case PROP_FPS:
         g_value_set_int(value, self->fps);
+        break;
+    case PROP_GPU_PIPELINE:
+        g_value_set_string(value, self->gpu_pipeline);
         break;
     case PROP_RENDER_SCALE:
         g_value_set_double(value, self->render_scale);
@@ -619,8 +636,11 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
         return false;
 
     wallpaper::RenderInitInfo info {};
+    const auto gpu_policy = parse_gpu_pipeline_policy(self->gpu_pipeline);
     info.offscreen = true;
     info.export_mode = wallpaper::ExternalFrameExportMode::OPAQUE_FD;
+    info.device_preference = vulkan_device_preference_for_policy(gpu_policy);
+    info.gpu_pipeline_preference = render_gpu_pipeline_preference_for_policy(gpu_policy);
     info.width = static_cast<uint16_t>(render_width);
     info.height = static_cast<uint16_t>(render_height);
     info.render_scale = get_render_scale(self);
@@ -631,6 +651,8 @@ static bool ensure_render_initialized(HanabiSceneWidget *self) {
         if (bridge)
             bridge->request_redraw();
     };
+    g_message("HanabiScene: scene widget gpu-pipeline=%s",
+              gpu_pipeline_policy_name(gpu_policy));
     self->scene->initVulkan(info);
 
     self->render_width = render_width;
@@ -831,6 +853,9 @@ static void hanabi_scene_widget_class_init(HanabiSceneWidgetClass *klass) {
     properties[PROP_FPS] =
         g_param_spec_int("fps", nullptr, nullptr, 5, 240, 30,
                          static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
+    properties[PROP_GPU_PIPELINE] =
+        g_param_spec_string("gpu-pipeline", nullptr, nullptr, "nvidia",
+                            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
     properties[PROP_RENDER_SCALE] =
         g_param_spec_double("render-scale", nullptr, nullptr, 1.0, G_MAXDOUBLE, 1.0,
                             static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY));
@@ -853,6 +878,7 @@ static void hanabi_scene_widget_init(HanabiSceneWidget *self) {
     self->volume = 1.0;
     self->fill_mode = 2;
     self->fps = 30;
+    self->gpu_pipeline = g_strdup("nvidia");
     self->render_scale = 1.0;
     self->playing = TRUE;
     self->user_properties_json = nullptr;
@@ -1110,6 +1136,22 @@ void hanabi_scene_widget_set_fps(HanabiSceneWidget *self, int fps) {
 int hanabi_scene_widget_get_fps(HanabiSceneWidget *self) {
     g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), 30);
     return self->fps;
+}
+
+void hanabi_scene_widget_set_gpu_pipeline(HanabiSceneWidget *self, const char *gpu_pipeline) {
+    g_return_if_fail(HANABI_SCENE_IS_WIDGET(self));
+    const char *next = gpu_pipeline != nullptr ? gpu_pipeline : "nvidia";
+    if (g_strcmp0(self->gpu_pipeline, next) == 0)
+        return;
+
+    g_free(self->gpu_pipeline);
+    self->gpu_pipeline = g_strdup(next);
+    g_object_notify_by_pspec(G_OBJECT(self), properties[PROP_GPU_PIPELINE]);
+}
+
+const char *hanabi_scene_widget_get_gpu_pipeline(HanabiSceneWidget *self) {
+    g_return_val_if_fail(HANABI_SCENE_IS_WIDGET(self), nullptr);
+    return self->gpu_pipeline;
 }
 
 void hanabi_scene_widget_set_render_scale(HanabiSceneWidget *self, double render_scale) {

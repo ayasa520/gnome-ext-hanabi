@@ -1,7 +1,7 @@
 var createSceneBackendClass = (env, helpers, baseClasses) => {
     const {Gtk, Gio, GLib, GdkPixbuf, HanabiScene, ProjectType, flags, state} = env;
     const Mpris = imports.mpris;
-    const {haveSceneBackend, haveContentFit, haveGraphicsOffload} = flags;
+    const {haveSceneBackend, haveContentFit} = flags;
     const {setExpandFill, createConfiguredPicture} = helpers;
     const {BackendController} = baseClasses;
     const MEDIA_CACHE_DIR = GLib.build_filenamev([GLib.get_tmp_dir(), 'hanabi-scene-media-cache']);
@@ -564,7 +564,6 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._sceneWidgets = [];
             this._scenePaintables = [];
             this._scenePictures = [];
-            this._sceneOffloads = [];
             this._previewPictures = [];
             this._readyStates = new Map();
             this._readySignalHandlers = [];
@@ -619,7 +618,6 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
             this._sceneWidgets = [];
             this._scenePaintables = [];
             this._scenePictures = [];
-            this._sceneOffloads = [];
             this._previewPictures = [];
             this._readyStates.clear();
             this._readyCallback = null;
@@ -729,14 +727,10 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
 
             if (haveSceneBackend) {
                 const supportsPaintableClass = Boolean(HanabiScene.Paintable);
-                const supportsGraphicsOffloadWidget = Boolean(Gtk.GraphicsOffload);
                 const paintableSupported = Boolean(HanabiScene.Paintable?.is_supported?.());
                 const canUsePaintable =
                     supportsPaintableClass &&
                     paintableSupported;
-                const canUseGraphicsOffload =
-                    haveGraphicsOffload &&
-                    supportsGraphicsOffloadWidget;
                 if (canUsePaintable) {
                     const paintable = new HanabiScene.Paintable({
                         'project-dir': this._project.path,
@@ -744,6 +738,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                         muted: state.getMute(),
                         volume: state.getVolume(),
                         fps: state.getSceneFps(),
+                        'gpu-pipeline': state.getGpuPipeline(),
                         'fill-mode': this._getSceneFillMode(),
                         playing: true,
                     });
@@ -757,17 +752,12 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                     }));
                     this._scenePictures.push(picture);
 
-                    if (canUseGraphicsOffload) {
-                        const offload = setExpandFill(Gtk.GraphicsOffload.new(picture));
-                        offload.set_enabled(Gtk.GraphicsOffloadEnabled.ENABLED);
-                        this._sceneOffloads.push(offload);
-                        this._trackRenderScale(index, paintable, offload, {
-                            kind: 'paintable-offload',
-                            picture,
-                        });
-                        return offload;
-                    }
-
+                    // Keep scene paintables inside GTK's regular render tree. Gtk.GraphicsOffload
+                    // exposes the native scene dma-buf surface more directly to Mutter; on hybrid
+                    // systems with an Intel primary compositor and NVIDIA scene/video-texture
+                    // rendering, that cross-GPU offload path can make gnome-shell abort while
+                    // swapping the desktop frame. Ordinary GTK presentation avoids that compositor
+                    // import path without changing the scene render FPS or texture quality.
                     this._trackRenderScale(index, paintable, picture, {
                         kind: 'paintable-picture',
                         picture,
@@ -781,6 +771,7 @@ var createSceneBackendClass = (env, helpers, baseClasses) => {
                     muted: state.getMute(),
                     volume: state.getVolume(),
                     fps: state.getSceneFps(),
+                    'gpu-pipeline': state.getGpuPipeline(),
                     'fill-mode': this._getSceneFillMode(),
                     playing: true,
                 }));

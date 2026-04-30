@@ -22,6 +22,7 @@ add_subdirectory(${WESCENE_RENDERER_DIR}
 
 add_library(HanabiScene SHARED
   hanabi-scene-dmabuf-texture.cpp
+  hanabi-scene-gpu-policy.cpp
   hanabi-scene-paintable.cpp
   hanabi-scene-widget.cpp
 )

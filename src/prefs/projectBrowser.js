@@ -33,6 +33,8 @@ import {
 } from '../project.js';
 import {connectTracked} from './rows.js';
 
+const GpuPipelinePolicy = imports.gpuPipelinePolicy;
+
 // Resolve paths from this module so the preview actions work both from the
 // installed extension directory and from an in-tree development build where the
 // preferences module still sits next to the renderer directory under src/.
@@ -657,7 +659,20 @@ function getProjectPreviewWindowDimension(anchorWidget) {
     return `${width}:${height}`;
 }
 
-function launchProjectPreview(project, windowed, anchorWidget = null) {
+function getGpuPipelinePreviewEnvironment(settings) {
+    let gpuPipeline = 'auto';
+    try {
+        gpuPipeline = settings?.get_string('gpu-pipeline') ?? 'auto';
+    } catch (_e) {
+        gpuPipeline = 'auto';
+    }
+
+    return GpuPipelinePolicy.environmentToEnvVector(
+        GpuPipelinePolicy.buildRendererEnvironment(gpuPipeline).environment
+    );
+}
+
+function launchProjectPreview(project, windowed, anchorWidget = null, settings = null) {
     const path = project?.path;
     if (!path) {
         console.warn('Hanabi preferences: cannot preview wallpaper because the project path is empty');
@@ -679,11 +694,16 @@ function launchProjectPreview(project, windowed, anchorWidget = null) {
         argv.push('-W', getProjectPreviewWindowDimension(anchorWidget));
     argv.push('--project-path', path);
 
+    const previewEnvironment = getGpuPipelinePreviewEnvironment(settings);
+    const launchArgv = previewEnvironment.length > 0
+        ? ['env', ...previewEnvironment, ...argv]
+        : argv;
+
     // Use a small shell wrapper only for the same stderr/stdout tee behavior as
     // the documented manual preview command. Every argv segment is shell-quoted
     // before joining so wallpaper paths with spaces or quotes stay data, not
     // shell syntax.
-    const command = `${argv.map(arg => GLib.shell_quote(arg)).join(' ')} 2>&1 | tee run.log`;
+    const command = `${launchArgv.map(arg => GLib.shell_quote(arg)).join(' ')} 2>&1 | tee run.log`;
     try {
         const launcher = new Gio.SubprocessLauncher({flags: Gio.SubprocessFlags.NONE});
         launcher.set_cwd(extensionDir);
@@ -694,16 +714,16 @@ function launchProjectPreview(project, windowed, anchorWidget = null) {
     }
 }
 
-function attachProjectPreviewContextMenu(preview, project) {
+function attachProjectPreviewContextMenu(preview, project, settings) {
     const actions = new Gio.SimpleActionGroup();
     const openFolderAction = new Gio.SimpleAction({name: 'open-folder'});
     openFolderAction.connect('activate', () => openProjectDirectory(project));
     actions.add_action(openFolderAction);
     const previewWindowAction = new Gio.SimpleAction({name: 'preview-window'});
-    previewWindowAction.connect('activate', () => launchProjectPreview(project, true, preview));
+    previewWindowAction.connect('activate', () => launchProjectPreview(project, true, preview, settings));
     actions.add_action(previewWindowAction);
     const previewFullscreenAction = new Gio.SimpleAction({name: 'preview-fullscreen'});
-    previewFullscreenAction.connect('activate', () => launchProjectPreview(project, false));
+    previewFullscreenAction.connect('activate', () => launchProjectPreview(project, false, null, settings));
     actions.add_action(previewFullscreenAction);
     preview.insert_action_group('thumbnail', actions);
 
@@ -739,7 +759,7 @@ function attachProjectPreviewContextMenu(preview, project) {
     preview.add_controller(contextGesture);
 }
 
-function createProjectCard(project, onActivate, previewQueue) {
+function createProjectCard(project, onActivate, previewQueue, settings) {
     const titleText = typeof project.title === 'string' && project.title !== ''
         ? project.title
         : (project.basename || _('Untitled'));
@@ -760,7 +780,7 @@ function createProjectCard(project, onActivate, previewQueue) {
         vexpand: false,
     });
     preview.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
-    attachProjectPreviewContextMenu(preview, project);
+    attachProjectPreviewContextMenu(preview, project, settings);
 
     const subtitleParts = [project.type || _('Unknown')];
     if (project.tags?.length)
@@ -2039,7 +2059,7 @@ function createProjectBrowserDialog(window, settings) {
                 settings.set_string(currentProjectKey, selectedProject.path);
                 syncSelectionState();
                 buildInspector(selectedProject);
-            }, previewQueue);
+            }, previewQueue, settings);
             const flowChild = new Gtk.FlowBoxChild({
                 halign: Gtk.Align.START,
                 hexpand: false,

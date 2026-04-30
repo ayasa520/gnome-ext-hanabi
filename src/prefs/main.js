@@ -10,6 +10,7 @@ import {
     prefsRowInt,
     prefsRowPauseOnBattery,
     prefsRowPauseOnMaximizeOrFullscreen,
+    prefsRowStringChoice,
     prefsRowWebBackend,
 } from './rows.js';
 import {
@@ -94,19 +95,18 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
             title: _('Experimental'),
         });
         page.add(experimentalGroup);
-        prefsRowBoolean(
+        prefsRowStringChoice(
             window,
             experimentalGroup,
-            _('Experimental VA Plugin'),
-            'enable-va',
-            _('Enable VA decoders which improve performance for Intel/AMD Wayland users')
-        );
-        prefsRowBoolean(
-            window,
-            experimentalGroup,
-            _('NVIDIA Stateless Decoders'),
-            'enable-nvsl',
-            _('Use new stateless NVIDIA decoders')
+            _('GPU Pipeline'),
+            'gpu-pipeline',
+            _('Use one GPU pipeline for videos, scenes, and scene video textures'),
+            [
+                {value: 'auto', label: _('Auto')},
+                {value: 'nvidia', label: _('NVIDIA / NVDEC')},
+                {value: 'nvidia-stateless', label: _('NVIDIA Stateless / NVDEC')},
+                {value: 'va', label: _('VA-API')},
+            ]
         );
 
         const developerGroup = new Adw.PreferencesGroup({
