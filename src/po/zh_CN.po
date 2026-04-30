@@ -1,46 +1,46 @@
 # Gnome Shell Extension - Hanabi
 # Copyright (C) 2023 Jeff Shee (jeffshee8969@gmail.com)
 # This file is distributed under the same license as the gnome-ext-hanabi package.
-# volkov <d2oo1dle2x@gmail.com>, 2024.
-# Hotripak <hotr1pak@gmail.com>, 2024.
-# Димко <Dymkovych@proton.me>, 2026.
+# MomentQYC <zixipersonal@gmail.com>, 2023.
+# 0xarch <alanqa-ops@outlook.com>, 2024.
+# 云晓逸 <jiangmingyu150@gmail.com>, 2024.
+# Xarth <g@lzzz.ink>, 2024.
 msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-04-30 15:30+0800\n"
-"PO-Revision-Date: 2026-03-19 09:09+0000\n"
-"Last-Translator: Димко <Dymkovych@proton.me>\n"
-"Language-Team: Ukrainian <https://hosted.weblate.org/projects/gnome-ext-"
-"hanabi/gnome-ext-hanabi/uk/>\n"
-"Language: uk\n"
+"PO-Revision-Date: 2024-10-09 02:15+0000\n"
+"Last-Translator: Xarth <g@lzzz.ink>\n"
+"Language-Team: Chinese (Simplified) <https://hosted.weblate.org/projects/"
+"gnome-ext-hanabi/gnome-ext-hanabi/zh_CN/>\n"
+"Language: zh_CN\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
-"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-"X-Generator: Weblate 5.17-dev\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Weblate 5.8-dev\n"
 
 #: src/prefs/main.js:36
 msgid "General Settings"
-msgstr "Загальні налаштування"
+msgstr "常规设置"
 
 #: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
 #: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
-msgstr "Заглушити аудіо"
+msgstr "静音"
 
 #: src/prefs/main.js:43
 msgid "Volume Level"
-msgstr "Рівень гучності"
+msgstr "音量"
 
 #: src/prefs/main.js:44
 msgid "Show Panel Menu"
-msgstr "Показувати індикатор у панелі стану"
+msgstr "显示面板菜单"
 
 #: src/prefs/main.js:50
 msgid "Web Settings"
-msgstr "Веб-налаштування"
+msgstr "网页设置"
 
 #: src/prefs/main.js:54
 msgid "WPE WebKit"
@@ -52,63 +52,63 @@ msgstr "CEF (gstcefsrc)"
 
 #: src/prefs/main.js:66
 msgid "Scene Settings"
-msgstr "Налаштування сцен"
+msgstr "场景设置"
 
 #: src/prefs/main.js:69
 msgid "Scene FPS"
-msgstr "FPS сцени"
+msgstr "场景 FPS"
 
 #: src/prefs/main.js:69
 msgid "Set target FPS for scene wallpapers"
-msgstr "Задати цільовий FPS для шпалер-сцен"
+msgstr "设置场景壁纸的目标 FPS"
 
 #: src/prefs/main.js:72
 msgid "Auto Pause"
-msgstr "Автопауза"
+msgstr "自动暂停"
 
 #: src/prefs/main.js:77
 msgid "Low Battery Threshold"
-msgstr "Поріг низького заряду акумулятора"
+msgstr "低电量阈值"
 
 #: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
-msgstr "Встановіть пороговий відсоток для низького заряду батареї"
+msgstr "设置低电量水平的阈值百分比"
 
 #: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
-msgstr "Пауза у відтворенні медіаплеєра"
+msgstr "在媒体播放器播放媒体时暂停"
 
 #: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
-msgstr "Призупинити відтворення, коли медіаплеєр MPRIS відтворює медіафайли"
+msgstr "当MPRIS媒体播放器在播放媒体时暂停播放"
 
 #: src/prefs/main.js:87
 msgid "Wallpaper Changer"
-msgstr "Змінювач шпалер"
+msgstr "壁纸修改器"
 
 #: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
-msgstr "Автоматична зміна шпалер"
+msgstr "自动切换壁纸"
 
 #: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
-msgstr "Інтервал зміни шпалер (хвилини)"
+msgstr "切换壁纸间隔（分钟）"
 
 #: src/prefs/main.js:95
 msgid "Experimental"
-msgstr "Експериментальні налаштування"
+msgstr "实验性"
 
 #: src/prefs/main.js:101
 msgid "GPU Pipeline"
-msgstr "Конвеєр GPU"
+msgstr "GPU 管线"
 
 #: src/prefs/main.js:103
 msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
-msgstr "Використовувати один конвеєр GPU для відео, сцен і відеотекстур сцен"
+msgstr "为视频、场景以及场景视频纹理使用统一的 GPU 管线"
 
 #: src/prefs/main.js:105
 msgid "Auto"
-msgstr "Автоматично"
+msgstr "自动"
 
 #: src/prefs/main.js:106
 msgid "NVIDIA / NVDEC"
@@ -116,7 +116,7 @@ msgstr "NVIDIA / NVDEC"
 
 #: src/prefs/main.js:107
 msgid "NVIDIA Stateless / NVDEC"
-msgstr "NVIDIA без стану / NVDEC"
+msgstr "NVIDIA 无状态 / NVDEC"
 
 #: src/prefs/main.js:108
 msgid "VA-API"
@@ -124,95 +124,93 @@ msgstr "VA-API"
 
 #: src/prefs/main.js:113
 msgid "Developer"
-msgstr "Розробник"
+msgstr "开发者"
 
 #: src/prefs/main.js:119
 msgid "Debug Mode"
-msgstr "Режим налагодження"
+msgstr "调试模式"
 
 #: src/prefs/main.js:121
 msgid "Print debug messages to log"
-msgstr "Надсилати повідомлення відлагодження до звіту"
+msgstr "将调试信息打印到日志中"
 
 #: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
-msgstr "Примусово використовувати gtk4paintablesink"
+msgstr "强制使用 gtk4paintablesink"
 
 #: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
-msgstr "Примусово використовувати gtk4paintablesink для програвання відео"
+msgstr "强制使用 gtk4paintablesink 播放视频"
 
 #: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
-msgstr "Примусово використовувати GtkMediaFile"
+msgstr "强制使用 GtkMediaFile"
 
 #: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
-msgstr "Примусово використовувати GtkMediaFile для програвання відео"
+msgstr "强制使用 GtkMediaFile 播放视频"
 
 #: src/prefs/main.js:140
 msgid "Enable Graphics Offload"
-msgstr "Увімкнути графічне розвантаження"
+msgstr "启用图形卸载"
 
 #: src/prefs/main.js:142
 msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
-msgstr "Увімкнути графічне розвантаження для кращої продуктивності (потрібен GTK 4.14+)"
+msgstr "启用图形卸载以提升性能（需要 GTK 4.14+）"
 
 #: src/prefs/main.js:144
 msgid "Startup Delay"
-msgstr "Затримка запуску"
+msgstr "启动延迟"
 
 #: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
-msgstr ""
-"Додати затримку запуску (у мілісекунда) щоб виправити проблеми сумісності з "
-"іншими розширеннями"
+msgstr "增加启动延迟（以毫秒为单位）以减少与其它扩展的兼容性问题"
 
 #: src/prefs/projectBrowser.js:161
 msgid "Scene"
-msgstr "Сцена"
+msgstr "场景"
 
 #: src/prefs/projectBrowser.js:163
 msgid "Web"
-msgstr "Web"
+msgstr "网页"
 
 #: src/prefs/projectBrowser.js:165
 msgid "Video"
-msgstr "Відео"
+msgstr "视频"
 
 #: src/prefs/projectBrowser.js:167
 msgid "Unknown"
-msgstr "Невідомо"
+msgstr "未知"
 
 #: src/prefs/projectBrowser.js:174
 msgid "Everyone"
-msgstr "Для всіх"
+msgstr "所有人"
 
 #: src/prefs/projectBrowser.js:176
 msgid "Questionable"
-msgstr "Сумнівне"
+msgstr "存疑"
 
 #: src/prefs/projectBrowser.js:178
 msgid "Mature"
-msgstr "Для дорослих"
+msgstr "成人"
 
 #: src/prefs/projectBrowser.js:187
 msgid "Abstract"
-msgstr "Абстракція"
+msgstr "抽象"
 
 #: src/prefs/projectBrowser.js:189
 msgid "Animal"
-msgstr "Тварини"
+msgstr "动物"
 
 #: src/prefs/projectBrowser.js:191
 msgid "Anime"
-msgstr "Anime"
+msgstr "动画"
 
 #: src/prefs/projectBrowser.js:193
 msgid "Cartoon"
-msgstr "Мультфільми"
+msgstr "卡通"
 
 #: src/prefs/projectBrowser.js:195
 msgid "CGI"
@@ -220,35 +218,35 @@ msgstr "CGI"
 
 #: src/prefs/projectBrowser.js:197
 msgid "Cyberpunk"
-msgstr "Cyberpunk"
+msgstr "赛博朋克"
 
 #: src/prefs/projectBrowser.js:199
 msgid "Fantasy"
-msgstr "Фентезі"
+msgstr "奇幻"
 
 #: src/prefs/projectBrowser.js:201
 msgid "Game"
-msgstr "Гра"
+msgstr "游戏"
 
 #: src/prefs/projectBrowser.js:203
 msgid "Girls"
-msgstr "Дівчата"
+msgstr "女孩"
 
 #: src/prefs/projectBrowser.js:205
 msgid "Guys"
-msgstr "Хлопці"
+msgstr "男性"
 
 #: src/prefs/projectBrowser.js:207
 msgid "Landscape"
-msgstr "Пейзаж"
+msgstr "风景"
 
 #: src/prefs/projectBrowser.js:209
 msgid "Medieval"
-msgstr "Середньовіччя"
+msgstr "中世纪"
 
 #: src/prefs/projectBrowser.js:211
 msgid "Memes"
-msgstr "Меми"
+msgstr "梗图"
 
 #: src/prefs/projectBrowser.js:213
 msgid "MMD"
@@ -256,194 +254,194 @@ msgstr "MMD"
 
 #: src/prefs/projectBrowser.js:215
 msgid "Music"
-msgstr "Музика"
+msgstr "音乐"
 
 #: src/prefs/projectBrowser.js:217
 msgid "Nature"
-msgstr "Природа"
+msgstr "自然"
 
 #: src/prefs/projectBrowser.js:219
 msgid "Pixel art"
-msgstr "Піксель-арт"
+msgstr "像素艺术"
 
 #: src/prefs/projectBrowser.js:221
 msgid "Relaxing"
-msgstr "Розслаблення"
+msgstr "放松"
 
 #: src/prefs/projectBrowser.js:223
 msgid "Retro"
-msgstr "Ретро"
+msgstr "复古"
 
 #: src/prefs/projectBrowser.js:225
 msgid "Sci-Fi"
-msgstr "Наукова фантастика"
+msgstr "科幻"
 
 #: src/prefs/projectBrowser.js:227
 msgid "Sports"
-msgstr "Спорт"
+msgstr "运动"
 
 #: src/prefs/projectBrowser.js:229
 msgid "Technology"
-msgstr "Технології"
+msgstr "科技"
 
 #: src/prefs/projectBrowser.js:231
 msgid "Television"
-msgstr "Телебачення"
+msgstr "电视"
 
 #: src/prefs/projectBrowser.js:233
 msgid "Vehicle"
-msgstr "Транспорт"
+msgstr "载具"
 
 #: src/prefs/projectBrowser.js:235
 msgid "Unspecified"
-msgstr "Не вказано"
+msgstr "未指定"
 
 #: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
-msgstr "Ні"
+msgstr "无"
 
 #: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
 msgid "Steam Library"
-msgstr "Бібліотека Steam"
+msgstr "Steam 库"
 
 #: src/prefs/projectBrowser.js:273
 msgid "Select Steam Library"
-msgstr "Вибрати бібліотеку Steam"
+msgstr "选择 Steam 库"
 
 #: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
-msgstr "Скасувати"
+msgstr "取消"
 
 #: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
 #: src/prefs/projectBrowser.js:1760
 msgid "Open"
-msgstr "Відкрити"
+msgstr "打开"
 
 #: src/prefs/projectBrowser.js:816
 msgid "Window Preview"
-msgstr "Попередній перегляд у вікні"
+msgstr "窗口预览"
 
 #: src/prefs/projectBrowser.js:817
 msgid "Fullscreen Preview"
-msgstr "Повноекранний попередній перегляд"
+msgstr "全屏预览"
 
 #: src/prefs/projectBrowser.js:821
 msgid "Preview"
-msgstr "Попередній перегляд"
+msgstr "预览"
 
 #: src/prefs/projectBrowser.js:822
 msgid "Open Wallpaper Folder"
-msgstr "Відкрити теку шпалер"
+msgstr "打开壁纸文件夹"
 
 #: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
 #: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
 #: src/prefs/projectBrowser.js:1708
 msgid "Untitled"
-msgstr "Без назви"
+msgstr "未命名"
 
 #: src/prefs/projectBrowser.js:1164
 msgid "Choose Wallpaper"
-msgstr "Вибрати шпалери"
+msgstr "选择壁纸"
 
 #: src/prefs/projectBrowser.js:1170
 msgid "Close"
-msgstr "Закрити"
+msgstr "关闭"
 
 #: src/prefs/projectBrowser.js:1211
 msgid "Search wallpapers"
-msgstr "Пошук шпалер"
+msgstr "搜索壁纸"
 
 #: src/prefs/projectBrowser.js:1217
 msgid "Name"
-msgstr "Назва"
+msgstr "名称"
 
 #: src/prefs/projectBrowser.js:1218
 msgid "File size"
-msgstr "Розмір файла"
+msgstr "文件大小"
 
 #: src/prefs/projectBrowser.js:1219
 msgid "Last updated"
-msgstr "Останнє оновлення"
+msgstr "最后更新"
 
 #: src/prefs/projectBrowser.js:1226
 msgid "Sort"
-msgstr "Сортувати"
+msgstr "排序"
 
 #: src/prefs/projectBrowser.js:1235
 msgid "Filter"
-msgstr "Фільтр"
+msgstr "筛选"
 
 #: src/prefs/projectBrowser.js:1261
 msgid "Show or hide wallpapers by category"
-msgstr "Показувати або приховувати шпалери за категорією"
+msgstr "按类别显示或隐藏壁纸"
 
 #: src/prefs/projectBrowser.js:1268
 msgid "Reset"
-msgstr "Скинути"
+msgstr "重置"
 
 #: src/prefs/projectBrowser.js:1532
 msgid "Type"
-msgstr "Тип"
+msgstr "类型"
 
 #: src/prefs/projectBrowser.js:1537
 msgid "Age"
-msgstr "Віковий рейтинг"
+msgstr "年龄分级"
 
 #: src/prefs/projectBrowser.js:1541
 msgid "Genre"
-msgstr "Жанр"
+msgstr "题材"
 
 #: src/prefs/projectBrowser.js:1591
 msgid "Image unavailable"
-msgstr "Зображення недоступне"
+msgstr "图像不可用"
 
 #: src/prefs/projectBrowser.js:1734
 msgid "Current"
-msgstr "Поточні"
+msgstr "当前"
 
 #: src/prefs/projectBrowser.js:1859
 msgid "No options available"
-msgstr "Немає доступних параметрів"
+msgstr "没有可用选项"
 
 #: src/prefs/projectBrowser.js:1968
 msgid "Unsupported setting type"
-msgstr "Непідтримуваний тип налаштування"
+msgstr "不支持的设置类型"
 
 #: src/prefs/projectBrowser.js:2028
 msgid "This wallpaper has no configurable properties"
-msgstr "Ці шпалери не мають налаштовуваних властивостей"
+msgstr "此壁纸没有可配置属性"
 
 #: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
 msgid "Select a wallpaper to configure its properties"
-msgstr "Виберіть шпалери, щоб налаштувати їхні властивості"
+msgstr "选择一个壁纸以配置其属性"
 
 #: src/prefs/projectBrowser.js:2113
 msgid "No wallpapers match your search or filters"
-msgstr "Немає шпалер, що відповідають пошуку або фільтрам"
+msgstr "没有符合搜索或筛选条件的壁纸"
 
 #: src/prefs/projectBrowser.js:2134
 msgid "No wallpaper projects were found in this Steam library"
-msgstr "У цій бібліотеці Steam не знайдено проєктів шпалер"
+msgstr "此 Steam 库中未找到壁纸项目"
 
 #: src/prefs/projectBrowser.js:2135
 msgid "Choose a Steam library first"
-msgstr "Спочатку виберіть бібліотеку Steam"
+msgstr "请先选择 Steam 库"
 
 #: src/prefs/projectBrowser.js:2215
 msgid "Wallpaper"
-msgstr "Шпалери"
+msgstr "壁纸"
 
 #: src/prefs/projectBrowser.js:2222
 msgid "Browse"
-msgstr "Огляд"
+msgstr "浏览"
 
 #: src/prefs/rows.js:67
 msgid "Fit Mode"
-msgstr "Режим заповнення"
+msgstr "适应模式"
 
 #: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
-msgstr "Керує як саме шпалери будуть вміщатися у моніторі"
+msgstr "控制壁纸在显示器内的适配方式"
 
 #: src/prefs/rows.js:69
 msgid ""
@@ -458,43 +456,39 @@ msgid ""
 "    "
 msgstr ""
 "\n"
-"    <b>Заповнювати</b>: Розтягувати шпалери щоб заповнити монітор.\n"
-"    <b>Утримувати</b>: Масштабувати шпалери щоб заповнити монітор (зі "
-"збереженням співвідношення сторін).\n"
-"    <b>Накладати</b>: Масштабувати шпалери щоб покрити монітор (зі "
-"збереженням співвідношення сторін).\n"
-"    <b>Зменшити масштаб</b>: Зменшити масштаб шпалер щоб заповнити монітор "
-"(якщо масштабування потребується), в іншому випадку використовувати "
-"оригінальний розмір.\n"
+"    <b>填充</b>：拉伸壁纸以填满显示器。\n"
+"    <b>包含</b>：缩放壁纸以适应显示器（保持宽高比）。\n"
+"    <b>覆盖</b>：缩放壁纸以覆盖显示器（保持宽高比）。\n"
+"    <b>缩放</b>：必要时缩放壁纸以适应显示器，否则保持原始大小。\n"
 "    "
 
 #: src/prefs/rows.js:77
 msgid "Fill"
-msgstr "Заповнювати"
+msgstr "填充"
 
 #: src/prefs/rows.js:78
 msgid "Contain"
-msgstr "Утримувати"
+msgstr "包含"
 
 #: src/prefs/rows.js:79
 msgid "Cover"
-msgstr "Накладати"
+msgstr "覆盖"
 
 #: src/prefs/rows.js:80
 msgid "Scale-down"
-msgstr "Зменшити масштаб"
+msgstr "缩减"
 
 #: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
-msgstr "Ця функція потребує Gtk 4.8 або вище"
+msgstr "此功能需要 Gtk 4.8 或更高版本"
 
 #: src/prefs/rows.js:105
 msgid "Web Backend"
-msgstr "Веб-бекенд"
+msgstr "网页后端"
 
 #: src/prefs/rows.js:106
 msgid "Choose the renderer used for web wallpapers"
-msgstr "Виберіть рендерер для веб-шпалер"
+msgstr "选择用于网页壁纸的渲染器"
 
 #: src/prefs/rows.js:122
 msgid ""
@@ -505,21 +499,22 @@ msgid ""
 "        "
 msgstr ""
 "\n"
-"        <b>WPE WebKit</b>: типовий бекенд для веб-шпалер.\n"
-"        <b>CEF (gstcefsrc)</b>: експериментальний бекенд на базі Chromium із використанням GStreamer.\n"
+"        <b>WPE WebKit</b>：网页壁纸的默认后端。\n"
+"        <b>CEF (gstcefsrc)</b>：基于 Chromium 并使用 GStreamer 的实验性后"
+"端。\n"
 "        "
 
 #: src/prefs/rows.js:126
 msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
-msgstr "<b>WPE WebKit</b>: типовий бекенд для веб-шпалер."
+msgstr "<b>WPE WebKit</b>：网页壁纸的默认后端。"
 
 #: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
-msgstr "Пауза на повноекранному режимі"
+msgstr "最大化或全屏时暂停"
 
 #: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
-msgstr "Призупинити відтворення при розгорнутому або повноекранному вікні"
+msgstr "存在最大化窗口或全屏窗口时暂停播放"
 
 #: src/prefs/rows.js:165
 msgid ""
@@ -532,34 +527,30 @@ msgid ""
 "    "
 msgstr ""
 "\n"
-"    <b>Ніколи</b>: Вимкнути дану функцію.\n"
-"    <b>Будь-який монітор</b>: Призупинити відтворення, коли вікно розгорнуто "
-"на весь екран або на весь екран на будь-якому моніторі.\n"
-"    <b>Всі монітори</b>: Призупинити відтворення, коли на всіх моніторах "
-"розгорнуті вікна на весь екран або в повноекранному режимі.\n"
+"    <b>从不</b>: 停用该功能。\n"
+"    <b>任一显示器</b>: 当任一显示器存在最大化窗口或全屏窗口时暂停播放。\n"
+"    <b>所有显示器</b>: 当所有显示器都存在最大化窗口或全屏窗口时暂停播放。\n"
 "    "
 
 #: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
-msgstr "Ніколи"
+msgstr "从不"
 
 #: src/prefs/rows.js:173
 msgid "Any Monitor"
-msgstr "Будь-який монітор"
+msgstr "任一显示器"
 
 #: src/prefs/rows.js:174
 msgid "All Monitors"
-msgstr "Всі монітори"
+msgstr "所有显示器"
 
 #: src/prefs/rows.js:194
 msgid "Pause on Battery"
-msgstr "Пауза на акумуляторі"
+msgstr "使用电池时暂停"
 
 #: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
-msgstr ""
-"Призупинення відтворення, коли пристрій працює від акумулятора або "
-"акумулятор розряджений"
+msgstr "当设备未充电或电量较低时暂停播放"
 
 #: src/prefs/rows.js:196
 msgid ""
@@ -571,28 +562,26 @@ msgid ""
 "    "
 msgstr ""
 "\n"
-"    <b>Ніколи</b>: Вимкнути дану функцію.\n"
-"    <b>Низький рівень заряду акумулятора</b>: Призупинити відтворення, коли "
-"пристрій має низький рівень заряду акумулятора (нижче порогового значення).\n"
-"    <b>Завжди</b>: Призупинити відтворення, коли пристрій працює від "
-"акумулятора.\n"
+"    <b>从不</b>: 停用该功能。\n"
+"    <b>低电量时</b>: 当设备处于 低电量(低于阀值) 状态时暂停播放。\n"
+"    <b>总是</b>: 当设备使用电池时暂停播放。\n"
 "    "
 
 #: src/prefs/rows.js:204
 msgid "Low Battery"
-msgstr "Низький рівень заряду акумулятора"
+msgstr "低电量"
 
 #: src/prefs/rows.js:205
 msgid "Always"
-msgstr "Завжди"
+msgstr "总是"
 
 #: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
-msgstr "Зміна режиму шпалер"
+msgstr "壁纸切换模式"
 
 #: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
-msgstr "Керуйте автоматичною зміною шпалер"
+msgstr "控制如何自动切换壁纸"
 
 #: src/prefs/rows.js:227
 msgid ""
@@ -604,58 +593,55 @@ msgid ""
 "    "
 msgstr ""
 "\n"
-"    <b>Послідовний:</b> Зберегти послідовність каталогів (за спаданням).\n"
-"    <b>Зворотна послідовність:</b> Отримати шпалери у зворотній "
-"послідовності (за зростанням).\n"
-"    <b>Випадково:</b> Випадковий вибір шпалер з каталогу.\n"
+"    <b>顺序：</b>保留目录顺序（降序）。\n"
+"    <b>逆序：</b>按相反顺序（升序）检索壁纸。\n"
+"    <b>随机：</b>从目录中随机选择壁纸。\n"
 "    "
 
 #: src/prefs/rows.js:234
 msgid "Sequential"
-msgstr "Послідовний"
+msgstr "顺序"
 
 #: src/prefs/rows.js:235
 msgid "Inverse Sequential"
-msgstr "Зворотна послідовність"
+msgstr "逆序"
 
 #: src/prefs/rows.js:236
 msgid "Random"
-msgstr "Випадково"
+msgstr "随机"
 
 #: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
 msgid "Pause"
-msgstr "Призупинити"
+msgstr "暂停"
 
 #: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
 msgid "Play"
-msgstr "Продовжити"
+msgstr "播放"
 
 #: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
 msgid "Unmute Audio"
-msgstr "Увімкнути звуки"
+msgstr "取消静音"
 
 #: src/shell/ui/panelMenu.js:143
 msgid "Next Wallpaper"
-msgstr "Наступні шпалери"
+msgstr "下一张壁纸"
 
 #: src/shell/ui/panelMenu.js:161
 msgid "Preferences"
-msgstr "Налаштування"
+msgstr "偏好设置"
 
 #~ msgid "Experimental VA Plugin"
-#~ msgstr "Експериментальний плагін відео-прискорення"
+#~ msgstr "实验性 VA 插件"
 
 #~ msgid ""
 #~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
-#~ msgstr ""
-#~ "Увімкнути декодери з відео-прискоренням які можуть покращити "
-#~ "продуктивність для користувачів Intel/AMD на Wayland"
+#~ msgstr "启用 VA 解码器以提高英特尔/AMD Wayland 用户的性能"
 
 #~ msgid "Use new stateless NVIDIA decoders"
-#~ msgstr "Використовувати нові декодери NVIDIA"
+#~ msgstr "使用新的 NVIDIA 无状态解码器"
 
 #~ msgid "Open File"
-#~ msgstr "Відкрити файл"
+#~ msgstr "打开文件"
 
 #~ msgid "Change Wallpaper Directory Path"
-#~ msgstr "Зміна шляху до каталогу шпалер"
+#~ msgstr "更改壁纸目录路径"

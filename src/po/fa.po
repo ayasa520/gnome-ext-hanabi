@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2025-12-25 16:00+0000\n"
 "Last-Translator: MojArch <Maemo5d@gmail.com>\n"
 "Language-Team: Persian <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
@@ -18,128 +18,148 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n > 1;\n"
 "X-Generator: Weblate 5.15.1\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr ""
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "تنظیمات عمومی"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr ""
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr ""
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
-msgstr ""
+msgstr "بی‌صدا کردن صدا"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr ""
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr ""
-
-#: src/prefs.js:38
-msgid "General"
-msgstr ""
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
-msgstr ""
+msgstr "سطح صدا"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
-msgstr ""
+msgstr "نمایش منوی پنل"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "تنظیمات وب"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "تنظیمات صحنه"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS صحنه"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "FPS هدف را برای کاغذدیواری‌های صحنه تنظیم کنید"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "توقف خودکار"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
-msgstr ""
+msgstr "آستانه باتری کم"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
-msgstr ""
+msgstr "درصد آستانه را برای سطح باتری کم تنظیم کنید"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
-msgstr ""
+msgstr "مکث هنگام پخش پخش‌کننده رسانه"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
-msgstr ""
+msgstr "هنگامی که یک پخش‌کننده رسانه MPRIS در حال پخش رسانه است، پخش را مکث کن"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
-msgstr ""
+msgstr "تعویض‌کننده کاغذدیواری"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "تغییر خودکار پس زمینه"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
-msgstr ""
+msgstr "فاصله تغییر کاغذدیواری (دقیقه)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
-msgstr ""
+msgstr "آزمایشی"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr ""
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "خط لوله GPU"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "از یک خط لوله GPU برای ویدیوها، صحنه‌ها و بافت‌های ویدیویی صحنه استفاده کنید"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr ""
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "خودکار"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr ""
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
-msgstr ""
+msgstr "توسعه‌دهنده"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
-msgstr ""
+msgstr "حالت اشکال‌زدایی"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
-msgstr ""
+msgstr "پیام‌های اشکال‌زدایی را در گزارش چاپ کن"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
-msgstr ""
+msgstr "اجبار به استفاده از gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
-msgstr ""
+msgstr "اجبار به استفاده از gtk4paintablesink برای پخش ویدیو"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
-msgstr ""
+msgstr "اجبار به استفاده از GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
-msgstr ""
+msgstr "اجبار به استفاده از GtkMediaFile برای پخش ویدیو"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "فعال‌سازی واگذاری گرافیک"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "واگذاری گرافیک را برای کارایی بهتر فعال کنید (به GTK 4.14+ نیاز دارد)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
-msgstr ""
+msgstr "تأخیر راه‌اندازی"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -147,43 +167,282 @@ msgstr ""
 "اضافه کردن تاخیر اجرا(بر حسب میلی ثانیه) برای جلوگیری از تداخل با دیگر "
 "افزونه‌ها"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr ""
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "صحنه"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "وب"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "ویدیو"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "ناشناخته"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "همه"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "مشکوک"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "بزرگسال"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "انتزاعی"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "حیوان"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "انیمه"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "کارتون"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "سایبرپانک"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "فانتزی"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "بازی"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "دختران"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "پسران"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "منظره"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "قرون وسطایی"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "میم‌ها"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "موسیقی"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "طبیعت"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "هنر پیکسلی"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "آرامش‌بخش"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "رترو"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "علمی‌تخیلی"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "ورزش"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "فناوری"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "تلویزیون"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "وسیله نقلیه"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "مشخص نشده"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
-msgstr ""
+msgstr "هیچ‌کدام"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr ""
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "کتابخانه Steam"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "انتخاب کتابخانه Steam"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "لغو"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
-msgstr ""
+msgstr "باز کردن"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "تغییر مسیر پوشه پس زمینه‌ها"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "پیش‌نمایش پنجره"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr ""
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "پیش‌نمایش تمام‌صفحه"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "پیش‌نمایش"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "باز کردن پوشه کاغذدیواری"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "بدون عنوان"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "انتخاب کاغذدیواری"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "بستن"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "جستجوی کاغذدیواری‌ها"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "نام"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "اندازه پرونده"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "آخرین به‌روزرسانی"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "مرتب‌سازی"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "فیلتر"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "نمایش یا پنهان کردن کاغذدیواری‌ها بر اساس دسته"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "بازنشانی"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "نوع"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "سن"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "سبک"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "تصویر در دسترس نیست"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "فعلی"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "گزینه‌ای در دسترس نیست"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "نوع تنظیم پشتیبانی‌نشده"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "این کاغذدیواری ویژگی قابل پیکربندی ندارد"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "برای پیکربندی ویژگی‌هایش یک کاغذدیواری انتخاب کنید"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "هیچ کاغذدیواری‌ای با جستجو یا فیلترهای شما مطابقت ندارد"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "هیچ پروژه کاغذدیواری در این کتابخانه Steam پیدا نشد"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "ابتدا یک کتابخانه Steam انتخاب کنید"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "کاغذدیواری"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "مرور"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
-msgstr ""
+msgstr "حالت جاگذاری"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
-msgstr ""
+msgstr "کنترل کنید کاغذدیواری چگونه در نمایشگر جا بگیرد"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -195,36 +454,67 @@ msgid ""
 "needed, otherwise keep its original size.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>پر کردن</b>: کاغذدیواری را بکشید تا نمایشگر را پر کند.\n"
+"    <b>جا دادن</b>: کاغذدیواری را طوری مقیاس کنید که در نمایشگر جا بگیرد (حفظ نسبت تصویر).\n"
+"    <b>پوشاندن</b>: کاغذدیواری را طوری مقیاس کنید که نمایشگر را بپوشاند (حفظ نسبت تصویر).\n"
+"    <b>کوچک کردن</b>: در صورت نیاز کاغذدیواری را کوچک کنید تا در نمایشگر جا بگیرد؛ در غیر این صورت اندازه اصلی آن حفظ می‌شود.\n"
+"    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
-msgstr ""
+msgstr "پر کردن"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
-msgstr ""
+msgstr "جا دادن"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
-msgstr ""
+msgstr "پوشاندن"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
-msgstr ""
+msgstr "کوچک کردن"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
-msgstr ""
+msgstr "این ویژگی به Gtk 4.8 یا بالاتر نیاز دارد"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "بک‌اند وب"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "رندرکننده مورد استفاده برای کاغذدیواری‌های وب را انتخاب کنید"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: بک‌اند پیش‌فرض برای کاغذدیواری‌های وب.\n"
+"        <b>CEF (gstcefsrc)</b>: بک‌اند آزمایشی مبتنی بر Chromium که از GStreamer استفاده می‌کند.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: بک‌اند پیش‌فرض برای کاغذدیواری‌های وب."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
-msgstr ""
+msgstr "مکث هنگام بیشینه‌سازی یا تمام‌صفحه"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
-msgstr ""
+msgstr "وقتی پنجره‌ای بیشینه یا تمام‌صفحه وجود دارد، پخش را مکث کن"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -242,27 +532,27 @@ msgstr ""
 "صفحه نمایش‌ها متوقف کن.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
-msgstr ""
+msgstr "هرگز"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "هر صفحه نمایشی"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "تمام صفحه نمایش‌ها"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
-msgstr ""
+msgstr "مکث هنگام استفاده از باتری"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
-msgstr ""
+msgstr "وقتی دستگاه با باتری کار می‌کند یا باتری کم است، پخش را مکث کن"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -278,23 +568,23 @@ msgstr ""
 "    <b>همیشه</b>: پخش تصویر رو در صورت استفاده از باتری دستگاه متوقف کن.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
-msgstr ""
+msgstr "باتری کم"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "همیشه"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
-msgstr ""
+msgstr "حالت تغییر کاغذدیواری"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
-msgstr ""
+msgstr "کنترل کنید کاغذدیواری‌ها چگونه به‌طور خودکار تغییر کنند"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -306,19 +596,42 @@ msgstr ""
 "\n"
 "    <b>نمایش پشت سر هم:</b> محتویات پوشه را پشت سر هم نشان بده(به ترتیب "
 "نزولی).\n"
-"    <b>نمایش برعکس:</b>  محتویات پوشه را پشت سر هم نشان بده(به ترتیب صعودی)"
-".\n"
+"    <b>نمایش برعکس:</b>  محتویات پوشه را پشت سر هم نشان بده(به ترتیب "
+"صعودی).\n"
 "    <b>تصادفی:</b> محتویات پوشه را تصادفی هم نشان بده.\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
-msgstr ""
+msgstr "ترتیبی"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
-msgstr ""
+msgstr "ترتیبی معکوس"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
-msgstr ""
+msgstr "تصادفی"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "مکث"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "پخش"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "لغو بی‌صدایی"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "کاغذدیواری بعدی"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "ترجیحات"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "تغییر مسیر پوشه پس زمینه‌ها"

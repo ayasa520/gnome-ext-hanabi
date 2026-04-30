@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-09-07 09:09+0000\n"
 "Last-Translator: Magnus Zahle <magnuskzahle@outlook.com>\n"
 "Language-Team: Danish <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
@@ -18,129 +18,148 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
 "X-Generator: Weblate 5.8-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Paus"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Generelle indstillinger"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Afspil"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Slå Lyden Til"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Slå lyd fra"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Næste Baggrund"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Præferencer"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Generelt"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Volumen Niveau"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Vis Panel Menu"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Webindstillinger"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Sceneindstillinger"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "Scene-FPS"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Angiv mål-FPS for scenebaggrunde"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Automatisk Pause"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Lavt Batteri Tærskel"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Set tærsklen for lavt batteri-niveau"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Paus ved Medie Afspiller"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr "Paus afspilning når en MPRIS medieafspiller afspiller noget"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Baggrunds Skifter"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "Skift Baggrund Automatisk"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "Ændr Baggrunds Interval (minutter)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Eksperimentel"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Eksperimentelt VA Plugin"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "GPU-pipeline"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"Slå VA dekodere til hvilket forbedre ydeevne for Intel/AMD Wayland brugere"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Brug én GPU-pipeline til videoer, scener og scenevideoteksturer"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr ""
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Automatisk"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Brug nye stat-løse NVIDIA dekodere"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Udvikler"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Debug Tilstand"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Print debug beskeder til log"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "Tving gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "Tving brug af gtk4paintablesink til video afspilning"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "Tving GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "Tving brug af GtkMediaFile til video afspilning"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Aktivér grafikaflastning"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Aktivér grafikaflastning for forbedret ydelse (kræver GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Start Forsinkelse"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -148,43 +167,282 @@ msgstr ""
 "Tilføj et start forsinkelse (i millisekunder) for at undvige "
 "kompatibilitetsproblemer med andre udvidelser"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Video Sti"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Scene"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Video"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Ukendt"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Alle"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Tvivlsomt"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "For voksne"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Abstrakt"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Dyr"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Tegnefilm"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Fantasy"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Spil"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Piger"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Fyre"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Landskab"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Middelalder"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Memes"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Musik"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Natur"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Pixelkunst"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Afslappende"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Retro"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Sci-fi"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Sport"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Teknologi"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Tv"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Køretøj"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Ikke angivet"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Ingen"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Åben Fil"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Steam-bibliotek"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Vælg Steam-bibliotek"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "Annuller"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Åben"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "Skift Stien Til Bagrunds-mappen"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Vinduesforhåndsvisning"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Vælg Mappe"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Fuldskærmsforhåndsvisning"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Forhåndsvisning"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Åbn baggrundsmappe"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Uden titel"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Vælg baggrund"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Luk"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Søg i baggrunde"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Navn"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Filstørrelse"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Senest opdateret"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Sortér"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Filtrer"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Vis eller skjul baggrunde efter kategori"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Nulstil"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Type"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Alder"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Genre"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Billede ikke tilgængeligt"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Aktuel"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Ingen valgmuligheder tilgængelige"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Ikke understøttet indstillingstype"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Denne baggrund har ingen konfigurerbare egenskaber"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Vælg en baggrund for at konfigurere dens egenskaber"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Ingen baggrunde matcher din søgning eller dine filtre"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "Ingen baggrundsprojekter blev fundet i dette Steam-bibliotek"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Vælg først et Steam-bibliotek"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Baggrund"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Gennemse"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
-msgstr ""
+msgstr "Tilpasningstilstand"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Kontroller hvordan baggrunde passer til skærmen"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -200,41 +458,66 @@ msgstr ""
 "    <b>Fyld</b>: Stræk baggrunden til at fylde skærmen.\n"
 "    <b>Indehold</b>: Skaler baggrunden for at passe ind på skærmen (behold "
 "billedformat).\n"
-"    <b>Dæk</b>: Skaler baggrunden til at dække skærmen (behold billedformat)."
-"\n"
+"    <b>Dæk</b>: Skaler baggrunden til at dække skærmen (behold "
+"billedformat).\n"
 "    <b>Skaler ned</b>: Skaler baggrunden ned for at passe til skærmen hvis "
 "nødvendigt, ellers behold den originale størrelse.\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Fyld"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
 msgstr "Indholde"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Dæk"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Skaler-ned"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Denne funktion har brug for Gtk 4.8 eller senere"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Web-backend"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Vælg den renderer, der bruges til webbaggrunde"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: Standard-backenden til webbaggrunde.\n"
+"        <b>CEF (gstcefsrc)</b>: Eksperimentel Chromium-baseret backend, der bruger GStreamer.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: Standard-backenden til webbaggrunde."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Paus ved Maksimer eller Fuldskærm"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr "Paus afspilning når der er et maksimeret eller fuldskærmet vindue"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -252,27 +535,27 @@ msgstr ""
 "skærms vindue på alle skærme.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Aldrig"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Enhver skærm"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Alle skærme"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Paus ved Batteri"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
 msgstr "Paus afspilning når enheden er på batteri eller batteriet er lavt"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -283,28 +566,28 @@ msgid ""
 msgstr ""
 "\n"
 "    <b>Aldrig</b>: Deaktiver denne funktion.\n"
-"    <b>Lavt Batteri</b>: Paus afspilning når enheden er på lavt batteri ("
-"under tærsklen).\n"
+"    <b>Lavt Batteri</b>: Paus afspilning når enheden er på lavt batteri "
+"(under tærsklen).\n"
 "    <b>Altid</b>: Paus afspilning når enheden er på batteri.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Lavt Batteri"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Altid"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Ændr Baggrunds Tilstand"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Kontroller hvordan baggrunde skiftes automatisk"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -314,21 +597,58 @@ msgid ""
 "    "
 msgstr ""
 "\n"
-"    <b>Normal rækkefølge:</b> Behold mappe rækkefølge (faldende rækkefølge)."
-"\n"
+"    <b>Normal rækkefølge:</b> Behold mappe rækkefølge (faldende "
+"rækkefølge).\n"
 "    <b>Modsat rækkefølge:</b> Hent baggrunde i modsat rækkefølge (stigende "
 "rækkefølge).\n"
 "    <b>Tilfældig:</b> Vælg baggrunde fra mappen i tilfældig rækkefølge.\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Normal rækkefølge"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Modsat Rækkefølge"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Tilfældig"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Paus"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Afspil"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Slå Lyden Til"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Næste Baggrund"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Præferencer"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Eksperimentelt VA Plugin"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "Slå VA dekodere til hvilket forbedre ydeevne for Intel/AMD Wayland brugere"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Brug nye stat-løse NVIDIA dekodere"
+
+#~ msgid "Open File"
+#~ msgstr "Åben Fil"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "Skift Stien Til Bagrunds-mappen"

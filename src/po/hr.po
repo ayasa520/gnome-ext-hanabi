@@ -6,11 +6,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-11-23 14:00+0000\n"
 "Last-Translator: Oliver Kreitmeyer <oliverkreitmeyer@gmail.com>\n"
-"Language-Team: Croatian <https://hosted.weblate.org/projects/"
-"gnome-ext-hanabi/gnome-ext-hanabi/hr/>\n"
+"Language-Team: Croatian <https://hosted.weblate.org/projects/gnome-ext-"
+"hanabi/gnome-ext-hanabi/hr/>\n"
 "Language: hr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -19,128 +19,148 @@ msgstr ""
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
 "X-Generator: Weblate 5.9-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr ""
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Opće postavke"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr ""
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr ""
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
-msgstr ""
+msgstr "Utišaj zvuk"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr ""
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr ""
-
-#: src/prefs.js:38
-msgid "General"
-msgstr ""
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
-msgstr ""
+msgstr "Razina glasnoće"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
-msgstr ""
+msgstr "Prikaži izbornik ploče"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Web postavke"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Postavke scene"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS scene"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Postavi ciljni FPS za pozadine scene"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Auto Pauza"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
-msgstr ""
+msgstr "Prag niske baterije"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
-msgstr ""
+msgstr "Postavi postotak praga za nisku razinu baterije"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Zaustavi Video za vrijeme Medijskih Zapisa"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr "Zaustavi video dok je MPRIS medijski čitač aktivan"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
-msgstr ""
+msgstr "Mjenjač pozadina"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
-msgstr ""
+msgstr "Automatski mijenjaj pozadinu"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
-msgstr ""
+msgstr "Interval promjene pozadine (minute)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
-msgstr ""
+msgstr "Eksperimentalno"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr ""
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "GPU cjevovod"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Koristi jedan GPU cjevovod za videozapise, scene i video teksture scene"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr ""
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Automatski"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr ""
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
-msgstr ""
+msgstr "Razvojni programer"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
-msgstr ""
+msgstr "Način otklanjanja grešaka"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
-msgstr ""
+msgstr "Ispiši poruke za otklanjanje grešaka u zapisnik"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
-msgstr ""
+msgstr "Forsiraj gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
-msgstr ""
+msgstr "Forsiraj upotrebu gtk4paintablesink za reprodukciju videozapisa"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
-msgstr ""
+msgstr "Forsiraj GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
-msgstr ""
+msgstr "Forsiraj upotrebu GtkMediaFile za reprodukciju videozapisa"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Omogući grafičko rasterećenje"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Omogući grafičko rasterećenje za bolju izvedbu (zahtijeva GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
-msgstr ""
+msgstr "Odgoda pokretanja"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -148,43 +168,282 @@ msgstr ""
 "Dodaj kašnjenje pri pokretanju (u milisekundama) za izbjegavanje problema "
 "kompatibilnosti s drugim proširenja"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr ""
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Scena"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Videozapis"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Nepoznato"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Svi"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Upitno"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Za odrasle"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Apstraktno"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Životinja"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Crtani film"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Fantazija"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Igra"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Djevojke"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Dečki"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Krajolik"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Srednjovjekovno"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Memovi"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Glazba"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Priroda"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Piksel umjetnost"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Opuštajuće"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Retro"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Znanstvena fantastika"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Sport"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Tehnologija"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Televizija"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Vozilo"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Nenavedeno"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
-msgstr ""
+msgstr "Nijedno"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr ""
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Steam biblioteka"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Odaberi Steam biblioteku"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
-msgstr ""
+msgstr "Odustani"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
-msgstr ""
+msgstr "Otvori"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr ""
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Pretpregled u prozoru"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Odaberi Direktorij"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Pretpregled preko cijelog zaslona"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Pretpregled"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Otvori mapu pozadina"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Bez naslova"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Odaberi pozadinu"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Zatvori"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Pretraži pozadine"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Naziv"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Veličina datoteke"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Zadnje ažurirano"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Sortiraj"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Filtriraj"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Prikaži ili sakrij pozadine prema kategoriji"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Vrati na zadano"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Vrsta"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Dob"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Žanr"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Slika nije dostupna"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Trenutačno"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Nema dostupnih opcija"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Nepodržana vrsta postavke"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Ova pozadina nema podesiva svojstva"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Odaberi pozadinu za podešavanje njezinih svojstava"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Nijedna pozadina ne odgovara tvojoj pretrazi ili filtrima"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "U ovoj Steam biblioteci nisu pronađeni projekti pozadina"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Najprije odaberi Steam biblioteku"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Pozadina"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Pregledaj"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
-msgstr ""
+msgstr "Način prilagodbe"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
-msgstr ""
+msgstr "Upravljaj načinom prilagodbe pozadine monitoru"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -196,36 +455,67 @@ msgid ""
 "needed, otherwise keep its original size.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>Ispuni</b>: Razvuci pozadinu da ispuni monitor.\n"
+"    <b>Prilagodi</b>: Skaliraj pozadinu da stane na monitor (zadrži omjer slike).\n"
+"    <b>Prekrij</b>: Skaliraj pozadinu da prekrije monitor (zadrži omjer slike).\n"
+"    <b>Smanji</b>: Smanji pozadinu da stane na monitor ako je potrebno; inače zadrži izvornu veličinu.\n"
+"    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
-msgstr ""
+msgstr "Ispuni"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
-msgstr ""
+msgstr "Prilagodi"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
-msgstr ""
+msgstr "Prekrij"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Smanji"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
-msgstr ""
+msgstr "Ova značajka zahtijeva Gtk 4.8 ili noviji"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Web pozadinski sustav"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Odaberi renderer koji se koristi za web pozadine"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: Zadani pozadinski sustav za web pozadine.\n"
+"        <b>CEF (gstcefsrc)</b>: Eksperimentalni pozadinski sustav temeljen na Chromiumu koji koristi GStreamer.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: Zadani pozadinski sustav za web pozadine."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Zaustavi Video u Fullscreen-u"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
-msgstr ""
+msgstr "Pauziraj reprodukciju kada postoji maksimizirani prozor ili prozor preko cijelog zaslona"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -243,27 +533,27 @@ msgstr ""
 "maksimiziran prozori preko cijelog ekrana.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Nikad"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Bilo Koji Monitor"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Svi monitori"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Zaustavi Video dok na Bateriji."
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
-msgstr ""
+msgstr "Pauziraj reprodukciju kada uređaj radi na bateriji ili je baterija niska"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -272,24 +562,29 @@ msgid ""
 "    <b>Always</b>: Pause playback when the device is on battery.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>Nikad</b>: Onemogući ovu značajku.\n"
+"    <b>Niska baterija</b>: Pauziraj reprodukciju kada je baterija uređaja niska (ispod praga).\n"
+"    <b>Uvijek</b>: Pauziraj reprodukciju kada uređaj radi na bateriji.\n"
+"    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Niska Baterija"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Uvijek"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
-msgstr ""
+msgstr "Način promjene pozadine"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
-msgstr ""
+msgstr "Upravljaj načinom automatske promjene pozadina"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -298,15 +593,40 @@ msgid ""
 "    <b>Random:</b> Randomly select wallpapers from the directory.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>Slijedno:</b> Zadrži redoslijed direktorija (silazni redoslijed).\n"
+"    <b>Obrnuto slijedno:</b> Dohvati pozadine u suprotnom redoslijedu (uzlazni redoslijed).\n"
+"    <b>Nasumično:</b> Nasumično odaberi pozadine iz direktorija.\n"
+"    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
-msgstr ""
+msgstr "Slijedno"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
-msgstr ""
+msgstr "Obrnuto slijedno"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Nasumično"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Pauziraj"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Reproduciraj"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Uključi zvuk"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Sljedeća pozadina"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Postavke"

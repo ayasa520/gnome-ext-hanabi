@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-08-26 02:09+0000\n"
 "Last-Translator: rain1150 <arinchai0405.jj@gmail.com>\n"
 "Language-Team: Thai <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
@@ -19,173 +19,429 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: Weblate 5.7.1-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "หยุดชั่วคราว"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "การตั้งค่าทั่วไป"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "เล่น"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "เปิดเสียง"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "ปิดเสียง"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "ภาพพื้นหลังต่อไป"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "ตั้งค่า"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "ทั่วไป"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "ตั้งค่าความดังเสียง"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "แสดงแผงเมนู"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "การตั้งค่าเว็บ"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "การตั้งค่าฉาก"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS ของฉาก"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "ตั้งค่า FPS เป้าหมายสำหรับวอลเปเปอร์ฉาก"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "หยุดอัตโนมัติ"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "แบตเตอรี่ขั้นต่ำ"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "ตั้งค่าแบตเตอรี่ต่ำกี่เปอร์เซ็น"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "หยุดชั่วคราวเมื่อมีการเล่น Media Player ต่าง ๆ"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr "หยุดชั่วคราวเมื่อ MPRIS media player กำลังเล่นอยู่"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "ตัวเปลี่ยนภาพพื้นหลัง"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "เปลี่ยนภาพพื้นหลังอัตโนมัติ"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "เปลี่ยนภาพพื้นหลังให้เอง (นาที)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "ทดลอง"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "ทดลองปลั๊กอิน VA"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "ไปป์ไลน์ GPU"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"เปิดค่า VA Decoders เพื่อให้เพิ่มประสิทธิภาพกับผู้ใช้งาน Intel/AMD บน Wayland"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "ใช้ไปป์ไลน์ GPU เดียวสำหรับวิดีโอ ฉาก และพื้นผิววิดีโอของฉาก"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr "NVIDIA Stateless Decoders"
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "อัตโนมัติ"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "ใช้ตัว stateless NVIDIA decoders"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "โหมด ผู้พัฒนา"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "โหมด ดีบัก"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "ส่งค่าข้อความดีบักไปยังข้อความล็อค"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "บังคับ gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "บังคับใช้ gtk4paintablesink สำหรับการเล่นวิดีโอพื้นหลัง"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "บังคับ GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "บังคับใช้ GtkMediaFile สำหรับการเล่นวิดีโอพื้นหลัง"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "เปิดใช้การถ่ายโอนงานกราฟิก"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "เปิดใช้การถ่ายโอนงานกราฟิกเพื่อเพิ่มประสิทธิภาพ (ต้องใช้ GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "ดีเลย์การเปิดขึ้น"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
-msgstr ""
-"เพิ่มดีเลย์การเปิดตัว (ใน มิลลิวินาที) "
-"เพื่อลดปัญหาความเข้ากันได้กับส่วนขยายอื่น"
+msgstr "เพิ่มดีเลย์การเปิดตัว (ใน มิลลิวินาที) เพื่อลดปัญหาความเข้ากันได้กับส่วนขยายอื่น"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "ที่อยู่วิดีโอ"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "ฉาก"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "เว็บ"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "วิดีโอ"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "ไม่ทราบ"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "ทุกคน"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "น่าสงสัย"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "ผู้ใหญ่"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "นามธรรม"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "สัตว์"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "อนิเมะ"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "การ์ตูน"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "ไซเบอร์พังก์"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "แฟนตาซี"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "เกม"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "ผู้หญิง"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "ผู้ชาย"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "ภูมิทัศน์"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "ยุคกลาง"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "มีม"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "เพลง"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "ธรรมชาติ"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "พิกเซลอาร์ต"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "ผ่อนคลาย"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "เรโทร"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "ไซไฟ"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "กีฬา"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "เทคโนโลยี"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "โทรทัศน์"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "ยานพาหนะ"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "ไม่ระบุ"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "ไม่มี"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "เปิดไฟล์"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "คลัง Steam"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "เลือกคลัง Steam"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "ยกเลิก"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "เปิด"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "เปลี่ยนที่เก็บไฟล์ของภาพพื้นหลัง"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "ตัวอย่างแบบหน้าต่าง"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "เลือกโฟลเดอร์"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "ตัวอย่างเต็มหน้าจอ"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "ตัวอย่าง"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "เปิดโฟลเดอร์วอลเปเปอร์"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "ไม่มีชื่อ"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "เลือกวอลเปเปอร์"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "ปิด"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "ค้นหาวอลเปเปอร์"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "ชื่อ"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "ขนาดไฟล์"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "อัปเดตล่าสุด"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "เรียงลำดับ"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "กรอง"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "แสดงหรือซ่อนวอลเปเปอร์ตามหมวดหมู่"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "รีเซ็ต"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "ประเภท"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "อายุ"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "แนว"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "รูปภาพไม่พร้อมใช้งาน"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "ปัจจุบัน"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "ไม่มีตัวเลือกที่ใช้ได้"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "ไม่รองรับชนิดการตั้งค่านี้"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "วอลเปเปอร์นี้ไม่มีคุณสมบัติที่กำหนดค่าได้"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "เลือกวอลเปเปอร์เพื่อกำหนดค่าคุณสมบัติ"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "ไม่มีวอลเปเปอร์ที่ตรงกับการค้นหาหรือตัวกรองของคุณ"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "ไม่พบโปรเจกต์วอลเปเปอร์ในคลัง Steam นี้"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "เลือกคลัง Steam ก่อน"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "วอลเปเปอร์"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "เรียกดู"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
 msgstr "โหมด พอดีหน้าจอ"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "ตั้งค่าวิธีการเปลี่ยนภาพพื้นหลังให้หน้าจอ"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -201,40 +457,64 @@ msgstr ""
 "    <b>เติม</b>: ขยายภาพให้เต็มหน้าจอ\n"
 "    <b>พอดี</b>: ขยายภาพให้พอดีหน้าจอ (โดยให้อัตราส่วนเหมือนเดิม)\n"
 "    <b>เต็มหน้าจอ</b>: ขยายภาพให้เต็มหน้าจอ (โดยให้อัตราส่วนเหมือนเดิม) \n"
-"    <b>ลดขนาดภาพ</b>: ลดขนาดภาพเพื่อให้พอดีหน้าจอ หากจำเป็น ไม่งั้น จะให้อัตราส่วนเหมือนเดิ"
-"ม\n"
+"    <b>ลดขนาดภาพ</b>: ลดขนาดภาพเพื่อให้พอดีหน้าจอ หากจำเป็น ไม่งั้น "
+"จะให้อัตราส่วนเหมือนเดิม\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "เติม"
 
-#: src/prefs.js:339
-#, fuzzy
+#: src/prefs/rows.js:78
 msgid "Contain"
-msgstr "พอดี"
+msgstr "พอดีในกรอบ"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "เต็มหน้าจอ"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "ลดขนาด"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "ฟีเจอร์นี้ต้องใช้ Gtk 4.8 หรือ มากกว่านั้น"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "แบ็กเอนด์เว็บ"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "เลือกตัวเรนเดอร์ที่ใช้สำหรับวอลเปเปอร์เว็บ"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: แบ็กเอนด์เริ่มต้นสำหรับวอลเปเปอร์เว็บ\n"
+"        <b>CEF (gstcefsrc)</b>: แบ็กเอนด์ทดลองที่อิง Chromium และใช้ GStreamer\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: แบ็กเอนด์เริ่มต้นสำหรับวอลเปเปอร์เว็บ"
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "หยุดชั่วคราวตอนหน้าจอขยาย หรือ หน้าจอแบบเต็ม"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr "หยุดการเล่นชั่วคราวเมื่อหน้าจอขยาย หรือ หน้าจอเต็ม"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -246,34 +526,31 @@ msgid ""
 msgstr ""
 "\n"
 "    <b>ไม่</b>: ปิดฟีเจอร์นี้\n"
-"    <b>หน้าจอใด ๆ</b>: หยุดการเล่นชั่วคราวเมื่อมีหน้าจอขยาย หรือ "
-"หน้าจอเต็มที่หน้าจอใด ๆ \n"
-"    <b>ทุกหน้าจอ</b>: หยุดการเล่นชั่วคราวเมื่อมีหน้าจอขยาย หรือ "
-"หน้าจอเต็มที่ทุกหน้าจอ\n"
+"    <b>หน้าจอใด ๆ</b>: หยุดการเล่นชั่วคราวเมื่อมีหน้าจอขยาย หรือ หน้าจอเต็มที่หน้าจอใด ๆ \n"
+"    <b>ทุกหน้าจอ</b>: หยุดการเล่นชั่วคราวเมื่อมีหน้าจอขยาย หรือ หน้าจอเต็มที่ทุกหน้าจอ\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "ไม่"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "หน้าจอใด ๆ"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "ทุกหน้าจอ"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "หยุดชั่วคราวตอนโหมดแบตเตอรี่"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
-msgstr ""
-"หยุดการเล่นชั่วคราวเมื่อการอุปกรณ์อยู่โหมดแบตเตอรี่ หรือ แบตเตอรี่ต่ำที่กำหนด"
+msgstr "หยุดการเล่นชั่วคราวเมื่อการอุปกรณ์อยู่โหมดแบตเตอรี่ หรือ แบตเตอรี่ต่ำที่กำหนด"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -284,28 +561,27 @@ msgid ""
 msgstr ""
 "\n"
 "    <b>ไม่</b>: ปิดฟีเจอร์นี้\n"
-"    <b>แบตเตอรี่ต่ำ</b>: หยุดการเล่นเมื่ออุปกรณ์มีแบตเตอรี่ต่ำ "
-"(ตามขั้นต่ำที่กำหนดไว้)\n"
+"    <b>แบตเตอรี่ต่ำ</b>: หยุดการเล่นเมื่ออุปกรณ์มีแบตเตอรี่ต่ำ (ตามขั้นต่ำที่กำหนดไว้)\n"
 "    <b>ตลอด</b>: หยุดการเล่นเมื่ออุปกรณ์เข้าสู่ระบบใช้พลังงานแบตเตอรี่\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "แบตเตอรี่ต่ำ"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "ตลอด"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "เปลี่ยนโหมดภาพพื้นหลัง"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "ตั้งค่าวิธีการเปลี่ยนภาพพื้นหลังอัตโนมัติ"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -320,14 +596,50 @@ msgstr ""
 "    <b>สุ่ม:</b> สุ่มภาพในโฟลเดอร์\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "ตามลำดับ"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "ลำดับย้อนกลับ"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "สุ่ม"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "หยุดชั่วคราว"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "เล่น"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "เปิดเสียง"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "ภาพพื้นหลังต่อไป"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "ตั้งค่า"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "ทดลองปลั๊กอิน VA"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr "เปิดค่า VA Decoders เพื่อให้เพิ่มประสิทธิภาพกับผู้ใช้งาน Intel/AMD บน Wayland"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "ใช้ตัว stateless NVIDIA decoders"
+
+#~ msgid "Open File"
+#~ msgstr "เปิดไฟล์"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "เปลี่ยนที่เก็บไฟล์ของภาพพื้นหลัง"

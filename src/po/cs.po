@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2025-04-06 08:05+0000\n"
 "Last-Translator: David Čudek <dajosek2seznam.cz@gmail.com>\n"
 "Language-Team: Czech <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
@@ -19,128 +19,148 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=((n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2);\n"
 "X-Generator: Weblate 5.11-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Pozastavit"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Obecná nastavení"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Přehrát"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Zapnout zvuk"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Vypnout zvuk"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Další tapeta"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Nastavení"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Obecné"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Hlasitost"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Zobrazit menu na panelu"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Webová nastavení"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Nastavení scény"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS scény"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Nastavit cílové FPS pro scénové tapety"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Automaticky pozastavit"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Hranice nízké baterie"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Nastavit procentuální hranici pro nízkou baterii"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Zastavit při přehrávání medií."
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr "Zastavit přehrávání jestli jakýkoliv přehrávač MPRIS přehrává média."
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Měnič tapety"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "Změnit Tapetu Automaticky"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "Interval změny tapety (minuty)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Experimentální"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Experimentální VA Plugin"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "GPU pipeline"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr "Povolit VA dekodéry které zlepší výkon pro Intel/AMD Wayland uživatele"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Použít jednu GPU pipeline pro videa, scény a video textury scén"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr "NVIDIA Stateless Dekodéry"
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Automaticky"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Použít nové stateless NVIDIA dekodéry"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA bezstavové / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Pro vývojáře"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Debug mód"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Vypisovat ladící zprávy do protokolu"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "Vynutit gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "Vynutí použití gtk4paintablesink pro přehrávání videa"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "Vynutit GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "Vynutí použití GtkMediaFile pro přehrávání videa"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Povolit grafické odlehčení"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Povolit grafické odlehčení pro lepší výkon (vyžaduje GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Prodleva při startu"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -148,43 +168,282 @@ msgstr ""
 "Přidá časovou prodlevu (v milisekundách) před startem, aby se vyhnulo "
 "potížím s kompatibilitou s ostatními rozšířeními"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Cesta k videu"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Scéna"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Video"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Neznámé"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Pro všechny"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Sporné"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Pro dospělé"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Abstraktní"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Zvířata"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Kreslené"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Fantasy"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Hra"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Dívky"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Chlapci"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Krajina"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Středověk"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Memy"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Hudba"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Příroda"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Pixel art"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Relaxace"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Retro"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Sci-fi"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Sport"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Technologie"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Televize"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Vozidlo"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Neurčeno"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Žádné video"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Otevřít soubor"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Knihovna Steam"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Vybrat knihovnu Steam"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "Zrušit"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Otevřít"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "Změnit cestu složky tapet"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Náhled v okně"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Vybrat složku"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Náhled na celou obrazovku"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Náhled"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Otevřít složku tapety"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Bez názvu"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Vybrat tapetu"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Zavřít"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Hledat tapety"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Název"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Velikost souboru"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Naposledy aktualizováno"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Seřadit"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Filtrovat"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Zobrazit nebo skrýt tapety podle kategorie"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Obnovit"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Typ"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Věkové hodnocení"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Žánr"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Obrázek není dostupný"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Aktuální"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Nejsou dostupné žádné volby"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Nepodporovaný typ nastavení"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Tato tapeta nemá žádné nastavitelné vlastnosti"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Vyberte tapetu pro nastavení jejích vlastností"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Žádné tapety neodpovídají hledání nebo filtrům"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "V této knihovně Steam nebyly nalezeny žádné projekty tapet"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Nejprve vyberte knihovnu Steam"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Tapeta"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Procházet"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
 msgstr "Mód vyplnění"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Nastavit jak se pozadí vejde do obrazovky"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -206,36 +465,61 @@ msgstr ""
 "třeba, jinak ponechat v původní velikosti\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Roztáhnout"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
 msgstr "Obsáhnout"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Vyplnit"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Škálovat dolů"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Tato funkce požaduje Gtk 4.8 nebo novější"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Webový backend"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Vyberte renderer používaný pro webové tapety"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: výchozí backend pro webové tapety.\n"
+"        <b>CEF (gstcefsrc)</b>: experimentální backend založený na Chromiu používající GStreamer.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: výchozí backend pro webové tapety."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Zastavit při maximalizovaném/fullscreen okně."
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr ""
 "Zastavit přehrávání jestli je okno maximalizováno nebo na plnou obrazovku."
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -253,27 +537,28 @@ msgstr ""
 "jsou maximalizované/fullscreen okna.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Nikdy"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Jakákoliv obrazovka"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Všechny obrazovky."
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Zastavit na baterii"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
-msgstr "Zastavit přehrávání jestli je zařízení na baterii nebo je baterie nízká"
+msgstr ""
+"Zastavit přehrávání jestli je zařízení na baterii nebo je baterie nízká"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -289,23 +574,23 @@ msgstr ""
 "    <b>Vždy</b>: Zastavit přehrávání jestli je zařízení napájeno z baterie.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Nízká baterie"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Vždy"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Změnit mód tapety."
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Ovládat jak se tapety mění automaticky"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -321,14 +606,51 @@ msgstr ""
 "    <b>Náhodně:</b> Náhodně vybrat tapety ze složky\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Sekvenční"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Obráceně sekvenční"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Random"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Pozastavit"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Přehrát"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Zapnout zvuk"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Další tapeta"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Nastavení"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Experimentální VA Plugin"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "Povolit VA dekodéry které zlepší výkon pro Intel/AMD Wayland uživatele"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Použít nové stateless NVIDIA dekodéry"
+
+#~ msgid "Open File"
+#~ msgstr "Otevřít soubor"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "Změnit cestu složky tapet"

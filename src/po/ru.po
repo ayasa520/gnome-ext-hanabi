@@ -11,7 +11,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-07-20 02:09+0000\n"
 "Last-Translator: Shebeno4ka <shebeno4ka@outlook.com>\n"
 "Language-Team: Russian <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
@@ -24,132 +24,150 @@ msgstr ""
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Weblate 5.7-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Приостановить"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Общие настройки"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Воспроизвести"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Включить звук"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Отключить звук"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Следующие обои"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Настройки"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Общее"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Уровень громкости"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Показывать индикатор в панели состояния"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Веб-настройки"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Настройки сцен"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS сцены"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Задать целевой FPS для обоев-сцен"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Автоматически приостанавливать"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Пороговый уровень заряда батареи"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Установить пороговый уровень заряда батареи"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Приостановить при проигрывании медиа плеера"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr ""
 "Приостанавливать воспроизведение при работе MPRIS-совместимого медиаплеера."
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Смена обоев"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "Менять обои автоматически"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "Изменить интервал смены обоев(в минутах)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Экспериментальные настройки"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Экспериментальный плагин VA"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "Конвейер GPU"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"Включите декодеры VA, которые повышают производительность для пользователей "
-"Intel/AMD на Wayland"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Использовать один конвейер GPU для видео, сцен и видеотекстур сцен"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr "NVIDIA Stateless Decoders"
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Автоматически"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Используйте новые декодеры NVIDIA без статических данных"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA без состояния / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Настройки для разработчиков"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Режим отладки"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Вывод сообщений отладки в журнал"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "Принудительно использовать gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr ""
 "Принудительное использование gtk4paintablesink для воспроизведения видео"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "Принудительно использовать GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "Принудительное использование GtkMediaFile для воспроизведения видео"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Включить графическую разгрузку"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Включить графическую разгрузку для повышения производительности (требуется GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Задержка запуска"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -157,43 +175,282 @@ msgstr ""
 "Добавьте задержку при запуске (в миллисекундах), чтобы уменьшить проблемы "
 "совместимости с другими расширениями"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Путь до видеофайла"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Сцена"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Видео"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Неизвестно"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Для всех"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Сомнительно"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Для взрослых"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Абстракция"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Животные"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Мультфильмы"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Фэнтези"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Игры"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Девушки"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Парни"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Пейзаж"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Средневековье"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Мемы"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Музыка"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Природа"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Пиксель-арт"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Расслабляющее"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Ретро"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Научная фантастика"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Спорт"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Технологии"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Телевидение"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Транспорт"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Не указано"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Нет"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Открыть файл"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Библиотека Steam"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Выбрать библиотеку Steam"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "Отмена"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Открыть"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "Изменить путь до директории с обоями"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Предпросмотр в окне"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Выбрать директорию"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Полноэкранный предпросмотр"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Предпросмотр"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Открыть папку обоев"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Без названия"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Выбрать обои"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Закрыть"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Поиск обоев"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Имя"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Размер файла"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Последнее обновление"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Сортировать"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Фильтр"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Показывать или скрывать обои по категории"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Сбросить"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Тип"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Возрастной рейтинг"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Жанр"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Изображение недоступно"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Текущие"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Нет доступных вариантов"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Неподдерживаемый тип настройки"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "У этих обоев нет настраиваемых свойств"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Выберите обои, чтобы настроить их свойства"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Нет обоев, соответствующих поиску или фильтрам"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "В этой библиотеке Steam не найдены проекты обоев"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Сначала выберите библиотеку Steam"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Обои"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Обзор"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
 msgstr "Режим"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Контроль того, как обои вписываются в монитор"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -215,35 +472,60 @@ msgstr ""
 ".\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Заполнение"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
 msgstr "Контейнер"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Наложение"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Сокращение масштаба"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Эта функция требует Gtk 4.8 или выше"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Веб-бэкенд"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Выберите рендерер для веб-обоев"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: бэкенд по умолчанию для веб-обоев.\n"
+"        <b>CEF (gstcefsrc)</b>: экспериментальный бэкенд на базе Chromium с использованием GStreamer.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: бэкенд по умолчанию для веб-обоев."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Приостанавливать при разворачивании на полный экран"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr "Приостановить при разворачивании приложений."
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -261,27 +543,27 @@ msgstr ""
 "мониторах запущены приложения развёрнутые на полный экран.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Никогда"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Любой монитор"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Все мониторы"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Приостанавливать при использовании батареи"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
 msgstr "Приостанавливать при питании от батареи или низком заряде"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -297,23 +579,23 @@ msgstr ""
 "    <b>Всегда<b>: Приостанавливать воспроизведение при питании от батареи.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Низкий уровень заряда баттареи"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Всегда"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Изменить режим смены обоев"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Способ, которым обои будут сменяться автоматически"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -330,14 +612,52 @@ msgstr ""
 "    <b>Случайно:</b> Случайный выбор обоев из каталога.\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Последовательно"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Обратная последовательность"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Случайный"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Приостановить"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Воспроизвести"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Включить звук"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Следующие обои"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Настройки"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Экспериментальный плагин VA"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "Включите декодеры VA, которые повышают производительность для "
+#~ "пользователей Intel/AMD на Wayland"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Используйте новые декодеры NVIDIA без статических данных"
+
+#~ msgid "Open File"
+#~ msgstr "Открыть файл"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "Изменить путь до директории с обоями"

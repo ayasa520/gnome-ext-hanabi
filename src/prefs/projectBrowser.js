@@ -12,6 +12,7 @@ import {gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions
 import {
     ProjectBrowserFilterKey,
     ProjectContentRatings,
+    ProjectType,
     ScenePropertyType,
     UserPropertyStoreKey,
     areScenePropertyValuesEqual,
@@ -154,6 +155,89 @@ function normalizeProjectBrowserSortKey(key) {
         : PROJECT_BROWSER_SORT_KEYS.NAME;
 }
 
+function formatProjectTypeLabel(type) {
+    switch (type) {
+    case ProjectType.SCENE:
+        return _('Scene');
+    case ProjectType.WEB:
+        return _('Web');
+    case ProjectType.VIDEO:
+        return _('Video');
+    default:
+        return type || _('Unknown');
+    }
+}
+
+function formatProjectContentRatingLabel(rating) {
+    switch (rating) {
+    case 'Everyone':
+        return _('Everyone');
+    case 'Questionable':
+        return _('Questionable');
+    case 'Mature':
+        return _('Mature');
+    default:
+        return rating;
+    }
+}
+
+function formatProjectGenreLabel(tag) {
+    switch (tag) {
+    case 'Abstract':
+        return _('Abstract');
+    case 'Animal':
+        return _('Animal');
+    case 'Anime':
+        return _('Anime');
+    case 'Cartoon':
+        return _('Cartoon');
+    case 'CGI':
+        return _('CGI');
+    case 'Cyberpunk':
+        return _('Cyberpunk');
+    case 'Fantasy':
+        return _('Fantasy');
+    case 'Game':
+        return _('Game');
+    case 'Girls':
+        return _('Girls');
+    case 'Guys':
+        return _('Guys');
+    case 'Landscape':
+        return _('Landscape');
+    case 'Medieval':
+        return _('Medieval');
+    case 'Memes':
+        return _('Memes');
+    case 'MMD':
+        return _('MMD');
+    case 'Music':
+        return _('Music');
+    case 'Nature':
+        return _('Nature');
+    case 'Pixel art':
+        return _('Pixel art');
+    case 'Relaxing':
+        return _('Relaxing');
+    case 'Retro':
+        return _('Retro');
+    case 'Sci-Fi':
+        return _('Sci-Fi');
+    case 'Sports':
+        return _('Sports');
+    case 'Technology':
+        return _('Technology');
+    case 'Television':
+        return _('Television');
+    case 'Vehicle':
+        return _('Vehicle');
+    case 'Unspecified':
+        return _('Unspecified');
+    default:
+        return tag;
+    }
+}
+
 export function formatProjectSubtitle(path) {
     if (!path)
         return _('None');
@@ -165,7 +249,7 @@ export function formatProjectSubtitle(path) {
     const title = typeof project.title === 'string' && project.title !== ''
         ? project.title
         : (project.basename || path);
-    return `${title} (${project.type})`;
+    return `${title} (${formatProjectTypeLabel(project.type)})`;
 }
 
 export function formatLibrarySubtitle(path) {
@@ -782,9 +866,9 @@ function createProjectCard(project, onActivate, previewQueue, settings) {
     preview.set_size_request(PROJECT_CARD_WIDTH, PROJECT_CARD_WIDTH);
     attachProjectPreviewContextMenu(preview, project, settings);
 
-    const subtitleParts = [project.type || _('Unknown')];
+    const subtitleParts = [formatProjectTypeLabel(project.type)];
     if (project.tags?.length)
-        subtitleParts.push(project.tags[0]);
+        subtitleParts.push(formatProjectGenreLabel(project.tags[0]));
 
     const title = new Gtk.Label({
         label: titleText,
@@ -1446,17 +1530,17 @@ function createProjectBrowserDialog(window, settings) {
         clearChildren(filterSectionsBox);
 
         filterSectionsBox.append(createFilterSection(_('Type'), 'type', [
-            {key: 'scene', label: _('Scene')},
-            {key: 'web', label: _('Web')},
-            {key: 'video', label: _('Video')},
+            {key: ProjectType.SCENE, label: formatProjectTypeLabel(ProjectType.SCENE)},
+            {key: ProjectType.WEB, label: formatProjectTypeLabel(ProjectType.WEB)},
+            {key: ProjectType.VIDEO, label: formatProjectTypeLabel(ProjectType.VIDEO)},
         ]));
         filterSectionsBox.append(createFilterSection(_('Age'), 'contentrating', ProjectContentRatings.map(rating => ({
             key: rating,
-            label: rating,
+            label: formatProjectContentRatingLabel(rating),
         }))));
         filterSectionsBox.append(createFilterSection(_('Genre'), 'tags', currentFilterTagOptions.map(tag => ({
             key: tag,
-            label: tag,
+            label: formatProjectGenreLabel(tag),
         }))));
 
         syncFilterControls();

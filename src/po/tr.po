@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-06-11 17:00+0000\n"
 "Last-Translator: Seymen Kalkan <seymenkalkan@gmail.com>\n"
 "Language-Team: Turkish <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
@@ -21,130 +21,148 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
 "X-Generator: Weblate 5.6-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Durdur"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Genel Ayarlar"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Oynat"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Sesi Aç"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Sesi Sustur"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Sonraki Duvar Kağıdı"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Tercihler"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Genel"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Ses Düzeyi"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Panel Menüsünü Göster"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Web Ayarları"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Sahne Ayarları"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "Sahne FPS'si"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Sahne duvar kağıtları için hedef FPS'yi ayarla"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Otomatik Durdur"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Düşük Batarya Eşiği"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Düşük batarya seviyesinin eşiğini ayarla"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Medya Oynatıcı Çalıyorken Duraklat"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr "MPRIS medya oynatıcısı çalıyorken oynatımı duraklat"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Duvar Kağıdı Değiştirici"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "Duvar Kağıdını Kendiliğinden Değiştir"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "Duvar Kağıdı Aralığını Değiştir (dakika)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Deneysel"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Deneysel VA Eklentisi"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "GPU İş Hattı"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"Intel/AMD Wayland kullanıcıları için başarımı artıran VA kod çözücülerini "
-"etkinleştir"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Videolar, sahneler ve sahne video dokuları için tek bir GPU iş hattı kullan"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr "NVIDIA Durumsuz Kod Çözücüler"
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Otomatik"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Yeni durumsuz NVIDIA kod çözücüleri kullan"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Geliştirici"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Hata Ayıklama Kipi"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Hata ayıklama iletilerini günlüğe yazdır"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "gtk4paintablesink'e zorla"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "Video oynatmalarında gtk4paintablesink kullanımına zorla"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "GtkMediaFile'a zorla"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "Video oynatmalarında GtkMediaFile kullanımına zorla"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Grafik Yük Aktarımını Etkinleştir"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Daha iyi performans için grafik yük aktarımını etkinleştir (GTK 4.14+ gerekir)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Başlangıç Gecikmesi"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -152,43 +170,282 @@ msgstr ""
 "Diğer uzantılarla uyumluluk sorunlarını azaltmak için başlangıç gecikmesi "
 "ekle (milisaniye cinsinden)"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Video Yolu"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Sahne"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Video"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Bilinmeyen"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Herkes"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Şüpheli"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Yetişkin"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Soyut"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Hayvan"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Çizgi Film"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Siberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Fantastik"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Oyun"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Kızlar"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Erkekler"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Manzara"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Orta Çağ"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Memler"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Müzik"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Doğa"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Piksel Sanatı"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Rahatlatıcı"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Retro"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Bilim Kurgu"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Spor"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Teknoloji"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Televizyon"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Araç"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Belirtilmemiş"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Yok"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Dosya Aç"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Steam Kütüphanesi"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Steam Kütüphanesi Seç"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "İptal"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Aç"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "Duvar Kağıdı Dizin Yolunu Değiştir"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Pencere Önizlemesi"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Dizin Seç"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Tam Ekran Önizleme"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Önizleme"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Duvar Kağıdı Klasörünü Aç"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Adsız"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Duvar Kağıdı Seç"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Kapat"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Duvar kağıtlarında ara"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Ad"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Dosya boyutu"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Son güncelleme"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Sırala"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Süz"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Duvar kağıtlarını kategoriye göre göster veya gizle"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Sıfırla"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Tür"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Yaş"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Tarz"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Görsel kullanılamıyor"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Geçerli"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Kullanılabilir seçenek yok"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Desteklenmeyen ayar türü"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Bu duvar kağıdının yapılandırılabilir özelliği yok"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Özelliklerini yapılandırmak için bir duvar kağıdı seçin"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Aramanızla veya süzgeçlerinizle eşleşen duvar kağıdı yok"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "Bu Steam kütüphanesinde duvar kağıdı projesi bulunamadı"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Önce bir Steam kütüphanesi seçin"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Duvar Kağıdı"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Göz At"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
 msgstr "Doldurma Kipi"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Duvar kağıdının ekrana nasıl sığdığını denetle"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -210,35 +467,60 @@ msgstr ""
 "aksi takdirde özgün boyutu koru.\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Doldur"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
 msgstr "İçer"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Kapla"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Küçült"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Bu özellik Gtk 4.8 veya üst sürümü gerektirir"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Web Arka Ucu"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Web duvar kağıtları için kullanılan işleyiciyi seçin"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: Web duvar kağıtları için öntanımlı arka uç.\n"
+"        <b>CEF (gstcefsrc)</b>: GStreamer kullanan deneysel Chromium tabanlı arka uç.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: Web duvar kağıtları için öntanımlı arka uç."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Tam veya Büyütülmüş Pencerede Duraklat"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr "Büyütülmüş veya tam ekran pencere olduğunda oynatmayı duraklat"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -256,27 +538,28 @@ msgstr ""
 "pencere varsa oynatmayı durdur.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Asla"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Herhangi Monitor"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Bütün Ekranlar"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Batarya durumunda duraklat"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
-msgstr "Bilgisayar batarya durumunda veya düşük bataryada ise oynatmayı durdur."
+msgstr ""
+"Bilgisayar batarya durumunda veya düşük bataryada ise oynatmayı durdur."
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -292,23 +575,23 @@ msgstr ""
 "    <b>Her zaman</b>: Bilgisayar güce takılı değil ise oynatmayı durdur.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Düşük Batarya"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Her zaman"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Duvar Kağıdı Kipini Değiştir"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Duvar kağıtlarını otomatik olarak nasıl değiştirileceğini ayarlayın."
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -323,14 +606,52 @@ msgstr ""
 "    <b>Rastgele:</b> Dizinden rastgele duvar kağıdı seç.\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Ardışık"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Ters Ardışık"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Rastgele"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Durdur"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Oynat"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Sesi Aç"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Sonraki Duvar Kağıdı"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Tercihler"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Deneysel VA Eklentisi"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "Intel/AMD Wayland kullanıcıları için başarımı artıran VA kod çözücülerini "
+#~ "etkinleştir"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Yeni durumsuz NVIDIA kod çözücüleri kullan"
+
+#~ msgid "Open File"
+#~ msgstr "Dosya Aç"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "Duvar Kağıdı Dizin Yolunu Değiştir"

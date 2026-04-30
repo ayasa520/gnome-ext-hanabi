@@ -7,11 +7,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2025-04-24 19:01+0000\n"
 "Last-Translator: Máté <vagvolgyimate19@gmail.com>\n"
-"Language-Team: Hungarian <https://hosted.weblate.org/projects/"
-"gnome-ext-hanabi/gnome-ext-hanabi/hu/>\n"
+"Language-Team: Hungarian <https://hosted.weblate.org/projects/gnome-ext-"
+"hanabi/gnome-ext-hanabi/hu/>\n"
 "Language: hu\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -19,130 +19,148 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
 "X-Generator: Weblate 5.11.1-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Szüneteltetés"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Általános beállítások"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Lejátszás"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Némítás feloldása"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Némítás"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Következő háttérkép"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Beállítások"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Általános"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Hangerőszint"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Panel menü mutatása"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Webes beállítások"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Jelenetbeállítások"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "Jelenet FPS-e"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Állítsa be a jelenet-háttérképek cél FPS-ét"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Automatikus szüneteltetés"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Alsó akkumulátorszint határ"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Alsó százalék beállítása alacsony akkumulátorszint esetén"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Szüneteltetés média lejátszása közben"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr "Szüneteltetés, ha MPRIS média lejátszó aktív"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Háttérkép váltása"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "Háttérkép változtatása automatikusan"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "Háttérkép időtartamának változtatása (perc)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Kísérleti"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Kísérleti VA bővítmény"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "GPU-folyamat"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"VA decoder bekapcsolása teljesítmény növeléséhez Intel/AMD Wayland "
-"felhasználóknak"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Egy GPU-folyamat használata videókhoz, jelenetekhez és jelenet-videótextúrákhoz"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr ""
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Automatikus"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Új NVIDIA Stateless Decoder használata"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Fejlesztői"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Hibakeresési mód"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Hibaüzenetek kiírása naplóba"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "gtk4paintablesink kényszerítése"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "gtk4paintablesink használatának kényszerítése videó lejátszásához"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "GtkMediaFile kényszerítése"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "GtkMediaFile használatának kényszerítése videó lejátszásához"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Grafikai tehermentesítés engedélyezése"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Grafikai tehermentesítés engedélyezése a jobb teljesítményhez (GTK 4.14+ szükséges)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Indítás késleltetése"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -150,43 +168,282 @@ msgstr ""
 "Indítás késleltetése (milliszekundumban) más bővitményekkel való "
 "kompatibilátási problémák elkerülésére"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Videó útvonala"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Jelenet"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Videó"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Ismeretlen"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Mindenki"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Kétes"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Felnőtt"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Absztrakt"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Állat"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Rajzfilm"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Fantasy"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Játék"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Lányok"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Fiúk"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Tájkép"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Középkori"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Mémek"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Zene"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Természet"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Pixel art"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Pihentető"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Retro"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Sci-fi"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Sport"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Technológia"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Televízió"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Jármű"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Nincs megadva"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Nincs"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Fájl megnyitása"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Steam-könyvtár"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Steam-könyvtár kiválasztása"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "Mégse"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Megnyitás"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "Háttérkép elérési útjának változtatása"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Ablakos előnézet"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Könyvtár kiválasztása"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Teljes képernyős előnézet"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Előnézet"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Háttérképmappa megnyitása"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Névtelen"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Háttérkép kiválasztása"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Bezárás"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Háttérképek keresése"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Név"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Fájlméret"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Utolsó frissítés"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Rendezés"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Szűrés"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Háttérképek megjelenítése vagy elrejtése kategória szerint"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Visszaállítás"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Típus"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Korhatár"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Műfaj"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "A kép nem érhető el"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Jelenlegi"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Nincsenek elérhető beállítások"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Nem támogatott beállítástípus"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Ennek a háttérképnek nincsenek konfigurálható tulajdonságai"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Válasszon háttérképet a tulajdonságai beállításához"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Nincs a keresésnek vagy a szűrőknek megfelelő háttérkép"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "Nem találhatók háttérkép-projektek ebben a Steam-könyvtárban"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Először válasszon Steam-könyvtárat"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Háttérkép"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Tallózás"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
-msgstr ""
+msgstr "Illesztési mód"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Változtatja hogyan illeszkedik a háttérkép a kijelzőhöz"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -202,43 +459,68 @@ msgstr ""
 "    <b>Kitöltés</b>: A háttérkép képernyőhöz nyújtással.\n"
 "    <b>Teljes háttérkép</b>: Háttérkép méretezése, hogy elférjen a képernyőn "
 "(képarány megtartása).\n"
-"    <b>Teljes képernyő</b>: Háttérkép méretezése, hogy kitöltse a képernyőt ("
-"képarány megtartása).\n"
+"    <b>Teljes képernyő</b>: Háttérkép méretezése, hogy kitöltse a képernyőt "
+"(képarány megtartása).\n"
 "    <b>Kicsinyítés</b>: Kicsinyítse a képet, hogy elférjen a képernyőn, ha "
 "szükséges, amúgy tartsa meg az erdeti méretet.\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Kitöltés"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
 msgstr "Teljes háttérkép"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Teljes képernyő"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Kicsinyítés"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Ehhez a funkcióhoz Gtk 4.8 vagy újabb szükséges"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Webes háttérrendszer"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Válassza ki a webes háttérképekhez használt megjelenítőt"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: A webes háttérképek alapértelmezett háttérrendszere.\n"
+"        <b>CEF (gstcefsrc)</b>: Kísérleti, Chromium-alapú háttérrendszer GStreamer használatával.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: A webes háttérképek alapértelmezett háttérrendszere."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Szüneteltetés teljes méret vagy teljes képernyő esetén"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr ""
 "Lejátszás szüneteltetése, ha egy ablak teljes méret vagy teljes képernyő "
 "módban van"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -256,29 +538,29 @@ msgstr ""
 "teljes képernyő esetén az összes monitoron.\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Soha"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Bármely képernyő"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Összes képernyő"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Szüneteltetés akkumulátor használat esetén"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
 msgstr ""
 "Lejátszás szüneteltetése, ha az eszköz akkumulátort használ, vagy az "
 "akkumulátorszint alacsony"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -295,23 +577,23 @@ msgstr ""
 "üzemel.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Alacsony akkumulátorszint"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Mindig"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Háttérkép módjának változtatása"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Szabályozza, hogy hogyan változzank a háttérképek automatikusan"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -323,18 +605,56 @@ msgstr ""
 "\n"
 "    <b>Csökkenő:</b> Könyvtár sorrendjének megtartása (csökkenő sorrend).\n"
 "    <b>Növekvő:</b> Könyvtár sorrendjének megfordítása (növekvő sorrend).\n"
-"    <b>Véletlenszerű:</b> Háttérkép választása véletlenszerűen a könyvtárból."
-"\n"
+"    <b>Véletlenszerű:</b> Háttérkép választása véletlenszerűen a "
+"könyvtárból.\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Csökkenő"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Növekvő"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Véletlenszerű"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Szüneteltetés"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Lejátszás"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Némítás feloldása"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Következő háttérkép"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Beállítások"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Kísérleti VA bővítmény"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "VA decoder bekapcsolása teljesítmény növeléséhez Intel/AMD Wayland "
+#~ "felhasználóknak"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Új NVIDIA Stateless Decoder használata"
+
+#~ msgid "Open File"
+#~ msgstr "Fájl megnyitása"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "Háttérkép elérési útjának változtatása"

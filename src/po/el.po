@@ -6,10 +6,10 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-07-29 15:09+0000\n"
-"Last-Translator: Athanasios Nektarios Karachalios Stagkas <nasos.karachalios."
-"stagkas@proton.me>\n"
+"Last-Translator: Athanasios Nektarios Karachalios Stagkas "
+"<nasos.karachalios.stagkas@proton.me>\n"
 "Language-Team: Greek <https://hosted.weblate.org/projects/gnome-ext-hanabi/"
 "gnome-ext-hanabi/el/>\n"
 "Language: el\n"
@@ -19,132 +19,150 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
 "X-Generator: Weblate 5.7-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Παύση"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Γενικές ρυθμίσεις"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Παίξε"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Κατάργηση Σίγασης Ήχου"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Σίγαση ήχου"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Επόμενη Ταπετσαρία"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Προτιμήσεις"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Γενικά"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Επίπεδο Έντασης"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Εμφάνιση μενού πάνελ"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Ρυθμίσεις ιστού"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Ρυθμίσεις σκηνής"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS σκηνής"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Ορισμός στόχου FPS για ταπετσαρίες σκηνής"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Αυτόματη Παύση"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Κατώφλι Xαμηλής Mπαταρίας"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Ορίστε το ποσοστό κατωφλίου για χαμηλή στάθμη μπαταρίας"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Παύση κατά την αναπαραγωγή προγράμματος αναπαραγωγής πολυμέσων"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr ""
 "Παύση αναπαραγωγής όταν μια συσκευή αναπαραγωγής πολυμέσων MPRIS αναπαράγει "
 "πολυμέσα"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Αλλαγή Ταπετσαρίας"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
-msgstr ""
+msgstr "Αυτόματη αλλαγή ταπετσαρίας"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
-msgstr ""
+msgstr "Διάστημα αλλαγής ταπετσαρίας (λεπτά)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Πειραματικό"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Πειραματικό πρόσθετο VA"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "Pipeline GPU"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"Ενεργοποίηση των αποκωδικοποιητών VA που βελτιώνουν την απόδοση για τους "
-"χρήστες Intel/AMD Wayland"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Χρήση ενός pipeline GPU για βίντεο, σκηνές και υφές βίντεο σκηνής"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr "Αποκωδικοποιητές NVIDIA χωρίς κατάσταση"
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Αυτόματα"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Χρήση νέων αποκωδικοποιητών NVIDIA χωρίς κατάσταση"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA Stateless / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Προγραμματιστής"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Λειτουργία Αποσφαλμάτωσης"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Εκτύπωση μηνυμάτων εντοπισμού σφαλμάτων στο αρχείο καταγραφής"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "Επιβολή gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "Επιβολή χρήσης του gtk4paintablesink για αναπαραγωγή βίντεο"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "Επιβολή GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "Επιβολή χρήσης του GtkMediaFile για την αναπαραγωγή βίντεο"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Ενεργοποίηση αποφόρτωσης γραφικών"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Ενεργοποίηση αποφόρτωσης γραφικών για βελτιωμένη απόδοση (απαιτεί GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Καθυστέρηση εκκίνησης"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -152,43 +170,282 @@ msgstr ""
 "Προσθέστε καθυστέρηση εκκίνησης (σε milliseconds) για τον μετριασμό των "
 "ζητημάτων συμβατότητας με άλλες επεκτάσεις"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Διαδρομή βίντεο"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Σκηνή"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Ιστός"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Βίντεο"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Άγνωστο"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Για όλους"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Αμφίβολο"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Για ενηλίκους"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Αφηρημένο"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Ζώο"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Καρτούν"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Φαντασία"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Παιχνίδι"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Κορίτσια"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Αγόρια"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Τοπίο"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Μεσαιωνικό"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Memes"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Μουσική"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Φύση"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Pixel art"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Χαλαρωτικό"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Ρετρό"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Επιστημονική φαντασία"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Αθλητικά"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Τεχνολογία"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Τηλεόραση"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Όχημα"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Μη καθορισμένο"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Κανένα"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Άνοιγμα Aρχείου"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Βιβλιοθήκη Steam"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Επιλογή βιβλιοθήκης Steam"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
-msgstr ""
+msgstr "Άκυρο"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Άνοιγμα"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr ""
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Προεπισκόπηση παραθύρου"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Επιλογή Φακέλου"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Προεπισκόπηση πλήρους οθόνης"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Προεπισκόπηση"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Άνοιγμα φακέλου ταπετσαριών"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Χωρίς τίτλο"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Επιλογή ταπετσαρίας"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Κλείσιμο"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Αναζήτηση ταπετσαριών"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Όνομα"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Μέγεθος αρχείου"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Τελευταία ενημέρωση"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Ταξινόμηση"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Φίλτρο"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Εμφάνιση ή απόκρυψη ταπετσαριών κατά κατηγορία"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Επαναφορά"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Τύπος"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Ηλικία"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Είδος"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Η εικόνα δεν είναι διαθέσιμη"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Τρέχον"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Δεν υπάρχουν διαθέσιμες επιλογές"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Μη υποστηριζόμενος τύπος ρύθμισης"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Αυτή η ταπετσαρία δεν έχει ρυθμιζόμενες ιδιότητες"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Επιλέξτε μια ταπετσαρία για να ρυθμίσετε τις ιδιότητές της"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Καμία ταπετσαρία δεν ταιριάζει με την αναζήτηση ή τα φίλτρα σας"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "Δεν βρέθηκαν έργα ταπετσαρίας σε αυτήν τη βιβλιοθήκη Steam"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Επιλέξτε πρώτα μια βιβλιοθήκη Steam"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Ταπετσαρία"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Περιήγηση"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
 msgstr "Λειτουργία προσαρμογής"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Έλεγχος του τρόπου τοποθέτησης της ταπετσαρίας στην οθόνη"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -204,43 +461,68 @@ msgstr ""
 "    <b>Γέμισμα</b>: Επιμηκύνετε την ταπετσαρία για να γεμίσει την οθόνη.\n"
 "    <b>Συγκρατεί</b>: Κλιμακώστε την ταπετσαρία ώστε να ταιριάζει στην οθόνη "
 "(διατηρήστε την αναλογία διαστάσεων).\n"
-"    <b>Κάλυψη</b>: Κλιμακώστε την ταπετσαρία ώστε να καλύπτει την οθόνη ("
-"διατηρήστε την αναλογία διαστάσεων).\n"
+"    <b>Κάλυψη</b>: Κλιμακώστε την ταπετσαρία ώστε να καλύπτει την οθόνη "
+"(διατηρήστε την αναλογία διαστάσεων).\n"
 "    <b>Κλιμακωτή μείωση</b>:  Κλιμακώστε την ταπετσαρία ώστε να ταιριάζει "
 "στην οθόνη, αν χρειάζεται, διαφορετικά διατηρήστε το αρχικό της μέγεθος.\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Γέμισμα"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
-msgstr ""
+msgstr "Προσαρμογή"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Εξώφυλλο"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Κλιμακωτή μείωση"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Αυτή η λειτουργία απαιτεί Gtk 4.8 ή νεότερη έκδοση"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Backend ιστού"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Επιλέξτε τον renderer που χρησιμοποιείται για ταπετσαρίες ιστού"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: Το προεπιλεγμένο backend για ταπετσαρίες ιστού.\n"
+"        <b>CEF (gstcefsrc)</b>: Πειραματικό backend βασισμένο στο Chromium που χρησιμοποιεί GStreamer.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: Το προεπιλεγμένο backend για ταπετσαρίες ιστού."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Παύση σε μεγιστοποίηση ή πλήρη οθόνη"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr ""
 "Παύση αναπαραγωγής όταν υπάρχει μεγιστοποιημένο παράθυρο ή παράθυρο πλήρους "
 "οθόνης"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -250,30 +532,35 @@ msgid ""
 "fullscreen windows on all monitors.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>Ποτέ</b>: Απενεργοποίηση αυτής της λειτουργίας.\n"
+"    <b>Οποιαδήποτε οθόνη</b>: Παύση αναπαραγωγής όταν υπάρχει μεγιστοποιημένο παράθυρο ή παράθυρο πλήρους οθόνης σε οποιαδήποτε οθόνη.\n"
+"    <b>Όλες οι οθόνες</b>: Παύση αναπαραγωγής όταν υπάρχουν μεγιστοποιημένα παράθυρα ή παράθυρα πλήρους οθόνης σε όλες τις οθόνες.\n"
+"    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Ποτέ"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Οποιαδήποτε Οθόνη"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Όλες Οι Οθόνες"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Παύση λειτουργίας κατά την κατανάλωση μπαταρίας"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
 msgstr ""
 "Παύση της αναπαραγωγής όταν η συσκευή λειτουργεί με μπαταρία ή όταν η "
 "μπαταρία είναι χαμηλή"
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -282,24 +569,29 @@ msgid ""
 "    <b>Always</b>: Pause playback when the device is on battery.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>Ποτέ</b>: Απενεργοποίηση αυτής της λειτουργίας.\n"
+"    <b>Χαμηλή μπαταρία</b>: Παύση αναπαραγωγής όταν η μπαταρία της συσκευής είναι χαμηλή (κάτω από το όριο).\n"
+"    <b>Πάντα</b>: Παύση αναπαραγωγής όταν η συσκευή λειτουργεί με μπαταρία.\n"
+"    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "ΧαμηλήMπαταρία"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Πάντα"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Αλλαγή λειτουργίας ταπετσαρίας"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Έλεγχος του τρόπου αυτόματης αλλαγής ταπετσαριών"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -308,15 +600,55 @@ msgid ""
 "    <b>Random:</b> Randomly select wallpapers from the directory.\n"
 "    "
 msgstr ""
+"\n"
+"    <b>Διαδοχικά:</b> Διατήρηση της σειράς του καταλόγου (φθίνουσα σειρά).\n"
+"    <b>Αντίστροφα διαδοχικά:</b> Ανάκτηση ταπετσαριών με την αντίθετη σειρά (αύξουσα σειρά).\n"
+"    <b>Τυχαία:</b> Τυχαία επιλογή ταπετσαριών από τον κατάλογο.\n"
+"    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Διαδοχικά"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Αντίστροφη Aκολουθία"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Τυχαία"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Παύση"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Παίξε"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Κατάργηση Σίγασης Ήχου"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Επόμενη Ταπετσαρία"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Προτιμήσεις"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Πειραματικό πρόσθετο VA"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "Ενεργοποίηση των αποκωδικοποιητών VA που βελτιώνουν την απόδοση για τους "
+#~ "χρήστες Intel/AMD Wayland"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Χρήση νέων αποκωδικοποιητών NVIDIA χωρίς κατάσταση"
+
+#~ msgid "Open File"
+#~ msgstr "Άνοιγμα Aρχείου"

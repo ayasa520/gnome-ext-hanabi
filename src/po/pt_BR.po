@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-25 18:29+0900\n"
+"POT-Creation-Date: 2026-04-30 15:30+0800\n"
 "PO-Revision-Date: 2024-09-24 22:22+0000\n"
 "Last-Translator: Emanoel Rodrigues Aires <emanoelairesrodrigues@gmail.com>\n"
 "Language-Team: Portuguese (Brazil) <https://hosted.weblate.org/projects/"
@@ -21,131 +21,149 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n > 1;\n"
 "X-Generator: Weblate 5.8-dev\n"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Pause"
-msgstr "Pausar"
+#: src/prefs/main.js:36
+msgid "General Settings"
+msgstr "Configurações gerais"
 
-#: src/panelMenu.js:70 src/panelMenu.js:85
-msgid "Play"
-msgstr "Reproduzir"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103
-msgid "Unmute Audio"
-msgstr "Ativar Som"
-
-#: src/panelMenu.js:94 src/panelMenu.js:103 src/prefs.js:43
+#: src/prefs/main.js:42 src/shell/ui/panelMenu.js:117
+#: src/shell/ui/panelMenu.js:123
 msgid "Mute Audio"
 msgstr "Silenciar Áudio"
 
-#: src/panelMenu.js:110
-msgid "Next Wallpaper"
-msgstr "Próximo Papel de Parede"
-
-#: src/panelMenu.js:125
-msgid "Preferences"
-msgstr "Preferências"
-
-#: src/prefs.js:38
-msgid "General"
-msgstr "Geral"
-
-#: src/prefs.js:44
+#: src/prefs/main.js:43
 msgid "Volume Level"
 msgstr "Nível de Volume"
 
-#: src/prefs.js:45
+#: src/prefs/main.js:44
 msgid "Show Panel Menu"
 msgstr "Mostrar o Menu do Painel"
 
-#: src/prefs.js:51
+#: src/prefs/main.js:50
+msgid "Web Settings"
+msgstr "Configurações web"
+
+#: src/prefs/main.js:54
+msgid "WPE WebKit"
+msgstr "WPE WebKit"
+
+#: src/prefs/main.js:59
+msgid "CEF (gstcefsrc)"
+msgstr "CEF (gstcefsrc)"
+
+#: src/prefs/main.js:66
+msgid "Scene Settings"
+msgstr "Configurações de cena"
+
+#: src/prefs/main.js:69
+msgid "Scene FPS"
+msgstr "FPS da cena"
+
+#: src/prefs/main.js:69
+msgid "Set target FPS for scene wallpapers"
+msgstr "Definir FPS alvo para papéis de parede de cena"
+
+#: src/prefs/main.js:72
 msgid "Auto Pause"
 msgstr "Pausa Automática"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Low Battery Threshold"
 msgstr "Limite de Baixa Bateria"
 
-#: src/prefs.js:56
+#: src/prefs/main.js:77
 msgid "Set the threshold percentage for low battery level"
 msgstr "Especifique um limite de porcentagem para o modo de Baixa Bateria"
 
-#: src/prefs.js:60
+#: src/prefs/main.js:81
 msgid "Pause on Media Player Playing"
 msgstr "Pausar quando algum reprodutor de mídia estiver reproduzindo"
 
-#: src/prefs.js:62
+#: src/prefs/main.js:83
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr ""
 "Pausar a reprodução quando um reprodutor de mídia MPRIS estiver reproduzindo"
 
-#: src/prefs.js:69
+#: src/prefs/main.js:87
 msgid "Wallpaper Changer"
 msgstr "Alterador de Papel de Parede"
 
-#: src/prefs.js:72
+#: src/prefs/main.js:90
 msgid "Change Wallpaper Automatically"
 msgstr "Mudar papel de parede automaticamente"
 
-#: src/prefs.js:75
+#: src/prefs/main.js:92
 msgid "Change Wallpaper Interval (minutes)"
 msgstr "Intervalo p/ mudar de papel de parede (minutos)"
 
-#: src/prefs.js:81
+#: src/prefs/main.js:95
 msgid "Experimental"
 msgstr "Opções Experimentais"
 
-#: src/prefs.js:87
-msgid "Experimental VA Plugin"
-msgstr "Plugin VA Experimental"
+#: src/prefs/main.js:101
+msgid "GPU Pipeline"
+msgstr "Pipeline de GPU"
 
-#: src/prefs.js:89
-msgid ""
-"Enable VA decoders which improve performance for Intel/AMD Wayland users"
-msgstr ""
-"Habilitar decodificadores VA que melhoram o desempenho para usuários de "
-"Wayland com Intel/AMD"
+#: src/prefs/main.js:103
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr "Usar um único pipeline de GPU para vídeos, cenas e texturas de vídeo de cena"
 
-#: src/prefs.js:94
-msgid "NVIDIA Stateless Decoders"
-msgstr "Decodificadores sem estado da NVIDIA"
+#: src/prefs/main.js:105
+msgid "Auto"
+msgstr "Automático"
 
-#: src/prefs.js:96
-msgid "Use new stateless NVIDIA decoders"
-msgstr "Utilizar os novos decodificadores sem estado da NVIDIA"
+#: src/prefs/main.js:106
+msgid "NVIDIA / NVDEC"
+msgstr "NVIDIA / NVDEC"
 
-#: src/prefs.js:103
+#: src/prefs/main.js:107
+msgid "NVIDIA Stateless / NVDEC"
+msgstr "NVIDIA sem estado / NVDEC"
+
+#: src/prefs/main.js:108
+msgid "VA-API"
+msgstr "VA-API"
+
+#: src/prefs/main.js:113
 msgid "Developer"
 msgstr "Desenvolvedor"
 
-#: src/prefs.js:109
+#: src/prefs/main.js:119
 msgid "Debug Mode"
 msgstr "Modo de Depuração"
 
-#: src/prefs.js:111
+#: src/prefs/main.js:121
 msgid "Print debug messages to log"
 msgstr "Armazenar mensagens de debug ao log"
 
-#: src/prefs.js:116
+#: src/prefs/main.js:126
 msgid "Force gtk4paintablesink"
 msgstr "Forçar gtk4paintablesink"
 
-#: src/prefs.js:118
+#: src/prefs/main.js:128
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr "Forçar o uso do gtk4paintablesink para a reprodução dos vídeos"
 
-#: src/prefs.js:123
+#: src/prefs/main.js:133
 msgid "Force GtkMediaFile"
 msgstr "Forçar GtkMediaFile"
 
-#: src/prefs.js:125
+#: src/prefs/main.js:135
 msgid "Force use of GtkMediaFile for video playback"
 msgstr "Forçar o uso do GtkMediaFile para a reprodução dos vídeos"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:140
+msgid "Enable Graphics Offload"
+msgstr "Ativar descarregamento gráfico"
+
+#: src/prefs/main.js:142
+msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
+msgstr "Ativar descarregamento gráfico para melhorar o desempenho (requer GTK 4.14+)"
+
+#: src/prefs/main.js:144
 msgid "Startup Delay"
 msgstr "Atraso na inicialização"
 
-#: src/prefs.js:127
+#: src/prefs/main.js:144
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"
@@ -153,43 +171,282 @@ msgstr ""
 "Adicionar um atraso na inicialização (em milissegundos) para mitigar "
 "problemas de compatibilidade com outras extensões"
 
-#: src/prefs.js:214
-msgid "Video Path"
-msgstr "Diretório do Vídeo"
+#: src/prefs/projectBrowser.js:161
+msgid "Scene"
+msgstr "Cena"
 
-#: src/prefs.js:220 src/prefs.js:245 src/prefs.js:279 src/prefs.js:300
+#: src/prefs/projectBrowser.js:163
+msgid "Web"
+msgstr "Web"
+
+#: src/prefs/projectBrowser.js:165
+msgid "Video"
+msgstr "Vídeo"
+
+#: src/prefs/projectBrowser.js:167
+msgid "Unknown"
+msgstr "Desconhecido"
+
+#: src/prefs/projectBrowser.js:174
+msgid "Everyone"
+msgstr "Todos"
+
+#: src/prefs/projectBrowser.js:176
+msgid "Questionable"
+msgstr "Questionável"
+
+#: src/prefs/projectBrowser.js:178
+msgid "Mature"
+msgstr "Adulto"
+
+#: src/prefs/projectBrowser.js:187
+msgid "Abstract"
+msgstr "Abstrato"
+
+#: src/prefs/projectBrowser.js:189
+msgid "Animal"
+msgstr "Animal"
+
+#: src/prefs/projectBrowser.js:191
+msgid "Anime"
+msgstr "Anime"
+
+#: src/prefs/projectBrowser.js:193
+msgid "Cartoon"
+msgstr "Desenho animado"
+
+#: src/prefs/projectBrowser.js:195
+msgid "CGI"
+msgstr "CGI"
+
+#: src/prefs/projectBrowser.js:197
+msgid "Cyberpunk"
+msgstr "Cyberpunk"
+
+#: src/prefs/projectBrowser.js:199
+msgid "Fantasy"
+msgstr "Fantasia"
+
+#: src/prefs/projectBrowser.js:201
+msgid "Game"
+msgstr "Jogo"
+
+#: src/prefs/projectBrowser.js:203
+msgid "Girls"
+msgstr "Garotas"
+
+#: src/prefs/projectBrowser.js:205
+msgid "Guys"
+msgstr "Rapazes"
+
+#: src/prefs/projectBrowser.js:207
+msgid "Landscape"
+msgstr "Paisagem"
+
+#: src/prefs/projectBrowser.js:209
+msgid "Medieval"
+msgstr "Medieval"
+
+#: src/prefs/projectBrowser.js:211
+msgid "Memes"
+msgstr "Memes"
+
+#: src/prefs/projectBrowser.js:213
+msgid "MMD"
+msgstr "MMD"
+
+#: src/prefs/projectBrowser.js:215
+msgid "Music"
+msgstr "Música"
+
+#: src/prefs/projectBrowser.js:217
+msgid "Nature"
+msgstr "Natureza"
+
+#: src/prefs/projectBrowser.js:219
+msgid "Pixel art"
+msgstr "Pixel art"
+
+#: src/prefs/projectBrowser.js:221
+msgid "Relaxing"
+msgstr "Relaxante"
+
+#: src/prefs/projectBrowser.js:223
+msgid "Retro"
+msgstr "Retrô"
+
+#: src/prefs/projectBrowser.js:225
+msgid "Sci-Fi"
+msgstr "Ficção científica"
+
+#: src/prefs/projectBrowser.js:227
+msgid "Sports"
+msgstr "Esportes"
+
+#: src/prefs/projectBrowser.js:229
+msgid "Technology"
+msgstr "Tecnologia"
+
+#: src/prefs/projectBrowser.js:231
+msgid "Television"
+msgstr "Televisão"
+
+#: src/prefs/projectBrowser.js:233
+msgid "Vehicle"
+msgstr "Veículo"
+
+#: src/prefs/projectBrowser.js:235
+msgid "Unspecified"
+msgstr "Não especificado"
+
+#: src/prefs/projectBrowser.js:243 src/prefs/projectBrowser.js:256
 msgid "None"
 msgstr "Nenhum"
 
-#: src/prefs.js:232
-msgid "Open File"
-msgstr "Abrir Arquivo"
+#: src/prefs/projectBrowser.js:261 src/prefs/projectBrowser.js:1736
+msgid "Steam Library"
+msgstr "Biblioteca Steam"
 
-#: src/prefs.js:237 src/prefs.js:293
+#: src/prefs/projectBrowser.js:273
+msgid "Select Steam Library"
+msgstr "Selecionar biblioteca Steam"
+
+#: src/prefs/projectBrowser.js:278 src/prefs/projectBrowser.js:1759
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/prefs.js:238 src/prefs.js:254 src/prefs.js:294 src/prefs.js:309
+#: src/prefs/projectBrowser.js:279 src/prefs/projectBrowser.js:294
+#: src/prefs/projectBrowser.js:1760
 msgid "Open"
 msgstr "Abrir"
 
-#: src/prefs.js:273
-msgid "Change Wallpaper Directory Path"
-msgstr "Alterar o caminho do diretório do papel de parede"
+#: src/prefs/projectBrowser.js:816
+msgid "Window Preview"
+msgstr "Prévia em janela"
 
-#: src/prefs.js:288
-msgid "Select Directory"
-msgstr "Selecionar Diretório"
+#: src/prefs/projectBrowser.js:817
+msgid "Fullscreen Preview"
+msgstr "Prévia em tela cheia"
 
-#: src/prefs.js:328
+#: src/prefs/projectBrowser.js:821
+msgid "Preview"
+msgstr "Prévia"
+
+#: src/prefs/projectBrowser.js:822
+msgid "Open Wallpaper Folder"
+msgstr "Abrir pasta do papel de parede"
+
+#: src/prefs/projectBrowser.js:849 src/prefs/projectBrowser.js:925
+#: src/prefs/projectBrowser.js:964 src/prefs/projectBrowser.js:1075
+#: src/prefs/projectBrowser.js:1708
+msgid "Untitled"
+msgstr "Sem título"
+
+#: src/prefs/projectBrowser.js:1164
+msgid "Choose Wallpaper"
+msgstr "Escolher papel de parede"
+
+#: src/prefs/projectBrowser.js:1170
+msgid "Close"
+msgstr "Fechar"
+
+#: src/prefs/projectBrowser.js:1211
+msgid "Search wallpapers"
+msgstr "Pesquisar papéis de parede"
+
+#: src/prefs/projectBrowser.js:1217
+msgid "Name"
+msgstr "Nome"
+
+#: src/prefs/projectBrowser.js:1218
+msgid "File size"
+msgstr "Tamanho do arquivo"
+
+#: src/prefs/projectBrowser.js:1219
+msgid "Last updated"
+msgstr "Última atualização"
+
+#: src/prefs/projectBrowser.js:1226
+msgid "Sort"
+msgstr "Ordenar"
+
+#: src/prefs/projectBrowser.js:1235
+msgid "Filter"
+msgstr "Filtrar"
+
+#: src/prefs/projectBrowser.js:1261
+msgid "Show or hide wallpapers by category"
+msgstr "Mostrar ou ocultar papéis de parede por categoria"
+
+#: src/prefs/projectBrowser.js:1268
+msgid "Reset"
+msgstr "Redefinir"
+
+#: src/prefs/projectBrowser.js:1532
+msgid "Type"
+msgstr "Tipo"
+
+#: src/prefs/projectBrowser.js:1537
+msgid "Age"
+msgstr "Classificação etária"
+
+#: src/prefs/projectBrowser.js:1541
+msgid "Genre"
+msgstr "Gênero"
+
+#: src/prefs/projectBrowser.js:1591
+msgid "Image unavailable"
+msgstr "Imagem indisponível"
+
+#: src/prefs/projectBrowser.js:1734
+msgid "Current"
+msgstr "Atual"
+
+#: src/prefs/projectBrowser.js:1859
+msgid "No options available"
+msgstr "Nenhuma opção disponível"
+
+#: src/prefs/projectBrowser.js:1968
+msgid "Unsupported setting type"
+msgstr "Tipo de configuração não suportado"
+
+#: src/prefs/projectBrowser.js:2028
+msgid "This wallpaper has no configurable properties"
+msgstr "Este papel de parede não tem propriedades configuráveis"
+
+#: src/prefs/projectBrowser.js:2090 src/prefs/projectBrowser.js:2205
+msgid "Select a wallpaper to configure its properties"
+msgstr "Selecione um papel de parede para configurar suas propriedades"
+
+#: src/prefs/projectBrowser.js:2113
+msgid "No wallpapers match your search or filters"
+msgstr "Nenhum papel de parede corresponde à sua pesquisa ou aos filtros"
+
+#: src/prefs/projectBrowser.js:2134
+msgid "No wallpaper projects were found in this Steam library"
+msgstr "Nenhum projeto de papel de parede foi encontrado nesta biblioteca Steam"
+
+#: src/prefs/projectBrowser.js:2135
+msgid "Choose a Steam library first"
+msgstr "Escolha primeiro uma biblioteca Steam"
+
+#: src/prefs/projectBrowser.js:2215
+msgid "Wallpaper"
+msgstr "Papel de parede"
+
+#: src/prefs/projectBrowser.js:2222
+msgid "Browse"
+msgstr "Procurar"
+
+#: src/prefs/rows.js:67
 msgid "Fit Mode"
 msgstr "Ajuste do Wallpaper"
 
-#: src/prefs.js:329
+#: src/prefs/rows.js:68
 msgid "Control how wallpaper fits within the monitor"
 msgstr "Controlar como o papel de parede se ajusta ao monitor"
 
-#: src/prefs.js:330
+#: src/prefs/rows.js:69
 msgid ""
 "\n"
 "    <b>Fill</b>: Stretch the wallpaper to fill the monitor.\n"
@@ -203,44 +460,69 @@ msgid ""
 msgstr ""
 "\n"
 "    <b>Preencher</b>: Esticar o papel de parede para preencher o monitor.\n"
-"    <b>Conter</b>: Redimensionar o papel de parede para caber no monitor ("
-"mantém a proporção).\n"
-"    <b>Cobrir</b>: Redimensionar o papel de parede para cobrir o monitor ("
-"mantém a proporção).\n"
+"    <b>Conter</b>: Redimensionar o papel de parede para caber no monitor "
+"(mantém a proporção).\n"
+"    <b>Cobrir</b>: Redimensionar o papel de parede para cobrir o monitor "
+"(mantém a proporção).\n"
 "    <b>Reduzir</b>: Reduzir o papel de parede para caber no monitor, se "
 "necessário; caso contrário, manter o tamanho original.\n"
 "    "
 
-#: src/prefs.js:338
+#: src/prefs/rows.js:77
 msgid "Fill"
 msgstr "Preencher"
 
-#: src/prefs.js:339
+#: src/prefs/rows.js:78
 msgid "Contain"
 msgstr "Conter"
 
-#: src/prefs.js:340
+#: src/prefs/rows.js:79
 msgid "Cover"
 msgstr "Cobrir"
 
-#: src/prefs.js:341
+#: src/prefs/rows.js:80
 msgid "Scale-down"
 msgstr "Reduzir"
 
-#: src/prefs.js:354
+#: src/prefs/rows.js:93
 msgid "This feature requires Gtk 4.8 or above"
 msgstr "Este recurso requer Gtk 4.8 ou superior"
 
-#: src/prefs.js:371
+#: src/prefs/rows.js:105
+msgid "Web Backend"
+msgstr "Backend web"
+
+#: src/prefs/rows.js:106
+msgid "Choose the renderer used for web wallpapers"
+msgstr "Escolher o renderizador usado para papéis de parede web"
+
+#: src/prefs/rows.js:122
+msgid ""
+"\n"
+"        <b>WPE WebKit</b>: The default backend for web wallpapers.\n"
+"        <b>CEF (gstcefsrc)</b>: Experimental Chromium-based backend using "
+"GStreamer.\n"
+"        "
+msgstr ""
+"\n"
+"        <b>WPE WebKit</b>: Backend padrão para papéis de parede web.\n"
+"        <b>CEF (gstcefsrc)</b>: Backend experimental baseado em Chromium que usa GStreamer.\n"
+"        "
+
+#: src/prefs/rows.js:126
+msgid "<b>WPE WebKit</b>: The default backend for web wallpapers."
+msgstr "<b>WPE WebKit</b>: Backend padrão para papéis de parede web."
+
+#: src/prefs/rows.js:163
 msgid "Pause on Maximize or Fullscreen"
 msgstr "Pausar ao Maximizar ou em Tela Cheia"
 
-#: src/prefs.js:372
+#: src/prefs/rows.js:164
 msgid "Pause playback when there is maximized or fullscreen window"
 msgstr ""
 "Pausar a reprodução quando houver uma janela maximizada ou em tela cheia"
 
-#: src/prefs.js:373
+#: src/prefs/rows.js:165
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -258,29 +540,29 @@ msgstr ""
 "maximizadas ou em tela cheia em todos dos monitores\n"
 "    "
 
-#: src/prefs.js:380 src/prefs.js:416
+#: src/prefs/rows.js:172 src/prefs/rows.js:203
 msgid "Never"
 msgstr "Nunca"
 
-#: src/prefs.js:381
+#: src/prefs/rows.js:173
 msgid "Any Monitor"
 msgstr "Qualquer Monitor"
 
-#: src/prefs.js:382
+#: src/prefs/rows.js:174
 msgid "All Monitors"
 msgstr "Todos os Monitores"
 
-#: src/prefs.js:407
+#: src/prefs/rows.js:194
 msgid "Pause on Battery"
 msgstr "Pausar no modo Bateria"
 
-#: src/prefs.js:408
+#: src/prefs/rows.js:195
 msgid "Pause playback when the device is on battery or the battery is low"
 msgstr ""
 "Pausar a reprodução quando o dispositivo estiver na bateria ou estiver com "
 "baixa bateria."
 
-#: src/prefs.js:409
+#: src/prefs/rows.js:196
 msgid ""
 "\n"
 "    <b>Never</b>: Disable this feature.\n"
@@ -297,23 +579,23 @@ msgstr ""
 "bateria.\n"
 "    "
 
-#: src/prefs.js:417
+#: src/prefs/rows.js:204
 msgid "Low Battery"
 msgstr "Baixa Bateria"
 
-#: src/prefs.js:418
+#: src/prefs/rows.js:205
 msgid "Always"
 msgstr "Sempre"
 
-#: src/prefs.js:443
+#: src/prefs/rows.js:225
 msgid "Change Wallpaper Mode"
 msgstr "Alterar o modo do papel de parede"
 
-#: src/prefs.js:444
+#: src/prefs/rows.js:226
 msgid "Control how to change wallpapers automatically"
 msgstr "Controlar como mudar os papeis de parede automaticamente"
 
-#: src/prefs.js:445
+#: src/prefs/rows.js:227
 msgid ""
 "\n"
 "    <b>Sequential:</b> Preserve the directory sequence (descending order).\n"
@@ -331,14 +613,52 @@ msgstr ""
 "aleatoriamente.\n"
 "    "
 
-#: src/prefs.js:452
+#: src/prefs/rows.js:234
 msgid "Sequential"
 msgstr "Sequencial"
 
-#: src/prefs.js:453
+#: src/prefs/rows.js:235
 msgid "Inverse Sequential"
 msgstr "Sequência Inversa"
 
-#: src/prefs.js:454
+#: src/prefs/rows.js:236
 msgid "Random"
 msgstr "Aleatório"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Pause"
+msgstr "Pausar"
+
+#: src/shell/ui/panelMenu.js:72 src/shell/ui/panelMenu.js:77
+msgid "Play"
+msgstr "Reproduzir"
+
+#: src/shell/ui/panelMenu.js:117 src/shell/ui/panelMenu.js:123
+msgid "Unmute Audio"
+msgstr "Ativar Som"
+
+#: src/shell/ui/panelMenu.js:143
+msgid "Next Wallpaper"
+msgstr "Próximo Papel de Parede"
+
+#: src/shell/ui/panelMenu.js:161
+msgid "Preferences"
+msgstr "Preferências"
+
+#~ msgid "Experimental VA Plugin"
+#~ msgstr "Plugin VA Experimental"
+
+#~ msgid ""
+#~ "Enable VA decoders which improve performance for Intel/AMD Wayland users"
+#~ msgstr ""
+#~ "Habilitar decodificadores VA que melhoram o desempenho para usuários de "
+#~ "Wayland com Intel/AMD"
+
+#~ msgid "Use new stateless NVIDIA decoders"
+#~ msgstr "Utilizar os novos decodificadores sem estado da NVIDIA"
+
+#~ msgid "Open File"
+#~ msgstr "Abrir Arquivo"
+
+#~ msgid "Change Wallpaper Directory Path"
+#~ msgstr "Alterar o caminho do diretório do papel de parede"
