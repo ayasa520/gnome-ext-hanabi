@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 1\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-30 15:30+0800\n"
+"POT-Creation-Date: 2026-05-01 18:59+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -62,103 +62,127 @@ msgstr ""
 msgid "Auto Pause"
 msgstr ""
 
-#: src/prefs/main.js:77
-msgid "Low Battery Threshold"
-msgstr ""
-
-#: src/prefs/main.js:77
-msgid "Set the threshold percentage for low battery level"
+#: src/prefs/main.js:79
+msgid "Pause when Desktop Loses Focus"
 msgstr ""
 
 #: src/prefs/main.js:81
+msgid "Pause playback when another window receives focus"
+msgstr ""
+
+#: src/prefs/main.js:84
+msgid "Low Battery Threshold"
+msgstr ""
+
+#: src/prefs/main.js:84
+msgid "Set the threshold percentage for low battery level"
+msgstr ""
+
+#: src/prefs/main.js:88
 msgid "Pause on Media Player Playing"
 msgstr ""
 
-#: src/prefs/main.js:83
+#: src/prefs/main.js:90
 msgid "Pause playback when an MPRIS media player is playing media"
 msgstr ""
 
-#: src/prefs/main.js:87
-msgid "Wallpaper Changer"
+#: src/prefs/main.js:96
+msgid "Stop on Applications"
 msgstr ""
 
-#: src/prefs/main.js:90
-msgid "Change Wallpaper Automatically"
+#: src/prefs/main.js:98
+msgid "Stop wallpaper completely while selected applications are running"
 msgstr ""
 
-#: src/prefs/main.js:92
-msgid "Change Wallpaper Interval (minutes)"
-msgstr ""
-
-#: src/prefs/main.js:95
-msgid "Experimental"
-msgstr ""
-
-#: src/prefs/main.js:101
-msgid "GPU Pipeline"
-msgstr ""
-
-#: src/prefs/main.js:103
-msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
-msgstr ""
-
-#: src/prefs/main.js:105
-msgid "Auto"
+#: src/prefs/main.js:100
+msgid ""
+"\n"
+"            Enter desktop application IDs, WM_CLASS values, or executable names separated by commas.\n"
+"            Examples: <b>org.telegram.desktop</b>, <b>steam</b>, <b>showtime</b>, <b>com.tencent.WeChat</b>\n"
+"            "
 msgstr ""
 
 #: src/prefs/main.js:106
-msgid "NVIDIA / NVDEC"
+msgid "Wallpaper Changer"
 msgstr ""
 
-#: src/prefs/main.js:107
-msgid "NVIDIA Stateless / NVDEC"
+#: src/prefs/main.js:109
+msgid "Change Wallpaper Automatically"
 msgstr ""
 
-#: src/prefs/main.js:108
-msgid "VA-API"
+#: src/prefs/main.js:111
+msgid "Change Wallpaper Interval (minutes)"
+msgstr ""
+
+#: src/prefs/main.js:114
+msgid "Experimental"
+msgstr ""
+
+#: src/prefs/main.js:120
+msgid "GPU Pipeline"
+msgstr ""
+
+#: src/prefs/main.js:122
+msgid "Use one GPU pipeline for videos, scenes, and scene video textures"
+msgstr ""
+
+#: src/prefs/main.js:112
+msgid "Auto"
 msgstr ""
 
 #: src/prefs/main.js:113
+msgid "NVIDIA / NVDEC"
+msgstr ""
+
+#: src/prefs/main.js:114
+msgid "NVIDIA Stateless / NVDEC"
+msgstr ""
+
+#: src/prefs/main.js:115
+msgid "VA-API"
+msgstr ""
+
+#: src/prefs/main.js:120
 msgid "Developer"
 msgstr ""
 
-#: src/prefs/main.js:119
+#: src/prefs/main.js:126
 msgid "Debug Mode"
 msgstr ""
 
-#: src/prefs/main.js:121
+#: src/prefs/main.js:128
 msgid "Print debug messages to log"
 msgstr ""
 
-#: src/prefs/main.js:126
+#: src/prefs/main.js:133
 msgid "Force gtk4paintablesink"
 msgstr ""
 
-#: src/prefs/main.js:128
+#: src/prefs/main.js:135
 msgid "Force use of gtk4paintablesink for video playback"
 msgstr ""
 
-#: src/prefs/main.js:133
+#: src/prefs/main.js:140
 msgid "Force GtkMediaFile"
 msgstr ""
 
-#: src/prefs/main.js:135
+#: src/prefs/main.js:142
 msgid "Force use of GtkMediaFile for video playback"
 msgstr ""
 
-#: src/prefs/main.js:140
+#: src/prefs/main.js:147
 msgid "Enable Graphics Offload"
 msgstr ""
 
-#: src/prefs/main.js:142
+#: src/prefs/main.js:149
 msgid "Enable graphics offload for improved performance (requires GTK 4.14+)"
 msgstr ""
 
-#: src/prefs/main.js:144
+#: src/prefs/main.js:151
 msgid "Startup Delay"
 msgstr ""
 
-#: src/prefs/main.js:144
+#: src/prefs/main.js:151
 msgid ""
 "Add a startup delay (in milliseconds) to mitigate compatibility issues with "
 "other extensions"

@@ -60,6 +60,12 @@
             <description>Pause playback when there is maximized or fullscreen window</description>
         </key>
 
+        <key name="pause-on-focus" type="b">
+            <default>false</default>
+            <summary>Pause when Desktop Loses Focus</summary>
+            <description>Pause playback when another window receives focus</description>
+        </key>
+
         <key name="pause-on-battery" type="i">
             <range min="0" max="2" />
             <default>0</default>
@@ -78,6 +84,12 @@
             <default>false</default>
             <summary>Pause on Media Player Playing</summary>
             <description>Pause playback when an MPRIS media player is playing media</description>
+        </key>
+
+        <key name="stop-on-applications" type="as">
+            <default>[]</default>
+            <summary>Stop on Applications</summary>
+            <description>Desktop application IDs or WM_CLASS values that should fully stop wallpaper rendering while any matching application is running</description>
         </key>
 
         <key name="debug-mode" type="b">

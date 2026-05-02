@@ -13,6 +13,9 @@ export class RendererManager {
         this._currentProcess = null;
         this._currentProjectType = null;
         this._reloadTime = 100;
+        this._launchInhibitionReasons = new Set();
+        this._stoppingProcess = null;
+        this._pendingLaunchDelay = null;
 
         this.killAll();
     }
@@ -21,11 +24,18 @@ export class RendererManager {
         return this._currentProjectType;
     }
 
+    get isLaunchInhibited() {
+        return this._launchInhibitionReasons.size > 0;
+    }
+
     sendPointerEvent(event) {
         return this._currentProcess?.sendPointerEvent(event) ?? false;
     }
 
     launch() {
+        if (this.isLaunchInhibited || this._currentProcess || this._stoppingProcess)
+            return;
+
         if (!this._extension.isEnabled)
             return;
 
@@ -68,7 +78,9 @@ export class RendererManager {
 
         process.subprocess.wait_async(null, (obj, res) => {
             obj.wait_finish(res);
-            if (this._currentProcess !== process || obj !== process.subprocess)
+            const isCurrentProcess = this._currentProcess === process;
+            const isStoppingProcess = this._stoppingProcess === process;
+            if ((!isCurrentProcess && !isStoppingProcess) || obj !== process.subprocess)
                 return;
 
             if (obj.get_if_exited()) {
@@ -79,18 +91,44 @@ export class RendererManager {
                 this._reloadTime = 1000;
             }
 
-            this._currentProcess = null;
-            this._currentProjectType = null;
-            this._extension.manager.set_wayland_client(null);
+            if (isCurrentProcess) {
+                this._currentProcess = null;
+                this._currentProjectType = null;
+                this._extension.manager.set_wayland_client(null);
+            }
+
+            if (isStoppingProcess) {
+                this._stoppingProcess = null;
+                if (this._extension.isEnabled)
+                    this._extension.override?.reloadBackgrounds?.();
+
+                if (
+                    this._pendingLaunchDelay !== null &&
+                    this._extension.isEnabled &&
+                    !this.isLaunchInhibited &&
+                    !this._currentProcess
+                ) {
+                    const delay = this._pendingLaunchDelay;
+                    this._pendingLaunchDelay = null;
+                    this._scheduleLaunch(delay);
+                }
+                return;
+            }
+
             if (this._extension.isEnabled)
+                this._extension.override?.reloadBackgrounds?.();
+            if (this._extension.isEnabled && !this.isLaunchInhibited)
                 this._scheduleLaunch(this._reloadTime);
         });
     }
 
     stop() {
+        const hadActiveProcess = !!this._currentProcess;
+        const hadPendingLaunch = !!this._launchSourceId;
         this._clearLaunchSource();
 
         if (this._currentProcess && this._currentProcess.subprocess) {
+            this._stoppingProcess = this._currentProcess;
             this._currentProcess.cancellable.cancel();
             this._currentProcess.subprocess.send_signal(15);
         }
@@ -98,12 +136,38 @@ export class RendererManager {
         this._currentProcess = null;
         this._currentProjectType = null;
         this._extension.manager?.set_wayland_client(null);
+
+        if (this._extension.isEnabled && (!hadActiveProcess && hadPendingLaunch))
+            this._extension.override?.reloadBackgrounds?.();
+
+        if (this._extension.isEnabled && !hadActiveProcess && !hadPendingLaunch)
+            this._extension.override?.reloadBackgrounds?.();
     }
 
     restart(delay = 100) {
         this.stop();
-        if (this._extension.isEnabled)
-            this._scheduleLaunch(delay);
+        if (this._extension.isEnabled && !this.isLaunchInhibited)
+            this._requestLaunch(delay);
+    }
+
+    suspendAutoLaunch(reason = 'unspecified') {
+        this._launchInhibitionReasons.add(reason);
+        this.stop();
+    }
+
+    resumeAutoLaunch(reason = 'unspecified', {launchIfPossible = true} = {}) {
+        this._launchInhibitionReasons.delete(reason);
+        if (
+            launchIfPossible &&
+            !this.isLaunchInhibited &&
+            this._extension.isEnabled &&
+            !this._currentProcess
+        )
+            this._requestLaunch(0);
+    }
+
+    clearAutoLaunchInhibition() {
+        this._launchInhibitionReasons.clear();
     }
 
     killAll() {
@@ -170,5 +234,15 @@ export class RendererManager {
                 return false;
             }
         );
+    }
+
+    _requestLaunch(delay) {
+        if (this._stoppingProcess) {
+            this._pendingLaunchDelay = delay;
+            return;
+        }
+
+        this._pendingLaunchDelay = null;
+        this._scheduleLaunch(delay);
     }
 }

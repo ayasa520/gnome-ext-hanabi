@@ -10,12 +10,13 @@ import {
     prefsRowInt,
     prefsRowPauseOnBattery,
     prefsRowPauseOnMaximizeOrFullscreen,
+    prefsRowStringList,
     prefsRowStringChoice,
-    prefsRowWebBackend,
+    prefsRowWebBackend
 } from './rows.js';
 import {
     prefsRowLibraryPath,
-    prefsRowProjectChooser,
+    prefsRowProjectChooser
 } from './projectBrowser.js';
 
 export default class HanabiExtensionPreferences extends ExtensionPreferences {
@@ -73,6 +74,13 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
         });
         page.add(autoPauseGroup);
         prefsRowPauseOnMaximizeOrFullscreen(window, autoPauseGroup);
+        prefsRowBoolean(
+            window,
+            autoPauseGroup,
+            _('Pause when Desktop Loses Focus'),
+            'pause-on-focus',
+            _('Pause playback when another window receives focus')
+        );
         prefsRowPauseOnBattery(window, autoPauseGroup);
         prefsRowInt(window, autoPauseGroup, _('Low Battery Threshold'), 'low-battery-threshold', _('Set the threshold percentage for low battery level'), 0, 100, 5, 10);
         prefsRowBoolean(
@@ -81,6 +89,18 @@ export default class HanabiExtensionPreferences extends ExtensionPreferences {
             _('Pause on Media Player Playing'),
             'pause-on-mpris-playing',
             _('Pause playback when an MPRIS media player is playing media')
+        );
+        prefsRowStringList(
+            window,
+            autoPauseGroup,
+            _('Stop on Applications'),
+            'stop-on-applications',
+            _('Stop wallpaper completely while selected applications are running'),
+            'org.telegram.desktop, steam, showtime',
+            _(`
+            Enter desktop application IDs, WM_CLASS values, or executable names separated by commas.
+            Examples: <b>org.telegram.desktop</b>, <b>steam</b>, <b>showtime</b>, <b>com.tencent.WeChat</b>
+            `)
         );
 
         const wallpaperChangerGroup = new Adw.PreferencesGroup({

@@ -71,6 +71,10 @@ export class GnomeShellOverride {
         }
     }
 
+    reloadBackgrounds() {
+        this._reloadBackgrounds();
+    }
+
     enable() {
         /**
          * Live wallpaper

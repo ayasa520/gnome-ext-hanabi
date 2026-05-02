@@ -167,6 +167,16 @@ export class PlaybackState {
                 }
             }
         );
+        this._rendererNameOwnerChangedId = this._renderer.proxy.connect('notify::g-name-owner', () => {
+            const nameOwner = typeof this._renderer.proxy.get_name_owner === 'function'
+                ? this._renderer.proxy.get_name_owner()
+                : '';
+            if (!nameOwner)
+                return;
+
+            this._logger.debug('Renderer DBus owner is available, syncing playback state');
+            this.syncRendererState();
+        });
         // Initialize
         this.reset();
     }
@@ -195,10 +205,22 @@ export class PlaybackState {
         this._machine.transition(this.getCurrentState(), 'autoPause');
     }
 
+    syncRendererState() {
+        if (this.getCurrentState() === 'playing')
+            this._renderer.setPlay();
+        else
+            this._renderer.setPause();
+    }
+
     destroy() {
         if (this._isPlayingChangedId) {
             this._renderer.proxy.disconnectSignal(this._isPlayingChangedId);
             this._isPlayingChangedId = 0;
+        }
+
+        if (this._rendererNameOwnerChangedId) {
+            this._renderer.proxy.disconnect(this._rendererNameOwnerChangedId);
+            this._rendererNameOwnerChangedId = 0;
         }
     }
 }

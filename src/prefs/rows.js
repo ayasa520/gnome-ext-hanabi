@@ -62,6 +62,34 @@ export function prefsRowInt(
     row.add_suffix(spin);
 }
 
+export function prefsRowStringList(window, prefsGroup, title, key, subtitle, placeholderText = '', tooltipText = '') {
+    const settings = window._settings;
+    const row = new Adw.ActionRow({title, subtitle});
+    const entry = new Gtk.Entry({
+        text: settings.get_strv(key).join(', '),
+        placeholder_text: placeholderText,
+        valign: Gtk.Align.CENTER,
+        width_chars: 28,
+    });
+
+    entry.connect('notify::text', entryWidget => {
+        const values = [...new Set(
+            entryWidget.text
+                .split(/[,\n;]/)
+                .map(value => value.trim())
+                .filter(Boolean)
+        )];
+        settings.set_strv(key, values);
+    });
+
+    if (tooltipText)
+        row.set_tooltip_markup(tooltipText);
+
+    row.add_suffix(entry);
+    row.activatable_widget = entry;
+    prefsGroup.add(row);
+}
+
 export function prefsRowFitMode(window, prefsGroup) {
     const settings = window._settings;
     const title = _('Fit Mode');
