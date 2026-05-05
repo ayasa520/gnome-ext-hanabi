@@ -22,7 +22,6 @@
  */
 
 import Meta from 'gi://Meta';
-import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
@@ -30,6 +29,7 @@ import * as Logger from '../logger.js';
 
 const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const logger = new Logger.Logger();
+const managedRendererTitlePrefix = `@${applicationId}!`;
 
 // Get GNOME Shell major version
 const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0]);
@@ -118,9 +118,9 @@ class ManagedWindow {
 
     _parseTitle() {
         const title = this._window.title;
-        if (title && title.startsWith(`@${applicationId}!`)) {
+        if (title && title.startsWith(managedRendererTitlePrefix)) {
             // TODO: revise syntax, remove split
-            const json = title.replace(`@${applicationId}!`, '').split('|')[0];
+            const json = title.replace(managedRendererTitlePrefix, '').split('|')[0];
             try {
                 const newState = JSON.parse(json);
                 this._states = {...this._states, ...newState};
@@ -172,7 +172,7 @@ export class WindowManager {
             'map',
             (_wm, windowActor) => {
                 const window = windowActor.get_meta_window();
-                if (this._waylandClient && this._waylandClient.query_window_belongs_to(window))
+                if (this._shouldManageWaylandWindow(window))
                     this.addWindow(window);
 
                 if (this._isX11) {
@@ -220,5 +220,19 @@ export class WindowManager {
         window.disconnect(window.managed._unmanagedId);
         window.managed.disconnect();
         window.managed = null;
+    }
+
+    _shouldManageWaylandWindow(window) {
+        if (!this._waylandClient)
+            return false;
+
+        if (!window?.title?.startsWith(managedRendererTitlePrefix))
+            return false;
+
+        // Meta.WaylandClient.owns_window() is a compositor-side ownership query.
+        // Keep it scoped to Hanabi's private managed-window titles so unrelated
+        // clients mapping windows cannot force synchronous work on Shell's main
+        // thread during app startup.
+        return this._waylandClient.query_window_belongs_to(window);
     }
 }

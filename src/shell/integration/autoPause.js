@@ -31,6 +31,12 @@ import UPower from 'gi://UPowerGlib';
 const applicationId = 'io.github.jeffshee.HanabiRenderer';
 const stopOnApplicationsReason = 'matched-applications';
 const logger = new Logger.Logger('autoPause');
+const moduleDir = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
+const commonDir = GLib.build_filenamev([moduleDir, '..', '..', 'common']);
+if (!imports.searchPath.some(path => path === commonDir))
+    imports.searchPath.unshift(commonDir);
+
+const Mpris = imports.mpris;
 
 // Get GNOME Shell major version
 const shellVersion = parseInt(Config.PACKAGE_VERSION.split('.')[0]);
@@ -615,95 +621,37 @@ const PauseOnMprisPlayingModule = GObject.registerClass(
                 this._update();
             });
 
-            this._dbus = new DBus.DBusWrapper();
-            this._mediaPlayers = {}; // {$mprisName: {playbackStatus, mpris, mprisPropertiesChangedId}, ...}
+            this._monitor = null;
         }
 
         enable() {
-            let mprisNames = this._queryMprisNames();
-            mprisNames.forEach(mprisName => {
-                this._logger.debug('Media Player found:', mprisName);
-                let mpris = new DBus.MprisWrapper(mprisName);
-                let playbackStatus = mpris.getPlaybackStatus();
-                let _mprisPropertiesChanged = this._mprisPropertiesChangedFactory(mprisName);
-                let mprisPropertiesChangedId = mpris.proxy.connect('g-properties-changed', _mprisPropertiesChanged);
-                this._mediaPlayers[mprisName] = {
-                    playbackStatus, mpris, mprisPropertiesChangedId,
-                };
-            });
-            this._logger.debug(this._stringifyMediaPlayers());
-
-            this._connectTrackedDbusSignal(this._dbus.proxy, 'NameOwnerChanged', (_proxy, _sender, [name, oldOwner, newOwner]) => {
-                if (name.startsWith('org.mpris.MediaPlayer2.')) {
-                    let mprisName = name;
-                    if (oldOwner === '') {
-                        this._logger.debug('Media Player created:', mprisName);
-                        let mpris = new DBus.MprisWrapper(mprisName);
-                        let playbackStatus = mpris.getPlaybackStatus();
-                        let _mprisPropertiesChanged = this._mprisPropertiesChangedFactory(mprisName);
-                        let mprisPropertiesChangedId = mpris.proxy.connect('g-properties-changed', _mprisPropertiesChanged);
-                        this._mediaPlayers[mprisName] = {
-                            playbackStatus, mpris, mprisPropertiesChangedId,
-                        };
-                    } else if (newOwner === '') {
-                        this._logger.debug('Media Player destroyed:', mprisName);
-                        let mpris = this._mediaPlayers[mprisName].mpris;
-                        let mprisPropertiesChangedId = this._mediaPlayers[mprisName].mprisPropertiesChangedId;
-                        mpris.proxy.disconnect(mprisPropertiesChangedId);
-                        delete this._mediaPlayers[mprisName];
-                    }
-                    this._logger.debug(this._stringifyMediaPlayers());
-                    this._update();
-                }
+            this._monitor = new Mpris.MprisMonitor({
+                warn: message => this._logger.debug(message),
+                onChanged: ({snapshots}) => this._monitorChanged(snapshots),
             });
 
             this._update();
         }
 
-        _queryMprisNames() {
-            try {
-                // let ret = this._dbus.listNames();
-                // let [names] =  ret.deep_unpack();
-                let [names] = this._dbus.listNames();
-                return names.filter(name => name.startsWith('org.mpris.MediaPlayer2.'));
-            } catch (e) {
-                this._logger.error('Error:', e.message);
-            }
-            return null;
+        _monitorChanged(snapshots) {
+            const previousState = this.states.mprisPlaying;
+            this._refreshPlaybackState(snapshots);
+            if (previousState !== this.states.mprisPlaying)
+                super._update();
         }
 
-        _mprisPropertiesChangedFactory(mprisName) {
-            let thisRef = this;
-            /**
-             * Update cached playback status when an MPRIS player reports a state change.
-             *
-             * @param {Gio.DBusProxy} _proxy the proxy that emitted the change
-             * @param {GLib.Variant} properties changed DBus properties
-             */
-            function _mprisPropertiesChanged(_proxy, properties) {
-                let payload = properties.deep_unpack();
-                if (!payload.hasOwnProperty('PlaybackStatus'))
-                    return;
-                thisRef._mediaPlayers[mprisName].playbackStatus = payload.PlaybackStatus.deep_unpack();
-                thisRef._logger.debug(thisRef._stringifyMediaPlayers());
-                thisRef._update();
-            }
-            return _mprisPropertiesChanged;
-        }
-
-        _stringifyMediaPlayers() {
-            let string = Object.entries(this._mediaPlayers).reduce((acc, [key, value]) => {
-                acc[key] = {playbackStatus: value.playbackStatus};
-                return acc;
-            }, {});
-
-            return JSON.stringify(string, null, 2);
+        _refreshPlaybackState(snapshots = this._monitor?.getSnapshots?.() ?? []) {
+            this.states.mprisPlaying = snapshots.some(
+                properties => properties.playbackStatus === 'Playing'
+            );
+            this._logger.debug(
+                `players=${JSON.stringify(snapshots.map(({name, playbackStatus}) => ({name, playbackStatus})))} ` +
+                `mprisPlaying=${this.states.mprisPlaying}`
+            );
         }
 
         _update() {
-            this.states.mprisPlaying = Object.values(this._mediaPlayers).some(
-                properties => properties.playbackStatus === 'Playing'
-            );
+            this._refreshPlaybackState();
 
             super._update();
         }
@@ -718,15 +666,9 @@ const PauseOnMprisPlayingModule = GObject.registerClass(
         }
 
         disable() {
+            this._monitor?.destroy?.();
+            this._monitor = null;
             super.disable();
-            Object.values(this._mediaPlayers).forEach(
-                mediaPlayer => {
-                    let mpris = mediaPlayer.mpris;
-                    let mprisPropertiesChangedId = mediaPlayer.mprisPropertiesChangedId;
-                    mpris.proxy.disconnect(mprisPropertiesChangedId);
-                }
-            );
-            this._mediaPlayers = {};
         }
     }
 );
@@ -821,13 +763,14 @@ const StopOnApplicationsModule = GObject.registerClass(
         _getWindowMatchInfo(metaWindow) {
             const app = this._windowTracker?.get_window_app(metaWindow) ?? null;
             const trackedWindow = this._trackedWindows.get(metaWindow);
+            const processIdentifiers = trackedWindow?.processIdentifiers ?? [];
             const originalIdentifiers = [
                 app?.get_id?.() ?? '',
                 app?.get_name?.() ?? '',
                 safeGetString(metaWindow, 'get_gtk_application_id'),
                 safeGetString(metaWindow, 'get_wm_class'),
                 safeGetString(metaWindow, 'get_wm_class_instance'),
-                ...(trackedWindow?.processIdentifiers ?? []),
+                ...processIdentifiers,
             ].filter(Boolean);
 
             const identifiers = normalizeMatcherList(originalIdentifiers);
