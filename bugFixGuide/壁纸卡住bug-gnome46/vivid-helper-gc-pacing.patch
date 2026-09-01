@@ -1,0 +1,133 @@
+--- shell/helper/display-helper.js.bak-watchdog	2026-08-26 10:33:24.535952506 +0800
++++ shell/helper/display-helper.js	2026-08-26 10:35:38.007452946 +0800
+@@ -117,6 +117,18 @@
+ const SOCKET_WRITE_WARN_USEC = 16_667;
+ const SOCKET_DIAGNOSTIC_LOG_INTERVAL_USEC = 1_000_000;
+ const CONNECT_FAILURE_LOG_INTERVAL_USEC = 30_000_000;
++/*
++ * gjs drops any JS callback invoked while SpiderMonkey is collecting garbage
++ * ("Attempting to call back into JSAPI during the sweeping phase of GC" /
++ * "Attempting to run a JS callback during garbage collection"). If that hits
++ * the receiver 'frame' signal, the frame has already been consumed from the
++ * socket but show_frame_with_sync() never runs, so the per-frame release
++ * syncobj is never signaled and the producer's buffer queue wedges until its
++ * release reaper force-signals. Keep the heap below SpiderMonkey's incremental
++ * GC trigger with periodic full GCs fired from a safe point, so no GC cycle
++ * is ever in flight when a frame is marshaled.
++ */
++const GC_PACE_INTERVAL_MS = 1_000;
+ 
+ const encoder = new TextEncoder();
+ const decoder = new TextDecoder();
+@@ -2688,6 +2700,7 @@
+         this._coalescedPointerMotionCount = 0;
+         this._cancellable = new Gio.Cancellable();
+         this._reconnectSourceId = 0;
++        this._gcPaceSourceId = 0;
+         this._applicationHoldAcquired = false;
+         this._lastWindowState = null;
+         this._lastMediaState = defaultMediaStatePayload();
+@@ -2704,11 +2717,13 @@
+     start() {
+         this._acquireApplicationHold();
+         this._mediaRuntime.start();
++        this._startGcPacing();
+         this._connect();
+     }
+ 
+     stop() {
+         this._clearReconnect();
++        this._stopGcPacing();
+         this._mediaRuntime.stop();
+         try {
+             this._cancellable.cancel();
+@@ -2718,6 +2733,33 @@
+         this._releaseApplicationHold();
+     }
+ 
++    _startGcPacing() {
++        if (this._gcPaceSourceId)
++            return;
++
++        /*
++         * Full GCs are cheap on this helper's tiny live heap. Running one every
++         * second from a normal main-context callback keeps SpiderMonkey from
++         * starting an incremental GC cycle of its own; see GC_PACE_INTERVAL_MS.
++         */
++        this._gcPaceSourceId = GLib.timeout_add(
++            GLib.PRIORITY_DEFAULT,
++            GC_PACE_INTERVAL_MS,
++            () => {
++                system.gc();
++                return GLib.SOURCE_CONTINUE;
++            }
++        );
++    }
++
++    _stopGcPacing() {
++        if (!this._gcPaceSourceId)
++            return;
++
++        GLib.source_remove(this._gcPaceSourceId);
++        this._gcPaceSourceId = 0;
++    }
++
+     _acquireApplicationHold() {
+         if (this._applicationHoldAcquired)
+             return;
+@@ -2776,6 +2818,15 @@
+                     if (error.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                         return;
+ 
++                    /*
++                     * If _startReceiver() threw after connecting its signals,
++                     * the receiver would otherwise be abandoned to the GC with
++                     * live JS signal closures; a sweep-time finalize of that
++                     * object is exactly what makes gjs drop JS callbacks with
++                     * "Attempting to call back into JSAPI during the sweeping
++                     * phase of GC". Tear it down deterministically instead.
++                     */
++                    this._teardownReceiver();
+                     this._logConnectFailure(error);
+                     this._scheduleReconnect();
+                 }
+@@ -2826,22 +2877,27 @@
+             throw new Error('display consumer receiver failed to start');
+     }
+ 
+-    _closeConnection(reconnect) {
+-        this._mediaRuntime.setTransportConnected(false);
+-        if (this._receiver) {
+-            for (const id of this._receiverSignalIds) {
+-                try {
+-                    this._receiver.disconnect(id);
+-                } catch (_e) {
+-                }
+-            }
+-            this._receiverSignalIds = [];
++    _teardownReceiver() {
++        if (!this._receiver)
++            return;
++
++        for (const id of this._receiverSignalIds) {
+             try {
+-                this._receiver.stop();
++                this._receiver.disconnect(id);
+             } catch (_e) {
+             }
+-            this._receiver = null;
+         }
++        this._receiverSignalIds = [];
++        try {
++            this._receiver.stop();
++        } catch (_e) {
++        }
++        this._receiver = null;
++    }
++
++    _closeConnection(reconnect) {
++        this._mediaRuntime.setTransportConnected(false);
++        this._teardownReceiver();
+ 
+         for (const output of this._outputs)
+             output.clear();

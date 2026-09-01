@@ -1,0 +1,86 @@
+--- shell/integration/gnomeShellOverride.js.bak-watchdog	2026-07-09 10:11:38.000000000 +0800
++++ shell/integration/gnomeShellOverride.js	2026-08-26 15:05:10.116699138 +0800
+@@ -44,11 +44,16 @@
+         this._wallpaperActors = new Set();
+         this._loggedHiddenHelperApps = new Set();
+         this._loggedMixedHelperApps = new Set();
++        this._shutdownId = 0;
+     }
+ 
+-    _reloadBackgrounds() {
++    _destroyWallpaperActors() {
+         this._wallpaperActors.forEach(actor => actor.destroy());
+         this._wallpaperActors.clear();
++    }
++
++    _reloadBackgrounds() {
++        this._destroyWallpaperActors();
+ 
+         const tryReloadStep = (label, callback) => {
+             try {
+@@ -108,14 +113,31 @@
+                 return function () {
+                     const backgroundActor = originalMethod.call(this);
+ 
+-                    // We need to pass radius to actors, so save a ref in bgManager.
+-                    this.videoActor = new Wallpaper.LiveWallpaper(
+-                        backgroundActor,
+-                        thisRef._extension.displayHelper
+-                    );
+-                    thisRef._wallpaperActors.add(this.videoActor);
++                    /*
++                     * A failed LiveWallpaper construction must not escape into
++                     * Shell's background bookkeeping: the original method already
++                     * added backgroundActor to its container, so an untracked
++                     * wallpaper actor left behind here would only be reclaimed by
++                     * the GC, where gjs blocks JS destroy callbacks during the
++                     * sweeping phase.
++                     */
++                    let videoActor = null;
++                    try {
++                        // We need to pass radius to actors, so save a ref in bgManager.
++                        videoActor = new Wallpaper.LiveWallpaper(
++                            backgroundActor,
++                            thisRef._extension.displayHelper
++                        );
++                    } catch (error) {
++                        logger.warn(`failed to create live wallpaper actor ` +
++                            `monitor=${backgroundActor.monitor}: ${error}`);
++                        return backgroundActor;
++                    }
++
++                    this.videoActor = videoActor;
++                    thisRef._wallpaperActors.add(videoActor);
+ 
+-                    this.videoActor.connect('destroy', actor => {
++                    videoActor.connect('destroy', actor => {
+                         thisRef._wallpaperActors.delete(actor);
+                     });
+ 
+@@ -266,10 +288,26 @@
+             }
+         );
+ 
++        /*
++         * GNOME Shell never disables extensions during session shutdown
++         * (ExtensionSystem connects 'shutdown' only to remove its crash
++         * recovery flag file), so live wallpaper actors would otherwise reach
++         * the final GC sweep with JS destroy handlers still connected. gjs
++         * blocks those callbacks while sweeping and retries them on every
++         * further sweep, which is what stalled Shell's own teardown. Destroy
++         * the actors explicitly while callbacks still work.
++         */
++        this._shutdownId = global.connect('shutdown', () => this._destroyWallpaperActors());
++
+         this._reloadBackgrounds();
+     }
+ 
+     disable() {
++        if (this._shutdownId) {
++            global.disconnect(this._shutdownId);
++            this._shutdownId = 0;
++        }
++
+         this._injectionManager.clear();
+         this._reloadBackgrounds();
+     }
